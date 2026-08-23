@@ -2,17 +2,25 @@
 
 from __future__ import annotations
 
-import json
 import math
 import struct
-import uuid
-from typing import Iterable, Mapping
+from typing import Iterable
+
+from ..api import contracts as _contracts
+
+# Compatibility exports for existing callers. Shared event encoding now lives
+# in ``openflight.api.contracts`` and is used by both BLE and SSE; BLE UUIDs and
+# binary framing remain owned by this module and are fully supported.
+SCHEMA_VERSION = _contracts.SCHEMA_VERSION
+build_club_event = _contracts.build_club_event
+build_shot_event = _contracts.build_shot_event
+encode_club_event = _contracts.encode_club_event
+encode_shot_event = _contracts.encode_shot_event
 
 SERVICE_UUID = "B6F633F2-E6E3-45AE-84B4-968ECCA2D9C7"
 SHOT_CHARACTERISTIC_UUID = "2B28F67E-9011-41D2-98ED-562B47D7A5E4"
 CONTROL_CHARACTERISTIC_UUID = "7E3B5D6C-7F10-4D4A-9C39-25E2B77F4A11"
 
-SCHEMA_VERSION = 1
 FRAME_VERSION = 1
 FRAME_SIZE = 20
 _HEADER = struct.Struct(">BHBB")
@@ -20,64 +28,6 @@ HEADER_SIZE = _HEADER.size
 FRAGMENT_PAYLOAD_SIZE = FRAME_SIZE - HEADER_SIZE
 MAX_FRAGMENT_COUNT = 255
 MAX_MESSAGE_SIZE = FRAGMENT_PAYLOAD_SIZE * MAX_FRAGMENT_COUNT
-
-_OPTIONAL_SHOT_FIELDS = (
-    "club_speed_mph",
-    "smash_factor",
-    "launch_angle_vertical",
-    "launch_angle_horizontal",
-    "spin_rpm",
-    "club_path_deg",
-    "spin_axis_deg",
-)
-
-
-def build_club_event(club: str) -> dict:
-    """Build the V1 event broadcast whenever the authoritative club changes."""
-    if not isinstance(club, str) or not club:
-        raise ValueError("Club must be a non-empty string")
-    return {
-        "schema_version": SCHEMA_VERSION,
-        "type": "club_changed",
-        "club": club,
-    }
-
-
-def encode_club_event(club: str) -> bytes:
-    """Encode a club-state event as deterministic, compact UTF-8 JSON."""
-    return json.dumps(
-        build_club_event(club),
-        allow_nan=False,
-        ensure_ascii=True,
-        separators=(",", ":"),
-        sort_keys=True,
-    ).encode("utf-8")
-
-
-def build_shot_event(shot_data: Mapping, *, event_id: str | None = None) -> dict:
-    """Build the stable, display-focused V1 payload from ``shot_to_dict`` output."""
-    event = {
-        "schema_version": SCHEMA_VERSION,
-        "event_id": event_id or str(uuid.uuid4()),
-        "timestamp": shot_data["timestamp"],
-        "club": shot_data["club"],
-        "ball_speed_mph": shot_data["ball_speed_mph"],
-        "estimated_carry_yards": shot_data["estimated_carry_yards"],
-    }
-    event.update({field: shot_data.get(field) for field in _OPTIONAL_SHOT_FIELDS})
-    return event
-
-
-def encode_shot_event(shot_data: Mapping, *, event_id: str | None = None) -> bytes:
-    """Encode a shot event as deterministic, compact UTF-8 JSON."""
-    event = build_shot_event(shot_data, event_id=event_id)
-    return json.dumps(
-        event,
-        allow_nan=False,
-        ensure_ascii=True,
-        separators=(",", ":"),
-        sort_keys=True,
-    ).encode("utf-8")
 
 
 def fragment_payload(payload: bytes, *, sequence: int) -> list[bytes]:

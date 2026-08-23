@@ -18,10 +18,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
-from flask import Flask, Response, request, send_from_directory
+from flask import Flask, Response, send_from_directory
 from flask_cors import CORS
 from flask_socketio import SocketIO
 
+from .api.contracts import API_VERSION, SCHEMA_VERSION
+from .api.dependencies import ApiDependencies
+from .api.routes import create_api_blueprint
 from .ballistics import resolve_launch, simulate
 from .launch_monitor import SPIN_CONFIDENCE_HIGH, ClubType, Shot
 from .ops243 import (
@@ -39,7 +42,7 @@ from .phone_orientation import (
 )
 from .rolling_buffer.monitor import estimate_carry_with_spin, get_optimal_spin_for_ball_speed
 from .session_logger import get_session_logger, init_session_logger, log_session_error
-from .shot_stream import SSE_MIMETYPE, ShotStreamBroker, ShotStreamFull
+from .shot_stream import ShotStreamBroker
 from .sim import (
     IncompleteShotError,
     PlayerState as SimPlayerState,
@@ -979,21 +982,17 @@ def display():
     return send_from_directory(_react_app_dir(), "index.html")
 
 
-@app.route("/api/calibration/iwr6843/orientation", methods=["GET", "POST"])
-def api_iwr6843_orientation_calibration():
-    """Read or apply a gravity-referenced phone measurement to TI mount tilt."""
+def current_iwr6843_orientation_calibration(_payload=None):
+    """Return the current gravity-referenced TI mount calibration."""
     if iwr6843_runtime is None:
         return {"error": "TI IWR6843 radar is not enabled"}, 409
 
-    if request.method == "GET":
-        return {
-            "status": "ready",
-            "configured_iwr_tilt_deg": round(math.degrees(iwr6843_runtime.calibration.tilt_rad), 4),
-            "azimuth_offset_deg": round(iwr6843_runtime.azimuth_offset_deg, 4),
-            "calibration": iwr6843_runtime_config.get("phone_orientation_calibration"),
-        }
-
-    return apply_iwr6843_orientation_calibration(request.get_json(silent=True))
+    return {
+        "status": "ready",
+        "configured_iwr_tilt_deg": round(math.degrees(iwr6843_runtime.calibration.tilt_rad), 4),
+        "azimuth_offset_deg": round(iwr6843_runtime.azimuth_offset_deg, 4),
+        "calibration": iwr6843_runtime_config.get("phone_orientation_calibration"),
+    }
 
 
 def apply_iwr6843_orientation_calibration(payload):
@@ -1150,12 +1149,36 @@ def dispatch_phone_control_command(command_type, payload):
     return handler(payload)
 
 
-@app.route("/api/club", methods=["GET", "POST"])
-def api_club_selection():
-    """Read or set the active club over Wi-Fi."""
-    if request.method == "GET":
-        return current_club_selection()
-    return apply_club_selection(request.get_json(silent=True))
+def current_api_capabilities():
+    """Describe API features available in the current server configuration."""
+    capabilities = ["club.read"]
+    if monitor is not None:
+        capabilities.append("club.write")
+    capabilities.append("events.stream")
+    if iwr6843_runtime is not None:
+        capabilities.extend(
+            [
+                "calibrations.iwr6843.orientation.read",
+                "calibrations.iwr6843.orientation.write",
+            ]
+        )
+    if ble_publisher is not None:
+        capabilities.append("events.ble")
+    return {
+        "api_version": API_VERSION,
+        "event_schema_versions": [SCHEMA_VERSION],
+        "capabilities": capabilities,
+    }
+
+
+def current_api_state():
+    """Return authoritative resources needed when a client connects."""
+    with club_selection_lock:
+        club_value = active_club.value
+    return {
+        "api_version": API_VERSION,
+        "club": {"value": club_value},
+    }
 
 
 @app.route("/<path:path>")
@@ -1164,8 +1187,7 @@ def static_files(path):
     return send_from_directory(app.static_folder, path)
 
 
-@app.route("/api/shutdown", methods=["POST"])
-def api_shutdown():
+def request_shutdown():
     """Cleanly shut down the server via REST API."""
     logger.info("[SERVER] Shutdown requested via REST API")
     threading.Thread(target=_shutdown_process_after_delay, daemon=True).start()
@@ -1621,22 +1643,20 @@ def camera_stream():
     return Response(generate_mjpeg(), mimetype="multipart/x-mixed-replace; boundary=frame")
 
 
-@app.route("/api/shots/stream")
-def shots_stream():
-    """Stream completed shots to the iOS app as Server-Sent Events."""
-    try:
-        subscriber = shot_stream.subscribe()
-    except ShotStreamFull as exc:
-        logger.warning("[SERVER] Refused shot stream client: %s", exc)
-        return str(exc), 503
-
-    response = Response(shot_stream.frames(subscriber), mimetype=SSE_MIMETYPE)
-    response.headers["Cache-Control"] = "no-cache"
-    response.headers["X-Accel-Buffering"] = "no"
-    # Covers the case where the response is discarded without ever being
-    # iterated; unsubscribing twice is a no-op.
-    response.call_on_close(lambda: shot_stream.unsubscribe(subscriber))
-    return response
+app.register_blueprint(
+    create_api_blueprint(
+        ApiDependencies(
+            capabilities=current_api_capabilities,
+            state=current_api_state,
+            read_club=current_club_selection,
+            write_club=apply_club_selection,
+            read_orientation_calibration=current_iwr6843_orientation_calibration,
+            write_orientation_calibration=apply_iwr6843_orientation_calibration,
+            event_stream=lambda: shot_stream,
+            shutdown=request_shutdown,
+        )
+    )
+)
 
 
 @socketio.on("toggle_camera")

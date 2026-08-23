@@ -16,7 +16,7 @@ from typing import Iterator, Mapping
 
 # The wire payload is the same versioned V1 shot event the BLE transport sends,
 # so both transports are validated against one contract and one test fixture.
-from .ble.protocol import encode_club_event, encode_shot_event
+from .api.contracts import encode_club_event, encode_shot_event
 
 logger = logging.getLogger(__name__)
 
