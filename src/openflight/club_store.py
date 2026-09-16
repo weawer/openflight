@@ -158,7 +158,9 @@ class ClubStore:
             if len(self._clubs) >= MAX_CUSTOM_CLUBS:
                 return None
             self._clubs.append(club)
-        self.save()
+            if not self._save_locked():
+                self._clubs.remove(club)
+                return None
         return club
 
     def update(self, club_id: Any, **changes: Any) -> Optional[CustomClub]:
@@ -177,8 +179,11 @@ class ClubStore:
             updated = CustomClub.from_dict(raw)
             if updated is None:
                 return None
-            self._clubs[self._clubs.index(current)] = updated
-        self.save()
+            index = self._clubs.index(current)
+            self._clubs[index] = updated
+            if not self._save_locked():
+                self._clubs[index] = current
+                return None
         return updated
 
     def remove(self, club_id: Any) -> bool:
@@ -187,14 +192,21 @@ class ClubStore:
             club = self._find(club_id)
             if club is None:
                 return False
-            self._clubs.remove(club)
-        self.save()
+            index = self._clubs.index(club)
+            self._clubs.pop(index)
+            if not self._save_locked():
+                self._clubs.insert(index, club)
+                return False
         return True
 
-    def save(self) -> None:
-        """Write all custom clubs atomically without raising into callers."""
+    def save(self) -> bool:
+        """Write all custom clubs atomically and report whether it succeeded."""
         with self._lock:
-            payload = self._payload()
+            return self._save_locked()
+
+    def _save_locked(self) -> bool:
+        """Persist the current catalog while the caller holds ``self._lock``."""
+        payload = self._payload()
         temp_path = self._path.with_name(f"{self._path.name}.{uuid.uuid4().hex}.tmp")
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
@@ -203,12 +215,14 @@ class ClubStore:
                 handle.flush()
                 os.fsync(handle.fileno())
             os.replace(temp_path, self._path)
+            return True
         except OSError as error:
             logger.error("[clubs] could not save custom clubs to %s: %s", self._path, error)
             try:
                 temp_path.unlink()
             except OSError:
                 pass
+            return False
 
     def _payload(self) -> dict:
         return {

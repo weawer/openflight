@@ -1,4 +1,5 @@
 import json
+import threading
 
 from openflight.club_store import ClubStore, CustomClub
 from openflight.launch_monitor import ClubType
@@ -121,3 +122,102 @@ def test_skips_invalid_and_duplicate_records_on_load(tmp_path):
     )
 
     assert ClubStore(path).list() == [CustomClub.from_dict(valid)]
+
+
+def test_add_rolls_back_when_persistence_fails(tmp_path, monkeypatch):
+    path = tmp_path / "clubs.json"
+    store = ClubStore(path)
+    original = path.read_text(encoding="utf-8")
+    monkeypatch.setattr(
+        "openflight.club_store.os.replace",
+        lambda *_args: (_ for _ in ()).throw(OSError("disk full")),
+    )
+
+    added = store.add(
+        name="P790 7 Iron",
+        label="7i",
+        group="Irons",
+        base_type=ClubType.IRON_7,
+        loft_deg=30.5,
+    )
+
+    assert added is None
+    assert store.list() == []
+    assert path.read_text(encoding="utf-8") == original
+
+
+def test_update_and_remove_roll_back_when_persistence_fails(tmp_path, monkeypatch):
+    path = tmp_path / "clubs.json"
+    store = ClubStore(path)
+    added = store.add(
+        name="Original",
+        label="7i",
+        group="Irons",
+        base_type=ClubType.IRON_7,
+        loft_deg=34,
+    )
+    assert added is not None
+    original = path.read_text(encoding="utf-8")
+    monkeypatch.setattr(
+        "openflight.club_store.os.replace",
+        lambda *_args: (_ for _ in ()).throw(OSError("disk full")),
+    )
+
+    assert store.update(added.id, name="Changed") is None
+    assert store.get(added.id) == added
+    assert store.remove(added.id) is False
+    assert store.get(added.id) == added
+    assert path.read_text(encoding="utf-8") == original
+
+
+def test_save_reports_failure(tmp_path, monkeypatch):
+    store = ClubStore(tmp_path / "clubs.json")
+    monkeypatch.setattr(
+        "openflight.club_store.os.replace",
+        lambda *_args: (_ for _ in ()).throw(OSError("disk full")),
+    )
+
+    assert store.save() is False
+
+
+def test_save_holds_lock_through_atomic_replace(tmp_path, monkeypatch):
+    store = ClubStore(tmp_path / "clubs.json")
+    replace_started = threading.Event()
+    release_replace = threading.Event()
+    mutation_finished = threading.Event()
+    real_replace = __import__("os").replace
+    calls = 0
+
+    def blocking_replace(source, destination):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            replace_started.set()
+            assert release_replace.wait(timeout=2)
+        real_replace(source, destination)
+
+    monkeypatch.setattr("openflight.club_store.os.replace", blocking_replace)
+    save_thread = threading.Thread(target=store.save)
+    save_thread.start()
+    assert replace_started.wait(timeout=2)
+
+    def add_club():
+        store.add(
+            name="Blocked",
+            label="B",
+            group="Irons",
+            base_type=ClubType.IRON_7,
+            loft_deg=34,
+        )
+        mutation_finished.set()
+
+    mutation_thread = threading.Thread(target=add_club)
+    mutation_thread.start()
+    assert not mutation_finished.wait(timeout=0.1)
+    release_replace.set()
+    save_thread.join(timeout=2)
+    mutation_thread.join(timeout=2)
+
+    assert not save_thread.is_alive()
+    assert not mutation_thread.is_alive()
+    assert mutation_finished.is_set()
