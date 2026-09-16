@@ -25,7 +25,11 @@ from flask_cors import CORS
 from flask_socketio import SocketIO
 
 from .ballistics import resolve_launch, simulate
-from .club_physics import get_club_physics
+from .club_physics import (
+    SHOT_SIMULATION_DEFAULTS,
+    get_club_physics,
+    get_club_simulation_profile,
+)
 from .launch_monitor import SPIN_CONFIDENCE_HIGH, ClubType, Shot, summarize_shots
 from .ops243 import (
     UART_BAUD_COMMANDS,
@@ -3920,81 +3924,6 @@ def stop_monitor():
 class MockLaunchMonitor:
     """Mock launch monitor for UI development without radar hardware."""
 
-    # TrackMan averages for amateur golfers: (avg_ball_speed, std_dev, smash_factor)
-    _CLUB_BALL_SPEEDS = {
-        ClubType.DRIVER: (143, 12, 1.45),
-        ClubType.WOOD_3: (135, 10, 1.42),
-        ClubType.WOOD_5: (128, 10, 1.40),
-        ClubType.WOOD_7: (122, 9, 1.40),
-        ClubType.HYBRID_3: (123, 9, 1.39),
-        ClubType.HYBRID_5: (118, 9, 1.37),
-        ClubType.HYBRID_7: (112, 8, 1.35),
-        ClubType.HYBRID_9: (106, 8, 1.33),
-        ClubType.IRON_2: (120, 9, 1.35),
-        ClubType.IRON_3: (118, 9, 1.35),
-        ClubType.IRON_4: (114, 8, 1.33),
-        ClubType.IRON_5: (110, 8, 1.31),
-        ClubType.IRON_6: (105, 7, 1.29),
-        ClubType.IRON_7: (100, 7, 1.27),
-        ClubType.IRON_8: (94, 6, 1.25),
-        ClubType.IRON_9: (88, 6, 1.23),
-        ClubType.PW: (82, 5, 1.21),
-        ClubType.GW: (76, 5, 1.20),
-        ClubType.SW: (73, 5, 1.19),
-        ClubType.LW: (70, 5, 1.18),
-        ClubType.UNKNOWN: (120, 15, 1.35),
-    }
-
-    # Spin rates (avg_rpm, std_dev) — drivers: low spin, wedges: high spin
-    _CLUB_SPIN = {
-        ClubType.DRIVER: (2700, 400),
-        ClubType.WOOD_3: (3200, 400),
-        ClubType.WOOD_5: (3700, 400),
-        ClubType.WOOD_7: (4200, 500),
-        ClubType.HYBRID_3: (3800, 400),
-        ClubType.HYBRID_5: (4200, 500),
-        ClubType.HYBRID_7: (4600, 500),
-        ClubType.HYBRID_9: (5000, 500),
-        ClubType.IRON_2: (3800, 400),
-        ClubType.IRON_3: (4100, 400),
-        ClubType.IRON_4: (4500, 500),
-        ClubType.IRON_5: (5000, 500),
-        ClubType.IRON_6: (5500, 600),
-        ClubType.IRON_7: (6000, 600),
-        ClubType.IRON_8: (7000, 700),
-        ClubType.IRON_9: (7800, 800),
-        ClubType.PW: (8500, 800),
-        ClubType.GW: (9200, 900),
-        ClubType.SW: (9800, 1000),
-        ClubType.LW: (10200, 1000),
-        ClubType.UNKNOWN: (5000, 800),
-    }
-
-    # Launch angles in degrees (avg, std_dev) — drivers: low, wedges: high
-    _CLUB_LAUNCH = {
-        ClubType.DRIVER: (11.0, 2.0),
-        ClubType.WOOD_3: (12.5, 2.0),
-        ClubType.WOOD_5: (14.0, 2.0),
-        ClubType.WOOD_7: (15.5, 2.0),
-        ClubType.HYBRID_3: (13.5, 2.0),
-        ClubType.HYBRID_5: (15.0, 2.0),
-        ClubType.HYBRID_7: (16.5, 2.0),
-        ClubType.HYBRID_9: (18.0, 2.5),
-        ClubType.IRON_2: (13.0, 2.0),
-        ClubType.IRON_3: (14.5, 2.0),
-        ClubType.IRON_4: (16.0, 2.0),
-        ClubType.IRON_5: (17.5, 2.0),
-        ClubType.IRON_6: (19.0, 2.5),
-        ClubType.IRON_7: (20.5, 2.5),
-        ClubType.IRON_8: (23.0, 3.0),
-        ClubType.IRON_9: (25.5, 3.0),
-        ClubType.PW: (28.0, 3.0),
-        ClubType.GW: (30.0, 3.5),
-        ClubType.SW: (32.0, 4.0),
-        ClubType.LW: (35.0, 4.0),
-        ClubType.UNKNOWN: (18.0, 3.0),
-    }
-
     def __init__(self):
         """Initialize mock monitor."""
         self._shots: List[Shot] = []
@@ -4022,26 +3951,48 @@ class MockLaunchMonitor:
 
     def simulate_shot(self, ball_speed: float = None):
         """Simulate a shot for testing using realistic TrackMan-based values."""
-        avg_speed, std_dev, smash = self._CLUB_BALL_SPEEDS.get(self._current_club, (120, 15, 1.35))
+        physics = get_club_physics(self._current_club)
+        profile = get_club_simulation_profile(self._current_club)
+        defaults = SHOT_SIMULATION_DEFAULTS
 
         if ball_speed is None:
-            ball_speed = max(50, min(200, random.gauss(avg_speed, std_dev)))
+            ball_speed = max(
+                defaults.min_ball_speed_mph,
+                min(
+                    defaults.max_ball_speed_mph,
+                    random.gauss(
+                        physics.average_ball_speed_mph,
+                        profile.ball_speed_std_dev_mph,
+                    ),
+                ),
+            )
 
-        smash_factor = smash + random.uniform(-0.03, 0.03)
+        smash_factor = profile.average_smash + random.uniform(
+            -defaults.smash_variation, defaults.smash_variation
+        )
         club_speed = ball_speed / smash_factor
 
-        # Generate spin
-        avg_spin, spin_std = self._CLUB_SPIN.get(self._current_club, (5000, 800))
-        spin_rpm = max(1000, random.gauss(avg_spin, spin_std))
+        spin_rpm = max(
+            defaults.min_spin_rpm,
+            random.gauss(physics.typical_spin_rpm, profile.spin_std_dev_rpm),
+        )
 
-        # Generate launch angle (vertical always positive, minimum 5°)
-        avg_launch, launch_std = self._CLUB_LAUNCH.get(self._current_club, (18.0, 3.0))
-        launch_v = max(5.0, random.gauss(avg_launch, launch_std))
-        launch_h = random.gauss(0, 2.0)
-        launch_confidence = round(random.uniform(0.5, 0.95), 2)
+        launch_v = max(
+            defaults.min_launch_deg,
+            random.gauss(physics.optimal_launch_deg, profile.launch_std_dev_deg),
+        )
+        launch_h = random.gauss(0, defaults.horizontal_launch_std_dev_deg)
+        launch_confidence = round(
+            random.uniform(defaults.confidence_min, defaults.confidence_max), 2
+        )
 
-        # Generate club angle of attack (negative for irons, near-zero for driver)
-        club_aoa = round(random.gauss(-4.0, 2.5), 1)
+        club_aoa = round(
+            random.gauss(
+                defaults.angle_of_attack_mean_deg,
+                defaults.angle_of_attack_std_dev_deg,
+            ),
+            1,
+        )
 
         shot = Shot(
             ball_speed_mph=ball_speed,
@@ -4049,7 +4000,7 @@ class MockLaunchMonitor:
             timestamp=datetime.now(),
             club=self._current_club,
             spin_rpm=spin_rpm,
-            spin_confidence=random.choice([0.3, 0.6, 0.7, 0.9]),
+            spin_confidence=random.choice(defaults.spin_confidence_choices),
             launch_angle_vertical=round(launch_v, 1),
             launch_angle_horizontal=round(launch_h, 1),
             launch_angle_confidence=launch_confidence,
@@ -4059,8 +4010,21 @@ class MockLaunchMonitor:
             launch_angle_horizontal_source="mock",
             angle_source="mock",
             club_angle_deg=club_aoa,
-            club_path_deg=round(random.uniform(-5.0, 5.0), 1),
-            spin_axis_deg=round(launch_h - random.uniform(-5.0, 5.0), 1),
+            club_path_deg=round(
+                random.uniform(
+                    -defaults.club_path_max_abs_deg,
+                    defaults.club_path_max_abs_deg,
+                ),
+                1,
+            ),
+            spin_axis_deg=round(
+                launch_h
+                - random.uniform(
+                    -defaults.spin_axis_error_max_abs_deg,
+                    defaults.spin_axis_error_max_abs_deg,
+                ),
+                1,
+            ),
             mode="mock",
         )
 

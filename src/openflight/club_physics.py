@@ -19,6 +19,35 @@ class ClubPhysics:
     optimal_smash: float
 
 
+@dataclass(frozen=True)
+class ClubSimulationProfile:
+    """Variability inputs used to generate realistic development shots."""
+
+    ball_speed_std_dev_mph: float
+    average_smash: float
+    spin_std_dev_rpm: float
+    launch_std_dev_deg: float
+
+
+@dataclass(frozen=True)
+class ShotSimulationDefaults:
+    """Shared bounds and distributions for development shot generation."""
+
+    min_ball_speed_mph: float = 50
+    max_ball_speed_mph: float = 200
+    smash_variation: float = 0.03
+    min_spin_rpm: float = 1000
+    min_launch_deg: float = 5.0
+    horizontal_launch_std_dev_deg: float = 2.0
+    confidence_min: float = 0.5
+    confidence_max: float = 0.95
+    angle_of_attack_mean_deg: float = -4.0
+    angle_of_attack_std_dev_deg: float = 2.5
+    spin_confidence_choices: tuple[float, ...] = (0.3, 0.6, 0.7, 0.9)
+    club_path_max_abs_deg: float = 5.0
+    spin_axis_error_max_abs_deg: float = 5.0
+
+
 CLUB_PHYSICS: dict[ClubType, ClubPhysics] = {
     #                           loft launch speed sensitivity spin  smash
     ClubType.DRIVER: ClubPhysics(10.5, 11.0, 143, 0.15, 2700, 1.48),
@@ -45,6 +74,40 @@ CLUB_PHYSICS: dict[ClubType, ClubPhysics] = {
 }
 
 
+CLUB_SIMULATION_PROFILES: dict[ClubType, ClubSimulationProfile] = {
+    #                           speed sd  smash  spin sd  launch sd
+    ClubType.DRIVER: ClubSimulationProfile(12, 1.45, 400, 2.0),
+    ClubType.WOOD_3: ClubSimulationProfile(10, 1.42, 400, 2.0),
+    ClubType.WOOD_5: ClubSimulationProfile(10, 1.40, 400, 2.0),
+    ClubType.WOOD_7: ClubSimulationProfile(9, 1.40, 500, 2.0),
+    ClubType.HYBRID_3: ClubSimulationProfile(9, 1.39, 400, 2.0),
+    ClubType.HYBRID_5: ClubSimulationProfile(9, 1.37, 500, 2.0),
+    ClubType.HYBRID_7: ClubSimulationProfile(8, 1.35, 500, 2.0),
+    ClubType.HYBRID_9: ClubSimulationProfile(8, 1.33, 500, 2.5),
+    ClubType.IRON_2: ClubSimulationProfile(9, 1.35, 400, 2.0),
+    ClubType.IRON_3: ClubSimulationProfile(9, 1.35, 400, 2.0),
+    ClubType.IRON_4: ClubSimulationProfile(8, 1.33, 500, 2.0),
+    ClubType.IRON_5: ClubSimulationProfile(8, 1.31, 500, 2.0),
+    ClubType.IRON_6: ClubSimulationProfile(7, 1.29, 600, 2.5),
+    ClubType.IRON_7: ClubSimulationProfile(7, 1.27, 600, 2.5),
+    ClubType.IRON_8: ClubSimulationProfile(6, 1.25, 700, 3.0),
+    ClubType.IRON_9: ClubSimulationProfile(6, 1.23, 800, 3.0),
+    ClubType.PW: ClubSimulationProfile(5, 1.21, 800, 3.0),
+    ClubType.GW: ClubSimulationProfile(5, 1.20, 900, 3.5),
+    ClubType.SW: ClubSimulationProfile(5, 1.19, 1000, 4.0),
+    ClubType.LW: ClubSimulationProfile(5, 1.18, 1000, 4.0),
+    ClubType.UNKNOWN: ClubSimulationProfile(15, 1.35, 800, 3.0),
+}
+
+
+SHOT_SIMULATION_DEFAULTS = ShotSimulationDefaults()
+
+
 def get_club_physics(club_type: ClubType) -> ClubPhysics:
     """Return canonical defaults, falling back to the unknown category."""
     return CLUB_PHYSICS.get(club_type, CLUB_PHYSICS[ClubType.UNKNOWN])
+
+
+def get_club_simulation_profile(club_type: ClubType) -> ClubSimulationProfile:
+    """Return mock generation inputs, falling back to the unknown category."""
+    return CLUB_SIMULATION_PROFILES.get(club_type, CLUB_SIMULATION_PROFILES[ClubType.UNKNOWN])
