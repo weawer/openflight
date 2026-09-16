@@ -25,6 +25,7 @@ from flask_cors import CORS
 from flask_socketio import SocketIO
 
 from .ballistics import resolve_launch, simulate
+from .club_physics import get_club_physics
 from .launch_monitor import SPIN_CONFIDENCE_HIGH, ClubType, Shot, summarize_shots
 from .ops243 import (
     UART_BAUD_COMMANDS,
@@ -432,57 +433,6 @@ def _shutdown_process_after_delay(delay_s: float = 0.5) -> None:
     os._exit(0)
 
 
-# Baseline launch angles by club (TrackMan data)
-# Format: (avg_launch_deg, avg_ball_speed_mph, deg_per_mph_deviation)
-_CLUB_LAUNCH_MODEL = {
-    ClubType.DRIVER: (11.0, 143, 0.15),
-    ClubType.WOOD_3: (12.5, 135, 0.18),
-    ClubType.WOOD_5: (14.0, 128, 0.20),
-    ClubType.WOOD_7: (15.5, 122, 0.20),
-    ClubType.HYBRID_3: (13.5, 123, 0.22),
-    ClubType.HYBRID_5: (15.0, 118, 0.22),
-    ClubType.HYBRID_7: (16.5, 112, 0.25),
-    ClubType.HYBRID_9: (18.0, 106, 0.25),
-    ClubType.IRON_2: (13.0, 120, 0.25),
-    ClubType.IRON_3: (14.5, 118, 0.25),
-    ClubType.IRON_4: (16.0, 114, 0.28),
-    ClubType.IRON_5: (17.5, 110, 0.28),
-    ClubType.IRON_6: (19.0, 105, 0.30),
-    ClubType.IRON_7: (20.5, 100, 0.30),
-    ClubType.IRON_8: (23.0, 94, 0.30),
-    ClubType.IRON_9: (25.5, 88, 0.30),
-    ClubType.PW: (28.0, 82, 0.30),
-    ClubType.GW: (30.0, 76, 0.30),
-    ClubType.SW: (32.0, 73, 0.30),
-    ClubType.LW: (35.0, 70, 0.30),
-    ClubType.UNKNOWN: (18.0, 120, 0.25),
-}
-
-# Optimal smash factor by club type (ball_speed / club_speed)
-_OPTIMAL_SMASH = {
-    ClubType.DRIVER: 1.48,
-    ClubType.WOOD_3: 1.44,
-    ClubType.WOOD_5: 1.42,
-    ClubType.WOOD_7: 1.42,
-    ClubType.HYBRID_3: 1.39,
-    ClubType.HYBRID_5: 1.38,
-    ClubType.HYBRID_7: 1.37,
-    ClubType.HYBRID_9: 1.36,
-    ClubType.IRON_2: 1.37,
-    ClubType.IRON_3: 1.36,
-    ClubType.IRON_4: 1.35,
-    ClubType.IRON_5: 1.35,
-    ClubType.IRON_6: 1.34,
-    ClubType.IRON_7: 1.34,
-    ClubType.IRON_8: 1.33,
-    ClubType.IRON_9: 1.33,
-    ClubType.PW: 1.25,
-    ClubType.GW: 1.23,
-    ClubType.SW: 1.22,
-    ClubType.LW: 1.20,
-    ClubType.UNKNOWN: 1.35,
-}
-
 # Max smash factor adjustment in degrees (clamped to prevent floor-dependence)
 _MAX_SMASH_ADJ_LOW = -3.0  # max degrees to subtract for thin/toe hits
 _MAX_SMASH_ADJ_HIGH = 2.0  # max degrees to add for high-face hits
@@ -531,19 +481,18 @@ def estimate_launch_angle(
 
     Returns (vertical_angle, confidence).
     """
-    avg_launch, avg_speed, deg_per_mph = _CLUB_LAUNCH_MODEL.get(club, (18.0, 120, 0.25))
+    physics = get_club_physics(club)
 
     # Slower than average → higher launch, faster → lower launch
-    speed_delta = ball_speed_mph - avg_speed
-    adjustment = -speed_delta * deg_per_mph
+    speed_delta = ball_speed_mph - physics.average_ball_speed_mph
+    adjustment = -speed_delta * physics.launch_deg_per_mph
 
     confidence = 0.2
 
     # Smash factor adjustment: compare actual smash to optimal for this club
     if club_speed_mph is not None and club_speed_mph > 0:
         smash_factor = ball_speed_mph / club_speed_mph
-        optimal_smash = _OPTIMAL_SMASH.get(club, 1.35)
-        smash_delta = smash_factor - optimal_smash
+        smash_delta = smash_factor - physics.optimal_smash
 
         if smash_delta < 0:
             smash_adj = max(_MAX_SMASH_ADJ_LOW, smash_delta * 100 * _SMASH_DEG_PER_HUNDREDTH_LOW)
@@ -566,7 +515,7 @@ def estimate_launch_angle(
         else:
             confidence = 0.35
 
-    launch_angle = max(5.0, round(avg_launch + adjustment, 1))
+    launch_angle = max(5.0, round(physics.optimal_launch_deg + adjustment, 1))
 
     return (launch_angle, confidence)
 
