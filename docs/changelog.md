@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Custom-club persistence foundation.** A validated, atomic JSON store now
   supports custom club definitions with stable IDs and configurable loft,
   physics, and display order. Runtime club selection is not yet integrated.
+- **PAR-TEE connector.** `"type": "partee"` in `config/sim.json` streams shots
+  to the [PAR-TEE](https://playpartee.com) iPhone app over OpenConnect V1 on the
+  phone's Wi-Fi address (port 921 by default). Same shared codec as GSPro and
+  OpenGolfSim; the header pill and "Sent to" panel read PAR-TEE.
 - **Profiles replace players.** Shots are now attributed to a server-owned profile
   (a person *or* a place) with a stable id, persisted to
   `~/.config/openflight/profiles.json` (override with `OPENFLIGHT_PROFILES_PATH`
