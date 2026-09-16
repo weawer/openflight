@@ -1,13 +1,14 @@
 """Tests for launch_monitor module."""
 
-import pytest
 from datetime import datetime
 
+import pytest
+
+from openflight.club_physics import ClubType
 from openflight.launch_monitor import (
     Shot,
-    ClubType,
-    estimate_carry_distance,
     adjust_carry_for_launch_angle,
+    estimate_carry_distance,
 )
 
 

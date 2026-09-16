@@ -11,7 +11,8 @@ import time
 from datetime import datetime
 from typing import Callable, List, Optional
 
-from ..launch_monitor import ClubType, Shot, estimate_carry_distance, summarize_shots
+from ..club_physics import ClubType, get_club_physics
+from ..launch_monitor import Shot, estimate_carry_distance, summarize_shots
 from ..ops243 import OPS243Radar, SpeedReading
 from ..session_logger import get_session_logger, log_session_error
 from .processor import RollingBufferProcessor
@@ -61,32 +62,7 @@ def get_optimal_spin_for_ball_speed(
             optimal = base_rpm + (upper - ball_speed_mph) * rpm_per_mph
             break
 
-    # Adjust for club type - irons need more spin
-    club_spin_multipliers = {
-        ClubType.DRIVER: 1.0,
-        ClubType.WOOD_3: 1.15,
-        ClubType.WOOD_5: 1.25,
-        ClubType.WOOD_7: 1.32,
-        ClubType.HYBRID_3: 1.45,
-        ClubType.HYBRID_5: 1.55,
-        ClubType.HYBRID_7: 1.65,
-        ClubType.HYBRID_9: 1.75,
-        ClubType.IRON_2: 1.5,
-        ClubType.IRON_3: 1.6,
-        ClubType.IRON_4: 1.8,
-        ClubType.IRON_5: 2.0,
-        ClubType.IRON_6: 2.2,
-        ClubType.IRON_7: 2.5,
-        ClubType.IRON_8: 2.8,
-        ClubType.IRON_9: 3.2,
-        ClubType.PW: 3.6,
-        ClubType.GW: 4.1,
-        ClubType.SW: 4.3,
-        ClubType.LW: 4.6,
-        ClubType.UNKNOWN: 1.0,
-    }
-
-    multiplier = club_spin_multipliers.get(club, 1.0)
+    multiplier = get_club_physics(club).optimal_spin_multiplier
     return optimal * multiplier
 
 

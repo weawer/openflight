@@ -27,10 +27,11 @@ from flask_socketio import SocketIO
 from .ballistics import resolve_launch, simulate
 from .club_physics import (
     SHOT_SIMULATION_DEFAULTS,
+    ClubType,
     get_club_physics,
     get_club_simulation_profile,
 )
-from .launch_monitor import SPIN_CONFIDENCE_HIGH, ClubType, Shot, summarize_shots
+from .launch_monitor import SPIN_CONFIDENCE_HIGH, Shot, summarize_shots
 from .ops243 import (
     UART_BAUD_COMMANDS,
     Direction,
@@ -3974,7 +3975,7 @@ class MockLaunchMonitor:
 
         spin_rpm = max(
             defaults.min_spin_rpm,
-            random.gauss(physics.typical_spin_rpm, profile.spin_std_dev_rpm),
+            random.gauss(profile.average_spin_rpm, profile.spin_std_dev_rpm),
         )
 
         launch_v = max(

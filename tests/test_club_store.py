@@ -1,8 +1,8 @@
 import json
 import threading
 
+from openflight.club_physics import ClubType
 from openflight.club_store import ClubStore, CustomClub
-from openflight.launch_monitor import ClubType
 
 
 def test_creates_empty_catalog_when_file_is_missing(tmp_path):

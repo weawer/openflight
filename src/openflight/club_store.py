@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional, Union
 
-from .launch_monitor import ClubType
+from .club_physics import ClubType
 
 logger = logging.getLogger(__name__)
 

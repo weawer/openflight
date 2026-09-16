@@ -5,9 +5,9 @@ import time
 
 import pytest
 
+from openflight.club_physics import ClubType
 from openflight.gspro.codec import GSProCodec
-from openflight.launch_monitor import ClubType
-from openflight.sim.codec import build_connector, SimConnector
+from openflight.sim.codec import SimConnector, build_connector
 from openflight.sim.config import ConnectorConfig
 from openflight.sim.types import ConnectionState, PlayerUpdate, ResolvedShot
 

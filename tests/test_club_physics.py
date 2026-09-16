@@ -6,10 +6,10 @@ from openflight.club_physics import (
     CLUB_PHYSICS,
     CLUB_SIMULATION_PROFILES,
     SHOT_SIMULATION_DEFAULTS,
+    ClubType,
     get_club_physics,
     get_club_simulation_profile,
 )
-from openflight.launch_monitor import ClubType
 
 
 def test_physics_registry_covers_every_club_type():
