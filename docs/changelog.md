@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   full horizontal speed, overstating attack angle on any shot with club path.
 
 ### Added
+- **Custom-club persistence foundation.** A validated, atomic JSON store now
+  supports custom club definitions with stable IDs and configurable loft,
+  physics, and display order. Runtime club selection is not yet integrated.
 - **Profiles replace players.** Shots are now attributed to a server-owned profile
   (a person *or* a place) with a stable id, persisted to
   `~/.config/openflight/profiles.json` (override with `OPENFLIGHT_PROFILES_PATH`

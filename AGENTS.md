@@ -292,7 +292,7 @@ React UI (WebSocket) ──► Flask Server ──► RollingBufferMonitor ─�
 ### Key Modules
 
 - `ops243.py` - OPS243 radar driver, rolling buffer capture, I/Q processing
-- `clubs/` - Built-in club types and immutable physics defaults
+- `clubs/` - Built-in club types, immutable physics defaults, and custom-club persistence; runtime integration is pending
 - `launch_monitor.py` - Shot dataclass and carry estimation
 - `rolling_buffer/` - Trigger strategies, I/Q processor, spin detection
 - `kld7/` - K-LD7 angle radar (deprecated hardware): RADC streaming, phase interferometry, dual-radar support

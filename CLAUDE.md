@@ -179,7 +179,7 @@ React UI (WebSocket) ──► Flask Server ──► RollingBufferMonitor ─�
 ### Key Modules
 
 - `ops243.py` - OPS243 radar driver, rolling buffer capture, I/Q processing
-- `clubs/` - Built-in club types and immutable physics defaults
+- `clubs/` - Built-in club types, immutable physics defaults, and custom-club persistence; runtime integration is pending
 - `launch_monitor.py` - Shot dataclass and carry estimation
 - `ballistics.py` - Numerical ballistic trajectory simulation (drag + Magnus RK4)
 - `iwr6843/` - TI IWR6843 mmWave radar driver, L3 raw dump parser, LCMF-v1 launch angle & club path
