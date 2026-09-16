@@ -1,7 +1,7 @@
 """Tests for gspro.codec — OpenConnectV1 wire serialization + inbound parsing."""
 import json
 
-from openflight.club_physics import ClubType
+from openflight.clubs import ClubType
 from openflight.gspro.codec import GSProCodec
 from openflight.sim.types import PlayerUpdate, ResolvedShot, ShotAck, SimError
 

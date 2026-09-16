@@ -22,7 +22,8 @@ import math
 from dataclasses import dataclass
 from typing import Literal, Optional
 
-from .club_physics import CLUB_PHYSICS, ClubType
+from .club_physics import CLUB_PHYSICS
+from .clubs import ClubType
 from .launch_monitor import SPIN_CONFIDENCE_HIGH, Shot
 
 MPH_TO_MPS = 0.44704

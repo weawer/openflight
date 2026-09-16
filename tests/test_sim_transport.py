@@ -9,7 +9,7 @@ from typing import List, Optional
 
 import pytest
 
-from openflight.club_physics import ClubType
+from openflight.clubs import ClubType
 from openflight.gspro.codec import GSProCodec
 from openflight.sim.transport import TcpSimClient, find_json_end
 from openflight.sim.types import (

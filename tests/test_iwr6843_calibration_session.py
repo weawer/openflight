@@ -2,7 +2,7 @@ import math
 
 import numpy as np
 
-from openflight.club_physics import ClubType
+from openflight.clubs import ClubType
 from openflight.iwr6843.calibration import Calibration
 from openflight.iwr6843.calibration_session import (
     CalibrationShotRecord,

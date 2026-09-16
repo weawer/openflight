@@ -13,7 +13,7 @@ import pytest
 
 from openflight import server as server_module
 from openflight.camera.replay import ReplayNotFoundError, ReplayPreparationError
-from openflight.club_physics import ClubType
+from openflight.clubs import ClubType
 from openflight.iwr6843 import Calibration
 from openflight.kld7.types import KLD7Angle
 from openflight.launch_monitor import Shot

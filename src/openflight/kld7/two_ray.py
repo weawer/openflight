@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from openflight.club_physics import ClubType
+from openflight.clubs import ClubType
 
 from .radc import (
     ANTENNA_SPACING_M,

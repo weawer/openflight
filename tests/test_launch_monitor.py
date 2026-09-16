@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pytest
 
-from openflight.club_physics import ClubType
+from openflight.clubs import ClubType
 from openflight.launch_monitor import (
     Shot,
     adjust_carry_for_launch_angle,
@@ -63,6 +63,23 @@ class TestShot:
         shot = Shot(ball_speed_mph=150.0, timestamp=datetime.now())
         assert shot.ball_speed_mph == 150.0
         assert shot.club == ClubType.DRIVER  # default
+
+    def test_custom_club_snapshot_is_serialized(self):
+        shot = Shot(
+            ball_speed_mph=150.0,
+            timestamp=datetime.now(),
+            club=ClubType.IRON_7,
+            custom_club_id="stable-id",
+            custom_club_name="P790 7 Iron",
+            custom_club_loft_deg=30.5,
+        )
+
+        payload = shot.to_dict()
+
+        assert payload["club"] == "7-iron"
+        assert payload["custom_club_id"] == "stable-id"
+        assert payload["custom_club_name"] == "P790 7 Iron"
+        assert payload["custom_club_loft_deg"] == 30.5
 
     def test_shot_with_club_speed(self):
         """Shot with both ball and club speed."""

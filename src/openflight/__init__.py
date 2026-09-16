@@ -2,7 +2,7 @@
 
 __version__ = "0.2.0"
 
-from .club_physics import ClubType
+from .clubs import ClubType
 from .launch_monitor import Shot, estimate_carry_distance
 from .ops243 import Direction, OPS243Radar, SpeedReading, SpeedUnit
 

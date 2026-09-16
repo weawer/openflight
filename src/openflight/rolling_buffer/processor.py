@@ -13,7 +13,7 @@ from typing import Callable, List, Optional, Tuple
 import numpy as np
 from scipy.signal import butter, find_peaks, sosfiltfilt
 
-from ..club_physics import ClubType
+from ..clubs import ClubType
 from ..launch_monitor import SPIN_CONFIDENCE_HIGH
 from .multitaper import estimate_multitaper_spin, repair_clipped_iq
 from .types import (

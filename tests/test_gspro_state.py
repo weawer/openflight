@@ -1,5 +1,5 @@
 """Tests for gspro.state — GSPro club-code mapping."""
-from openflight.club_physics import ClubType
+from openflight.clubs import ClubType
 from openflight.gspro.state import gspro_code_to_club
 
 

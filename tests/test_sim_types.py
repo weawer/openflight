@@ -1,7 +1,7 @@
 """Tests for sim.types — ConnectionState, PlayerState, inbound events."""
 import time
 
-from openflight.club_physics import ClubType
+from openflight.clubs import ClubType
 from openflight.sim.types import (
     SHOT_NUMBER_MAX,
     ConnectionState,

@@ -12,7 +12,7 @@ import math
 import numpy as np
 import pytest
 
-from openflight.club_physics import ClubType
+from openflight.clubs import ClubType
 from openflight.kld7.radc import WAVELENGTH_M, extract_launch_angle
 from openflight.kld7.two_ray import (
     _TOUR_LAUNCH_DEG,

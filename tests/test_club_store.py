@@ -1,8 +1,11 @@
 import json
 import threading
 
-from openflight.club_physics import ClubType
+import pytest
+
+import openflight.club_store as club_store_module
 from openflight.club_store import ClubStore, CustomClub
+from openflight.clubs import ClubType
 
 
 def test_creates_empty_catalog_when_file_is_missing(tmp_path):
@@ -124,6 +127,34 @@ def test_skips_invalid_and_duplicate_records_on_load(tmp_path):
     assert ClubStore(path).list() == [CustomClub.from_dict(valid)]
 
 
+def test_rejects_future_schema_without_rewriting_file(tmp_path, caplog):
+    path = tmp_path / "clubs.json"
+    payload = {"version": 2, "clubs": []}
+    original = json.dumps(payload)
+    path.write_text(original, encoding="utf-8")
+
+    store = ClubStore(path)
+
+    assert store.list() == []
+    assert path.read_text(encoding="utf-8") == original
+    assert "unsupported schema version" in caplog.text
+
+
+@pytest.mark.parametrize("enabled", [None, 0, 1, "false", "true"])
+def test_rejects_non_boolean_enabled_values(enabled):
+    raw = {
+        "id": "stable-id",
+        "name": "Valid",
+        "label": "7i",
+        "group": "Irons",
+        "base_type": "7-iron",
+        "loft_deg": 34,
+        "enabled": enabled,
+    }
+
+    assert CustomClub.from_dict(raw) is None
+
+
 def test_add_rolls_back_when_persistence_fails(tmp_path, monkeypatch):
     path = tmp_path / "clubs.json"
     store = ClubStore(path)
@@ -180,12 +211,44 @@ def test_save_reports_failure(tmp_path, monkeypatch):
     assert store.save() is False
 
 
+@pytest.mark.parametrize("failure_stage", ["write", "fsync", "replace"])
+def test_add_rolls_back_at_each_persistence_stage(tmp_path, monkeypatch, failure_stage):
+    path = tmp_path / "clubs.json"
+    store = ClubStore(path)
+    original = path.read_text(encoding="utf-8")
+
+    def fail(*_args, **_kwargs):
+        raise OSError("disk failure")
+
+    if failure_stage == "write":
+        monkeypatch.setattr(club_store_module.json, "dump", fail)
+    elif failure_stage == "fsync":
+        monkeypatch.setattr(club_store_module.os, "fsync", fail)
+    else:
+        monkeypatch.setattr(club_store_module.os, "replace", fail)
+
+    added = store.add(
+        name="P790 7 Iron",
+        label="7i",
+        group="Irons",
+        base_type=ClubType.IRON_7,
+        loft_deg=30.5,
+    )
+
+    assert added is None
+    assert store.list() == []
+    assert path.read_text(encoding="utf-8") == original
+    assert list(tmp_path.glob("*.tmp")) == []
+
+
 def test_save_holds_lock_through_atomic_replace(tmp_path, monkeypatch):
     store = ClubStore(tmp_path / "clubs.json")
     replace_started = threading.Event()
     release_replace = threading.Event()
     mutation_finished = threading.Event()
     real_replace = __import__("os").replace
+    added_clubs = []
+    save_results = []
     calls = 0
 
     def blocking_replace(source, destination):
@@ -197,17 +260,19 @@ def test_save_holds_lock_through_atomic_replace(tmp_path, monkeypatch):
         real_replace(source, destination)
 
     monkeypatch.setattr("openflight.club_store.os.replace", blocking_replace)
-    save_thread = threading.Thread(target=store.save)
+    save_thread = threading.Thread(target=lambda: save_results.append(store.save()))
     save_thread.start()
     assert replace_started.wait(timeout=2)
 
     def add_club():
-        store.add(
-            name="Blocked",
-            label="B",
-            group="Irons",
-            base_type=ClubType.IRON_7,
-            loft_deg=34,
+        added_clubs.append(
+            store.add(
+                name="Blocked",
+                label="B",
+                group="Irons",
+                base_type=ClubType.IRON_7,
+                loft_deg=34,
+            )
         )
         mutation_finished.set()
 
@@ -221,3 +286,7 @@ def test_save_holds_lock_through_atomic_replace(tmp_path, monkeypatch):
     assert not save_thread.is_alive()
     assert not mutation_thread.is_alive()
     assert mutation_finished.is_set()
+    assert save_results == [True]
+    assert added_clubs[0] is not None
+    assert store.list() == [added_clubs[0]]
+    assert ClubStore(tmp_path / "clubs.json").list() == [added_clubs[0]]

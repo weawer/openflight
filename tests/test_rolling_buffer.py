@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from openflight.club_physics import ClubType
+from openflight.clubs import ClubType
 from openflight.launch_monitor import Shot
 from openflight.rolling_buffer import (
     ImpactEstimate,

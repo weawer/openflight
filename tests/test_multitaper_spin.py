@@ -5,7 +5,7 @@ from datetime import datetime
 import numpy as np
 import pytest
 
-from openflight.club_physics import ClubType
+from openflight.clubs import ClubType
 from openflight.rolling_buffer import (
     IQCapture,
     ProcessedCapture,

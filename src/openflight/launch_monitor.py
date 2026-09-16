@@ -10,7 +10,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List, Optional
 
-from .club_physics import ClubType, get_club_physics
+from .club_physics import get_club_physics
+from .clubs import ClubType
 from .ops243 import SpeedReading
 
 # Spin confidence threshold for "high" quality — used across modules.
@@ -164,6 +165,9 @@ class Shot:
         peak_magnitude: Signal strength of strongest reading
         readings: All raw speed readings for this shot
         club: Club type for distance estimation
+        custom_club_id: Stable custom-club identifier selected for this shot
+        custom_club_name: Custom-club display name captured for historical records
+        custom_club_loft_deg: Custom loft captured for historical records
         launch_angle_vertical: Vertical launch angle in degrees (from camera)
         launch_angle_horizontal: Horizontal launch angle in degrees (from camera)
         launch_angle_confidence: Backward-compatible primary launch angle confidence (0-1)
@@ -207,6 +211,9 @@ class Shot:
     peak_magnitude: Optional[float] = None
     readings: List[SpeedReading] = field(default_factory=list)
     club: ClubType = ClubType.DRIVER
+    custom_club_id: Optional[str] = None
+    custom_club_name: Optional[str] = None
+    custom_club_loft_deg: Optional[float] = None
     launch_angle_vertical: Optional[float] = None
     launch_angle_horizontal: Optional[float] = None
     launch_angle_confidence: Optional[float] = None
@@ -379,6 +386,9 @@ class Shot:
             "estimated_carry_yards": self.estimated_carry_yards,
             "carry_range": list(self.estimated_carry_range),
             "club": self.club.value,
+            "custom_club_id": self.custom_club_id,
+            "custom_club_name": self.custom_club_name,
+            "custom_club_loft_deg": self.custom_club_loft_deg,
             "profile_id": self.profile_id,
             "profile_name": self.profile_name,
             "timestamp": self.timestamp.isoformat(),

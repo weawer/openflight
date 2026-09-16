@@ -7,7 +7,7 @@ from datetime import datetime
 
 import pytest
 
-from openflight.club_physics import ClubType
+from openflight.clubs import ClubType
 from openflight.launch_monitor import Shot
 from openflight.sim.types import ConnectionState, PlayerUpdate, ShotAck, SimError
 

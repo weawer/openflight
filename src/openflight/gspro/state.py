@@ -2,7 +2,7 @@
 
 import logging
 
-from openflight.club_physics import ClubType
+from openflight.clubs import ClubType
 
 logger = logging.getLogger(__name__)
 

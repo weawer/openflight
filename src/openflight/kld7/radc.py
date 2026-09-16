@@ -13,7 +13,7 @@ from functools import lru_cache
 
 import numpy as np
 
-from openflight.club_physics import ClubType
+from openflight.clubs import ClubType
 
 from .geometry import (
     GEOM_BALL_ABOVE_RADAR_FT,

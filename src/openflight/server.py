@@ -27,10 +27,10 @@ from flask_socketio import SocketIO
 from .ballistics import resolve_launch, simulate
 from .club_physics import (
     SHOT_SIMULATION_DEFAULTS,
-    ClubType,
     get_club_physics,
     get_club_simulation_profile,
 )
+from .clubs import ClubType
 from .launch_monitor import SPIN_CONFIDENCE_HIGH, Shot, summarize_shots
 from .ops243 import (
     UART_BAUD_COMMANDS,

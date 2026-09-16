@@ -12,7 +12,7 @@ from openflight.ballistics import (
     resolve_launch,
     simulate,
 )
-from openflight.club_physics import ClubType
+from openflight.clubs import ClubType
 from openflight.launch_monitor import Shot
 
 

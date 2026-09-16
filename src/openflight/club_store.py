@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional, Union
 
-from .club_physics import ClubType
+from .clubs import ClubType
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +86,9 @@ class CustomClub:
         label = _clean_text(raw.get("label"), MAX_LABEL_LENGTH)
         group = _clean_text(raw.get("group"), MAX_NAME_LENGTH)
         loft = _parse_loft(raw.get("loft_deg"))
+        enabled = raw.get("enabled", True)
+        if not isinstance(enabled, bool):
+            return None
         try:
             base_type = ClubType(raw.get("base_type"))
             sort_order = int(raw.get("sort_order", 0))
@@ -100,7 +103,7 @@ class CustomClub:
             group=group,
             base_type=base_type,
             loft_deg=loft,
-            enabled=raw.get("enabled", True) is not False,
+            enabled=enabled,
             sort_order=sort_order,
         )
 
@@ -246,7 +249,16 @@ class ClubStore:
             logger.warning("[clubs] could not read %s: %s", self._path, error)
             return
 
-        entries = raw.get("clubs") if isinstance(raw, dict) else None
+        if not isinstance(raw, dict) or raw.get("version") != CLUBS_SCHEMA_VERSION:
+            version = raw.get("version") if isinstance(raw, dict) else None
+            logger.warning(
+                "[clubs] unsupported schema version %r in %s",
+                version,
+                self._path,
+            )
+            return
+
+        entries = raw.get("clubs")
         if not isinstance(entries, list):
             return
         parsed = [CustomClub.from_dict(entry) for entry in entries]
