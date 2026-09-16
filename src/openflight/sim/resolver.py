@@ -8,8 +8,8 @@ serialize the ResolvedShot into their own wire format.
 import math
 from typing import Dict, Tuple
 
-from openflight.club_physics import get_club_physics
 from openflight.clubs import ClubType
+from openflight.clubs.physics import get_club_physics
 from openflight.launch_monitor import (
     SPIN_CONFIDENCE_HIGH,
     Shot,

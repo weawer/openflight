@@ -22,8 +22,8 @@ import numpy as np
 
 from openflight.camera.club_motion import ReferenceBall, detect_reference_ball
 from openflight.camera.geometry import deroll_normalized_offsets
-from openflight.club_physics import get_club_physics
 from openflight.clubs import ClubType
+from openflight.clubs.physics import get_club_physics
 
 # --- scene / mask constants -------------------------------------------------
 # Scene brightness gate: background 99.5th percentile. The 2026-08-07 session

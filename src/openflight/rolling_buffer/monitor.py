@@ -11,8 +11,8 @@ import time
 from datetime import datetime
 from typing import Callable, List, Optional
 
-from ..club_physics import get_club_physics
 from ..clubs import ClubType
+from ..clubs.physics import get_club_physics
 from ..launch_monitor import Shot, estimate_carry_distance, summarize_shots
 from ..ops243 import OPS243Radar, SpeedReading
 from ..session_logger import get_session_logger, log_session_error

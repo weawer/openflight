@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Mapping
 
-from .clubs import ClubType
+from .types import ClubType
 
 
 @dataclass(frozen=True)

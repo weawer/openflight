@@ -3,14 +3,14 @@ from dataclasses import FrozenInstanceError, fields
 
 import pytest
 
-from openflight.club_physics import (
+from openflight.clubs import ClubType
+from openflight.clubs.physics import (
     CLUB_PHYSICS,
     CLUB_SIMULATION_PROFILES,
     SHOT_SIMULATION_DEFAULTS,
     get_club_physics,
     get_club_simulation_profile,
 )
-from openflight.clubs import ClubType
 
 
 def test_physics_registry_covers_every_club_type():

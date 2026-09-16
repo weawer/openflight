@@ -3,9 +3,9 @@ import threading
 
 import pytest
 
-import openflight.club_store as club_store_module
-from openflight.club_store import ClubStore, CustomClub
+import openflight.clubs.store as club_store_module
 from openflight.clubs import ClubType
+from openflight.clubs.store import ClubStore, CustomClub
 
 
 def test_creates_empty_catalog_when_file_is_missing(tmp_path):
@@ -160,7 +160,7 @@ def test_add_rolls_back_when_persistence_fails(tmp_path, monkeypatch):
     store = ClubStore(path)
     original = path.read_text(encoding="utf-8")
     monkeypatch.setattr(
-        "openflight.club_store.os.replace",
+        "openflight.clubs.store.os.replace",
         lambda *_args: (_ for _ in ()).throw(OSError("disk full")),
     )
 
@@ -190,7 +190,7 @@ def test_update_and_remove_roll_back_when_persistence_fails(tmp_path, monkeypatc
     assert added is not None
     original = path.read_text(encoding="utf-8")
     monkeypatch.setattr(
-        "openflight.club_store.os.replace",
+        "openflight.clubs.store.os.replace",
         lambda *_args: (_ for _ in ()).throw(OSError("disk full")),
     )
 
@@ -204,7 +204,7 @@ def test_update_and_remove_roll_back_when_persistence_fails(tmp_path, monkeypatc
 def test_save_reports_failure(tmp_path, monkeypatch):
     store = ClubStore(tmp_path / "clubs.json")
     monkeypatch.setattr(
-        "openflight.club_store.os.replace",
+        "openflight.clubs.store.os.replace",
         lambda *_args: (_ for _ in ()).throw(OSError("disk full")),
     )
 
@@ -259,7 +259,7 @@ def test_save_holds_lock_through_atomic_replace(tmp_path, monkeypatch):
             assert release_replace.wait(timeout=2)
         real_replace(source, destination)
 
-    monkeypatch.setattr("openflight.club_store.os.replace", blocking_replace)
+    monkeypatch.setattr("openflight.clubs.store.os.replace", blocking_replace)
     save_thread = threading.Thread(target=lambda: save_results.append(store.save()))
     save_thread.start()
     assert replace_started.wait(timeout=2)
