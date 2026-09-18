@@ -138,32 +138,7 @@ def estimate_carry_with_spin(
     if club_speed_mph and club_speed_mph > 0:
         smash = ball_speed_mph / club_speed_mph
 
-        # Optimal smash factors by club type
-        optimal_smash = {
-            ClubType.DRIVER: 1.48,
-            ClubType.WOOD_3: 1.44,
-            ClubType.WOOD_5: 1.42,
-            ClubType.WOOD_7: 1.41,
-            ClubType.HYBRID_3: 1.39,
-            ClubType.HYBRID_5: 1.37,
-            ClubType.HYBRID_7: 1.35,
-            ClubType.HYBRID_9: 1.33,
-            ClubType.IRON_2: 1.36,
-            ClubType.IRON_3: 1.35,
-            ClubType.IRON_4: 1.33,
-            ClubType.IRON_5: 1.31,
-            ClubType.IRON_6: 1.29,
-            ClubType.IRON_7: 1.27,
-            ClubType.IRON_8: 1.25,
-            ClubType.IRON_9: 1.23,
-            ClubType.PW: 1.21,
-            ClubType.GW: 1.19,
-            ClubType.SW: 1.18,
-            ClubType.LW: 1.17,
-            ClubType.UNKNOWN: 1.35,
-        }
-
-        target_smash = optimal_smash.get(club, 1.35)
+        target_smash = get_club_physics(club).carry_smash_reference
         smash_delta = target_smash - smash
 
         if smash_delta > 0:

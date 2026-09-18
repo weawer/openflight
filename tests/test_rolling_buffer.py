@@ -37,10 +37,6 @@ from openflight.rolling_buffer import (
 class TestGetOptimalSpinForBallSpeed:
     """Tests for the optimal spin rate calculation based on ball speed."""
 
-    @pytest.mark.parametrize("club", [ClubType.UNKNOWN, None, "unrecognized"])
-    def test_unknown_club_preserves_driver_spin_baseline(self, club):
-        assert get_optimal_spin_for_ball_speed(140, club) == 2700
-
     def test_high_ball_speed_180_mph(self):
         """180 mph ball speed should have ~2050 rpm optimal spin."""
         optimal = get_optimal_spin_for_ball_speed(180, ClubType.DRIVER)

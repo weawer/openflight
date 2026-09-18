@@ -11,12 +11,9 @@ import pytest
 
 from openflight.clubs import ClubType
 from openflight.gspro.codec import GSProCodec
-from openflight.sim.transport import TcpSimClient, find_json_end
+from openflight.sim.transport import find_json_end, TcpSimClient
 from openflight.sim.types import (
-    ConnectionState,
-    PlayerUpdate,
-    ResolvedShot,
-    ShotAck,
+    ConnectionState, PlayerUpdate, ResolvedShot, ShotAck,
 )
 
 # --- framing unit tests ------------------------------------------------------

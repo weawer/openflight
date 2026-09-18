@@ -6,7 +6,7 @@ import pytest
 
 from openflight.clubs import ClubType
 from openflight.launch_monitor import Shot
-from openflight.sim.resolver import SPIN_MODEL_RPM, resolve_shot
+from openflight.sim.resolver import resolve_shot, SPIN_MODEL_RPM
 from openflight.sim.types import IncompleteShotError, PlayerState
 
 

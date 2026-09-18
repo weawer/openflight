@@ -7,7 +7,7 @@ import pytest
 
 from openflight.clubs import ClubType
 from openflight.gspro.codec import GSProCodec
-from openflight.sim.codec import SimConnector, build_connector
+from openflight.sim.codec import build_connector, SimConnector
 from openflight.sim.config import ConnectorConfig
 from openflight.sim.types import ConnectionState, PlayerUpdate, ResolvedShot
 

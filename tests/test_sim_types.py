@@ -3,11 +3,8 @@ import time
 
 from openflight.clubs import ClubType
 from openflight.sim.types import (
-    SHOT_NUMBER_MAX,
-    ConnectionState,
-    PlayerState,
-    PlayerUpdate,
-    initial_shot_counter,
+    ConnectionState, PlayerState, PlayerUpdate,
+    SHOT_NUMBER_MAX, initial_shot_counter,
 )
 
 
