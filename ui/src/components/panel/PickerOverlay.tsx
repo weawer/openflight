@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react';
+import { useState, type ReactNode, type CSSProperties } from 'react';
 import { clubGroupLabel } from '../../i18n';
 import { useI18n } from '../../i18n/useI18n';
 import { PanelAction } from './PanelAction';
@@ -12,6 +12,8 @@ interface PickerOverlayProps {
   onClose: () => void;
   /** Word-length labels (training implements) use a slightly smaller type size. */
   wide?: boolean;
+  toolbar?: ReactNode;
+  children?: ReactNode;
 }
 
 /**
@@ -19,7 +21,16 @@ interface PickerOverlayProps {
  * hairline-bordered option buttons grouped by tab. Four columns span the
  * overlay; row height is capped so irons stay on screen.
  */
-export function PickerOverlay({ title, selectedId, sections, onSelect, onClose, wide = false }: PickerOverlayProps) {
+export function PickerOverlay({
+  title,
+  selectedId,
+  sections,
+  onSelect,
+  onClose,
+  wide = false,
+  toolbar,
+  children,
+}: PickerOverlayProps) {
   const { t } = useI18n();
   const [sectionName, setSectionName] = useState(() => initialPickerSection(sections, selectedId));
   const activeSection = sections.find((section) => section.name === sectionName) ?? sections[0];
@@ -44,6 +55,7 @@ export function PickerOverlay({ title, selectedId, sections, onSelect, onClose, 
           ✕
         </button>
       </div>
+      {toolbar}
       {sections.length > 1 ? (
         <div className="picker-overlay__tabs" role="group" aria-label={t('picker.groups')}>
           {sections.map((section) => {
@@ -62,19 +74,21 @@ export function PickerOverlay({ title, selectedId, sections, onSelect, onClose, 
         </div>
       ) : null}
       <div className="picker-overlay__body">
-        <div className="picker-overlay__grid" style={{ '--picker-rows': String(rows) } as CSSProperties}>
-          {options.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              className={`picker-overlay__option${option.id === selectedId ? ' picker-overlay__option--selected' : ''}`}
-              aria-pressed={option.id === selectedId}
-              onClick={() => onSelect(option.id)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+        {children ?? (
+          <div className="picker-overlay__grid" style={{ '--picker-rows': String(rows) } as CSSProperties}>
+            {options.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                className={`picker-overlay__option${option.id === selectedId ? ' picker-overlay__option--selected' : ''}`}
+                aria-pressed={option.id === selectedId}
+                onClick={() => onSelect(option.id)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

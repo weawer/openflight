@@ -1,3 +1,4 @@
+import { useClubStore, type ClubsSnapshot } from '../stores/useClubStore';
 import { io, type Socket } from 'socket.io-client';
 import { useSystemStore } from '../stores/useSystemStore';
 import { useShotStore } from '../stores/useShotStore';
@@ -53,6 +54,7 @@ class SocketService {
       this.socket?.emit('get_radar_config');
       this.socket?.emit('get_camera_capture_settings');
       this.socket?.emit('get_profiles');
+      this.socket?.emit('get_clubs');
     });
 
     this.socket.on('disconnect', () => {
@@ -106,6 +108,10 @@ class SocketService {
 
     this.socket.on('club_changed', (data: { club: string }) => {
       ingestSessionClub(data.club);
+    });
+
+    this.socket.on('clubs', (data: ClubsSnapshot) => {
+      useClubStore.getState().applySnapshot(data);
     });
 
     this.socket.on('profiles', (data: ProfilesSnapshot) => {
@@ -217,6 +223,20 @@ class SocketService {
   uploadCloud() {
     useSystemStore.getState().setCloudUploadStatus('running', 'Uploading...');
     this.socket?.emit('upload_cloud');
+  }
+
+  async saveCustomClub(club: { id?: string; name: string; base_type: string; loft_deg: number }) {
+    return this.mutateClub('save_custom_club', club);
+  }
+
+  async removeCustomClub(id: string) {
+    return this.mutateClub('remove_custom_club', { id });
+  }
+
+  private async mutateClub(event: string, payload: object): Promise<void> {
+    if (!this.socket?.connected) throw new Error('Not connected. Try again when connected.');
+    const result: { error?: string } = await this.socket.timeout(5000).emitWithAck(event, payload);
+    if (result.error) throw new Error(result.error);
   }
 
   setClub(club: string) {

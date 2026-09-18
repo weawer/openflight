@@ -24,18 +24,26 @@ function appendName(name: string, chunk: string): string {
 interface ProfileNameDialogProps {
   /** Add and rename differ only in copy and initial value, so one dialog serves both. */
   mode: 'add' | 'rename';
+  titleOverride?: string;
   name: string;
   onChange: (name: string) => void;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
-export function ProfileNameDialog({ mode, name, onChange, onConfirm, onCancel }: ProfileNameDialogProps) {
+export function ProfileNameDialog({
+  mode,
+  name,
+  onChange,
+  onConfirm,
+  onCancel,
+  titleOverride,
+}: ProfileNameDialogProps) {
   const { t } = useI18n();
   const [shifted, setShifted] = useState(true);
   const [symbols, setSymbols] = useState(false);
   const canConfirm = Boolean(name.trim());
-  const title = mode === 'add' ? t('menu.addProfile') : t('menu.renameProfile');
+  const title = titleOverride ?? (mode === 'add' ? t('menu.addProfile') : t('menu.renameProfile'));
   const rows = symbols ? NUMBER_ROWS : LETTER_ROWS;
 
   const insertChar = (raw: string) => {
@@ -74,7 +82,7 @@ export function ProfileNameDialog({ mode, name, onChange, onConfirm, onCancel }:
         spellCheck={false}
         autoFocus
         maxLength={PROFILE_NAME_MAX}
-        placeholder={t('profiles.namePlaceholder')}
+        placeholder={titleOverride ?? t('profiles.namePlaceholder')}
         value={name}
         aria-labelledby="profile-name-title"
         onChange={(event) => onChange(event.target.value)}

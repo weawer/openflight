@@ -236,7 +236,7 @@ export function ShotsPanel({ shots, profileId, profileName, clubLabel, onDeleteS
                   <span className="shots-panel__index">{shotNumber}</span>
                   <span className="shots-panel__profile">
                     <span className="shots-panel__profile-name">{profileName}</span>
-                    <span className="shots-panel__profile-club">{shot.training_implement_label ?? shot.club}</span>
+                    <span className="shots-panel__profile-club">{shot.training_implement_label ?? (shot.custom_club_name || shot.club)}</span>
                   </span>
                   <span className="shots-panel__num shots-panel__value">{ball}</span>
                   <span className="shots-panel__num shots-panel__value">{club}</span>

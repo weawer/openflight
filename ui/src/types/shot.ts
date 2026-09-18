@@ -18,6 +18,8 @@ export interface Shot {
   estimated_carry_yards: number;
   carry_range: [number, number];
   club: string;
+  custom_club_id?: string;
+  custom_club_name?: string;
   profile_id?: string;
   profile_name?: string;
   timestamp: string;

@@ -31,6 +31,7 @@ from .clubs.physics import (
     get_club_physics,
     get_club_simulation_profile,
 )
+from .clubs.store import ClubStore, CustomClub
 from .launch_monitor import SPIN_CONFIDENCE_HIGH, Shot, summarize_shots
 from .ops243 import (
     UART_BAUD_COMMANDS,
@@ -83,6 +84,7 @@ debug_log_path: Optional[Path] = None
 # Created lazily so importing the server (in tests, in tooling) never writes
 # to the real config directory.
 profile_store: Optional[ProfileStore] = None
+club_store: Optional[ClubStore] = None
 
 
 def get_profile_store() -> ProfileStore:
@@ -91,6 +93,23 @@ def get_profile_store() -> ProfileStore:
     if profile_store is None:
         profile_store = ProfileStore()
     return profile_store
+
+
+def get_club_store() -> ClubStore:
+    """Load the shared custom club catalog on first use."""
+    global club_store  # pylint: disable=global-statement
+    if club_store is None:
+        club_store = ClubStore()
+    return club_store
+
+
+def _selected_custom_club() -> CustomClub | None:
+    custom = getattr(monitor, "_custom_club", None)
+    if isinstance(custom, CustomClub) and custom.base_type == getattr(
+        monitor, "_current_club", None
+    ):
+        return custom
+    return None
 
 
 TRAINING_IMPLEMENT_LABELS = {
@@ -1651,6 +1670,9 @@ def _get_trigger_status() -> dict:
 
 def _current_club_id() -> str:
     """Club id the kiosk should restore after a reload."""
+    custom = _selected_custom_club()
+    if custom is not None:
+        return custom.id
     if monitor is None:
         return ClubType.DRIVER.value
     club = getattr(monitor, "_current_club", None)
@@ -1799,17 +1821,85 @@ def handle_get_trigger_status():
     socketio.emit("trigger_status", _get_trigger_status())
 
 
+@socketio.on("get_clubs")
+def handle_get_clubs():
+    """Send saved clubs and descriptive loft defaults."""
+    socketio.emit(
+        "clubs",
+        {
+            "clubs": [club.to_dict() for club in get_club_store().list()],
+            "lofts": {club.value: get_club_physics(club).nominal_loft_deg for club in ClubType},
+        },
+    )
+
+
+@socketio.on("save_custom_club")
+def handle_save_custom_club(data):
+    """Save equipment metadata; physics always comes from the base type."""
+    payload = _payload_dict(data)
+    try:
+        base_type = ClubType(payload.get("base_type"))
+    except (ValueError, TypeError):
+        return {"error": "Choose a valid club type."}
+    name = payload.get("name")
+    if (
+        base_type == ClubType.UNKNOWN
+        or not isinstance(name, str)
+        or not 1 <= len(name.strip()) <= 40
+    ):
+        return {"error": "Enter a club name (1–40 characters) and type."}
+    values = {
+        "name": name.strip(),
+        "label": base_type.value,
+        "group": "My clubs",
+        "base_type": base_type,
+        "loft_deg": payload.get("loft_deg"),
+    }
+    store = get_club_store()
+    club_id = payload.get("id")
+    saved = store.update(club_id, **values) if club_id else store.add(**values)
+    if saved is None:
+        return {"error": "Could not save club. Check the loft (1–90°) and try again."}
+    active = _selected_custom_club()
+    if active is not None and active.id == saved.id:
+        monitor.set_club(saved.base_type)
+        monitor._custom_club = saved
+        socketio.emit("club_changed", {"club": saved.id})
+    handle_get_clubs()
+    return {"ok": True}
+
+
+@socketio.on("remove_custom_club")
+def handle_remove_custom_club(data):
+    """Remove a saved club without changing historical shot metadata."""
+    club_id = _payload_dict(data).get("id")
+    active = _selected_custom_club()
+    if not get_club_store().remove(club_id):
+        return {"error": "Could not delete club. Try again."}
+    if active is not None and active.id == club_id:
+        monitor._custom_club = None
+        socketio.emit("club_changed", {"club": active.base_type.value})
+    handle_get_clubs()
+    return {"ok": True}
+
+
 @socketio.on("set_club")
 def handle_set_club(data):
-    """Handle club selection change."""
-    club_name = data.get("club", "driver")
+    """Resolve custom selection to a built-in type for all calculations."""
+    club_name = _payload_dict(data).get("club", "driver")
+    custom = None
     try:
         club = ClubType(club_name)
-        if monitor:
-            monitor.set_club(club)
-        socketio.emit("club_changed", {"club": club.value})
-    except ValueError:
-        pass
+    except (ValueError, TypeError):
+        custom = get_club_store().get(club_name)
+        if custom is None or not custom.enabled:
+            socketio.emit("club_changed", {"club": _current_club_id()})
+            return
+        club = custom.base_type
+    if monitor:
+        monitor.set_club(club)
+        monitor._custom_club = custom
+    socketio.emit("club_changed", {"club": _current_club_id()})
 
 
 def _payload_dict(data) -> dict:
@@ -2239,6 +2329,7 @@ def _sim_on_inbound(target: str, event) -> None:
         if monitor is not None:
             try:
                 monitor.set_club(sim_player_state.club)
+                monitor._custom_club = None
             except Exception:  # pylint: disable=broad-except
                 logger.exception("[sim] monitor.set_club failed")
         socketio.emit("club_changed", {"club": club_value})
@@ -3520,6 +3611,10 @@ def on_shot_detected(shot: Shot) -> None:
 def _handle_shot_detected(shot: Shot) -> None:
     """Publish OPS metrics promptly, then enrich optional hardware data."""
     _assign_shot_number(shot)
+    custom = _selected_custom_club()
+    if custom is not None and custom.base_type == shot.club:
+        shot.custom_club_id = custom.id
+        shot.custom_club_name = custom.name
     active_profile = get_profile_store().get_active()
     shot.profile_id = active_profile.id
     shot.profile_name = active_profile.name

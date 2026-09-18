@@ -48,6 +48,11 @@ const render = (shots: Shot[]) =>
   );
 
 describe('ShotsPanel', () => {
+  it('displays the custom name captured with the shot', () => {
+    const html = render([makeShot({ custom_club_id: 'a', custom_club_name: 'My old driver' })]);
+    expect(html).toContain('My old driver');
+  });
+
   it('shows an empty state before any shots', () => {
     const html = render([]);
 

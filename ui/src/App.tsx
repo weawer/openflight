@@ -1,3 +1,5 @@
+import { ClubPicker } from './components/panel/ClubPicker';
+import { useClubStore } from './stores/useClubStore';
 import { useState, useEffect } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useSocket } from './hooks/useSocket';
@@ -29,7 +31,6 @@ import {
   PickerOverlay,
   ShotsPanel,
   StatsPanel,
-  clubSections,
   trainingImplementSections,
   type PanelView,
 } from './components/panel';
@@ -103,6 +104,7 @@ function AppContent() {
   );
 
   const [currentView, setCurrentView] = useState<PanelView>('live');
+  const customClubs = useClubStore((state) => state.clubs);
   const [selectedClub, setSelectedClub] = useState('driver');
   const [selectedTrainingImplement, setSelectedTrainingImplement] = useState('driver');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -131,7 +133,7 @@ function AppContent() {
   const isSwingSpeedMode = triggerStatus.mode === 'swing-speed';
   const activeImplementLabel = isSwingSpeedMode
     ? getTrainingImplementLabel(selectedTrainingImplement)
-    : getClubName(selectedClub);
+    : customClubs.find((club) => club.id === selectedClub)?.name ?? getClubName(selectedClub);
 
   useEffect(() => {
     return socketService.onSessionCleared(() => {
@@ -201,7 +203,6 @@ function AppContent() {
       setSelectedTrainingImplement(id);
       socketService.setTrainingImplement(id);
     } else {
-      setSelectedClub(id);
       socketService.setClub(id);
     }
     setPickerOpen(false);
@@ -420,14 +421,18 @@ function AppContent() {
       ) : null}
 
       {pickerOpen ? (
-        <PickerOverlay
-          title={isSwingSpeedMode ? t('app.selectImplement') : t('app.selectClub')}
-          selectedId={isSwingSpeedMode ? selectedTrainingImplement : selectedClub}
-          sections={isSwingSpeedMode ? trainingImplementSections() : clubSections()}
-          onSelect={handlePickerSelect}
-          onClose={() => setPickerOpen(false)}
-          wide={isSwingSpeedMode}
-        />
+        isSwingSpeedMode ? (
+          <PickerOverlay
+            title={t('app.selectImplement')}
+            selectedId={selectedTrainingImplement}
+            sections={trainingImplementSections()}
+            onSelect={handlePickerSelect}
+            onClose={() => setPickerOpen(false)}
+            wide
+          />
+        ) : (
+          <ClubPicker selectedId={selectedClub} onSelect={handlePickerSelect} onClose={() => setPickerOpen(false)} />
+        )
       ) : null}
 
       <PanelFooter

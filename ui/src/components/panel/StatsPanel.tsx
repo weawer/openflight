@@ -1,12 +1,6 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Shot } from '../../types/shot';
-import {
-  computeStats,
-  computeSwingSpeedStats,
-  filterShotsByProfile,
-  getUniqueClubs,
-  isSwingSpeedShot,
-} from '../../types/shot';
+import { computeStats, computeSwingSpeedStats, filterShotsByProfile, isSwingSpeedShot } from '../../types/shot';
 import { useDragScroll } from '../../hooks/useDragScroll';
 import { useUnitPreference } from '../../state/useUnitPreference';
 import { useI18n } from '../../i18n/useI18n';
@@ -38,7 +32,7 @@ interface StatTile {
 export function StatsPanel({ shots, activeClub, profileId, profileName, headerAction }: StatsPanelProps) {
   const { t } = useI18n();
   const profileShots = useMemo(() => filterShotsByProfile(shots, profileId), [shots, profileId]);
-  const hasShotsForActiveClub = profileShots.some((shot) => shot.club === activeClub);
+  const hasShotsForActiveClub = profileShots.some((shot) => (shot.custom_club_id || shot.club) === activeClub);
   const [selectedClub, setSelectedClub] = useState<string | null>(hasShotsForActiveClub ? activeClub : null);
   const [prevActiveClub, setPrevActiveClub] = useState(activeClub);
   const [prevProfileId, setPrevProfileId] = useState(profileId);
@@ -56,17 +50,24 @@ export function StatsPanel({ shots, activeClub, profileId, profileName, headerAc
   const speedUnit = getSpeedUnit(unitSystem);
   const distanceUnit = getDistanceUnit(unitSystem);
 
-  const availableClubs = useMemo(() => getUniqueClubs(profileShots), [profileShots]);
+  const availableClubs = useMemo(
+    () => [...new Set(profileShots.map((shot) => shot.custom_club_id || shot.club))],
+    [profileShots]
+  );
   const clubCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const shot of profileShots) {
-      counts[shot.club] = (counts[shot.club] ?? 0) + 1;
+      const id = shot.custom_club_id || shot.club;
+      counts[id] = (counts[id] ?? 0) + 1;
     }
     return counts;
   }, [profileShots]);
 
   const filteredShots = useMemo(
-    () => (selectedClub === null ? profileShots : profileShots.filter((shot) => shot.club === selectedClub)),
+    () =>
+      selectedClub === null
+        ? profileShots
+        : profileShots.filter((shot) => (shot.custom_club_id || shot.club) === selectedClub),
     [profileShots, selectedClub]
   );
 
@@ -160,7 +161,8 @@ export function StatsPanel({ shots, activeClub, profileId, profileName, headerAc
             aria-pressed={selectedClub === club}
             onClick={() => setSelectedClub(club)}
           >
-            {club.toUpperCase()} ({clubCounts[club] ?? 0})
+            {profileShots.find((shot) => shot.custom_club_id === club)?.custom_club_name || club.toUpperCase()} (
+            {clubCounts[club] ?? 0})
           </button>
         ))}
       </div>

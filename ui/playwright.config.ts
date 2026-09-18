@@ -17,6 +17,7 @@ function backendEnv(): { [key: string]: string } {
     if (value !== undefined) env[key] = value;
   }
   env[PROFILES_PATH_ENV] = E2E_PROFILES_PATH;
+  env.OPENFLIGHT_CLUBS_PATH = `${E2E_PROFILES_PATH}.clubs`;
   return env;
 }
 

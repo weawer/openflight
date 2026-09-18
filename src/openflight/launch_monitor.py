@@ -239,6 +239,8 @@ class Shot:
     spin_rejection_reason: Optional[str] = None
     carry_spin_adjusted: Optional[float] = None
     mode: str = "rolling-buffer"
+    custom_club_id: str = ""
+    custom_club_name: str = ""
     profile_id: str = ""
     profile_name: str = ""
     readings_data: Optional[list] = None
@@ -380,6 +382,8 @@ class Shot:
             "estimated_carry_yards": self.estimated_carry_yards,
             "carry_range": list(self.estimated_carry_range),
             "club": self.club.value,
+            "custom_club_id": self.custom_club_id,
+            "custom_club_name": self.custom_club_name,
             "profile_id": self.profile_id,
             "profile_name": self.profile_name,
             "timestamp": self.timestamp.isoformat(),

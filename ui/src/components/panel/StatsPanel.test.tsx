@@ -55,6 +55,20 @@ const render = (shots: Shot[], activeClub = 'driver', headerAction?: ReactNode) 
   );
 
 describe('StatsPanel', () => {
+  it('keeps custom clubs with the same base type separate', () => {
+    const html = render(
+      [
+        makeShot({ club: '7-iron', custom_club_id: 'a', custom_club_name: 'First iron', ball_speed_mph: 80 }),
+        makeShot({ club: '7-iron', custom_club_id: 'b', custom_club_name: 'Second iron', ball_speed_mph: 100 }),
+      ],
+      'a'
+    );
+    expect(html).toContain('First iron (1)');
+    expect(html).toContain('Second iron (1)');
+    expect(html).toContain('metric-card__value">80.0<');
+    expect(html).not.toContain('metric-card__value">90.0<');
+  });
+
   it('shows an empty state before any shots', () => {
     const html = render([]);
 
