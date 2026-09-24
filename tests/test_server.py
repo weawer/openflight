@@ -4659,6 +4659,94 @@ class TestHardwareTriggerPlumbing:
 
         server_module.stop_monitor()
 
+    def test_hardware_trigger_arms_iwr_before_monitor_and_forwards_timestamp(self, monkeypatch):
+        events = []
+
+        class FakeCaptureMonitor:
+            port = "/dev/iwr"
+            radar = SimpleNamespace(baud=1_041_667)
+
+            def arm(self):
+                events.append(("armed", None))
+
+            def notify_trigger(self, timestamp):
+                events.append(("notified", timestamp))
+                return True
+
+        class FakeMonitor:
+            def __init__(self, **_kwargs):
+                pass
+
+            def connect(self):
+                pass
+
+            @staticmethod
+            def get_radar_info():
+                return {}
+
+            def start(self, **kwargs):
+                events.append(("started", None))
+                kwargs["capture_started_callback"](1234.5)
+
+            def stop(self):
+                pass
+
+            def disconnect(self):
+                pass
+
+        capture_monitor = FakeCaptureMonitor()
+        monkeypatch.setattr("openflight.rolling_buffer.RollingBufferMonitor", FakeMonitor)
+        monkeypatch.setattr(server_module, "monitor", None)
+        monkeypatch.setattr(server_module, "get_session_logger", lambda: None)
+        monkeypatch.setattr(
+            server_module,
+            "iwr6843_runtime",
+            SimpleNamespace(capture_monitor=capture_monitor),
+        )
+
+        server_module.start_monitor(trigger_type="hardware")
+
+        assert events == [
+            ("armed", None),
+            ("started", None),
+            ("notified", 1234.5),
+        ]
+        server_module.stop_monitor()
+
+    def test_hardware_trigger_notifies_camera_when_iwr_is_disabled(self, monkeypatch):
+        timestamps = []
+
+        class FakeMonitor:
+            def __init__(self, **_kwargs):
+                pass
+
+            def connect(self):
+                pass
+
+            def start(self, **kwargs):
+                kwargs["capture_started_callback"](1234.5)
+
+            def stop(self):
+                pass
+
+            def disconnect(self):
+                pass
+
+        monkeypatch.setattr("openflight.rolling_buffer.RollingBufferMonitor", FakeMonitor)
+        monkeypatch.setattr(server_module, "monitor", None)
+        monkeypatch.setattr(server_module, "get_session_logger", lambda: None)
+        monkeypatch.setattr(server_module, "iwr6843_runtime", None)
+        monkeypatch.setattr(
+            server_module,
+            "camera_capture_runtime",
+            SimpleNamespace(notify_trigger=lambda timestamp: timestamps.append(timestamp)),
+        )
+
+        server_module.start_monitor(trigger_type="hardware")
+
+        assert timestamps == [1234.5]
+        server_module.stop_monitor()
+
     def test_start_monitor_rejects_non_30_ksps_hardware_mode(self, monkeypatch):
         """Hardware mode must not start with an untested sample rate."""
         monkeypatch.setattr(server_module, "monitor", None)
@@ -4668,6 +4756,8 @@ class TestHardwareTriggerPlumbing:
                 trigger_type="hardware",
                 sample_rate_ksps=25,
             )
+
+
 class TestBallisticCarryPrecedence:
     """Finalization is the single writer of carry_spin_adjusted.
 

@@ -217,6 +217,7 @@ class RollingBufferMonitor:
         self._live_callback: Optional[Callable[[SpeedReading], None]] = None
         self._diagnostic_callback: Optional[Callable[[dict], None]] = None
         self._processing_callback: Optional[Callable[[str], None]] = None
+        self._capture_started_callback: Optional[Callable[[float], None]] = None
         self._shots: List[Shot] = []
         self._shot_sequence_number = 0
         self._current_club: ClubType = ClubType.DRIVER
@@ -302,6 +303,7 @@ class RollingBufferMonitor:
         live_callback: Optional[Callable[[SpeedReading], None]] = None,
         diagnostic_callback: Optional[Callable[[dict], None]] = None,
         processing_callback: Optional[Callable[[str], None]] = None,
+        capture_started_callback: Optional[Callable[[float], None]] = None,
     ):
         """
         Start monitoring for shots.
@@ -311,11 +313,14 @@ class RollingBufferMonitor:
             live_callback: Called for live readings (limited in rolling buffer mode)
             diagnostic_callback: Called with trigger diagnostic data for UI display
             processing_callback: Called with "started" or "failed" around shot processing
+            capture_started_callback: Called with the inferred OPS trigger epoch
+                when an internal-trigger dump starts arriving.
         """
         self._shot_callback = shot_callback
         self._live_callback = live_callback
         self._diagnostic_callback = diagnostic_callback
         self._processing_callback = processing_callback
+        self._capture_started_callback = capture_started_callback
         self._stop_event.clear()
         self._running = True
 
@@ -453,12 +458,14 @@ class RollingBufferMonitor:
                 }
                 capture_started = False
 
-                def on_capture_started() -> None:
+                def on_capture_started(trigger_timestamp: Optional[float] = None) -> None:
                     nonlocal capture_started
                     capture_started = True
                     self._notify_processing("capturing")
+                    if trigger_timestamp is not None and self._capture_started_callback is not None:
+                        self._capture_started_callback(trigger_timestamp)
 
-                if self.trigger_type == "sound":
+                if self.trigger_type in {"sound", "hardware"}:
                     trigger_kwargs["cancel_event"] = self._stop_event
                     trigger_kwargs["capture_started_callback"] = on_capture_started
                 capture = self.trigger.wait_for_trigger(**trigger_kwargs)

@@ -726,6 +726,8 @@ class HardwareTriggeredCapture(TriggerStrategy):
         radar: "OPS243Radar",
         processor: RollingBufferProcessor,
         timeout: float = 30.0,
+        cancel_event: Optional[threading.Event] = None,
+        capture_started_callback: Optional[Callable[[float], None]] = None,
     ) -> Optional[IQCapture]:
         """Wait for one internal-trigger dump and return a valid capture."""
         logger.info(
@@ -734,7 +736,20 @@ class HardwareTriggeredCapture(TriggerStrategy):
             timeout,
         )
 
-        response = radar.wait_for_hardware_trigger(timeout=timeout)
+        def on_first_byte() -> None:
+            if capture_started_callback is None:
+                return
+            first_byte_timestamp = radar.last_hardware_trigger_first_byte_timestamp
+            if first_byte_timestamp is None:
+                first_byte_timestamp = time.time()
+            post_trigger_s = (32 - self.pre_trigger_segments) * 128 / (self.sample_rate_ksps * 1000)
+            capture_started_callback(first_byte_timestamp - post_trigger_s)
+
+        response = radar.wait_for_hardware_trigger(
+            timeout=timeout,
+            cancel_event=cancel_event,
+            on_first_byte=on_first_byte if capture_started_callback is not None else None,
+        )
         if not response:
             logger.info("[TRIGGER] OPS hardware trigger timeout — no dump received")
             if self._rearm_pending:

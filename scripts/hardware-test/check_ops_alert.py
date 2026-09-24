@@ -28,7 +28,7 @@ def run_test(radar, gpio, mode, duration, emit):
     gpio.when_released = lambda: emit("alert_rising", phase=phase)
     if mode == "internal":
         radar.configure_for_internal_speed_trigger(
-            trigger_threshold_mph=40, trigger_magnitude=600, pre_trigger_segments=6
+            trigger_threshold_mph=5, trigger_magnitude=6, pre_trigger_segments=6
         )
     else:
         radar.configure_for_speed_trigger()

@@ -638,6 +638,32 @@ class TestHardwareTriggeredCapture:
         )
         radar.rearm_internal_speed_trigger.assert_called_once_with(30)
 
+    def test_notifies_capture_start_with_inferred_internal_trigger_time(self):
+        radar = MagicMock()
+        radar.last_hardware_trigger_first_byte_timestamp = 1000.0
+
+        def wait_for_hardware_trigger(**kwargs):
+            kwargs["on_first_byte"]()
+            return '{"Q": [1]}'
+
+        radar.wait_for_hardware_trigger.side_effect = wait_for_hardware_trigger
+        processor = MagicMock()
+        processor.parse_capture.return_value = self._capture()
+        processor.process_standard.return_value = SpeedTimeline(
+            readings=[SpeedReading(100.0, 900.0, 68.0, "outbound")],
+            sample_rate_hz=937.5,
+        )
+        timestamps = []
+
+        trigger = HardwareTriggeredCapture(pre_trigger_segments=20)
+        trigger.wait_for_trigger(
+            radar,
+            processor,
+            capture_started_callback=timestamps.append,
+        )
+
+        assert timestamps == [pytest.approx(999.9488)]
+
     def test_rejects_false_trigger_but_still_rearms(self):
         """A board trigger with no qualifying outbound ball speed is discarded."""
         radar = MagicMock()
@@ -3142,6 +3168,39 @@ class TestShutdownPreservesRollingBuffer:
         monitor._capture_loop()
 
         assert states == []
+
+    def test_hardware_capture_start_forwards_inferred_trigger_timestamp(self):
+        from openflight.rolling_buffer import RollingBufferMonitor
+
+        monitor = RollingBufferMonitor(port=None, trigger_type="hardware")
+        timestamps = []
+
+        class OneRejectedCaptureTrigger:
+            calls = 0
+
+            def wait_for_trigger(self, **kwargs):
+                self.calls += 1
+                if self.calls == 1:
+                    kwargs["capture_started_callback"](1234.5)
+                    return None
+                monitor._running = False
+                return None
+
+            @staticmethod
+            def drain_diagnostics():
+                return [{"accepted": False, "reason": "no_ball_speed"}]
+
+            @staticmethod
+            def reset():
+                return None
+
+        monitor.trigger = OneRejectedCaptureTrigger()
+        monitor._capture_started_callback = timestamps.append
+        monitor._running = True
+
+        monitor._capture_loop()
+
+        assert timestamps == [1234.5]
 
     def test_stop_cancels_idle_sound_trigger_wait(self):
         """Default shutdown should wake the idle trigger thread immediately."""

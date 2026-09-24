@@ -3675,6 +3675,14 @@ def on_swing_speed_detected(event: SwingSpeedEvent):
     )
 
 
+def _notify_ops_hardware_trigger(trigger_timestamp: float) -> None:
+    """Freeze the angle-radar and camera rings from one OPS trigger."""
+    if iwr6843_runtime is not None:
+        iwr6843_runtime.capture_monitor.notify_trigger(trigger_timestamp)
+    elif camera_capture_runtime is not None:
+        camera_capture_runtime.notify_trigger(trigger_timestamp)
+
+
 def start_monitor(
     port: Optional[str] = None,
     mock: bool = False,
@@ -3821,13 +3829,21 @@ def start_monitor(
             """Forward trigger diagnostics to connected UI clients."""
             socketio.emit("trigger_diagnostic", data)
 
+        monitor_start_kwargs = {
+            "shot_callback": on_shot_detected,
+            "live_callback": on_live_reading,
+            "diagnostic_callback": on_trigger_diagnostic,
+            "processing_callback": on_shot_processing,
+        }
+        if trigger_type == "hardware":
+            if iwr6843_runtime is not None:
+                iwr6843_runtime.capture_monitor.arm()
+            monitor_start_kwargs["capture_started_callback"] = _notify_ops_hardware_trigger
+
         monitor.start(  # pylint: disable=unexpected-keyword-arg
-            shot_callback=on_shot_detected,
-            live_callback=on_live_reading,
-            diagnostic_callback=on_trigger_diagnostic,
-            processing_callback=on_shot_processing,
+            **monitor_start_kwargs,
         )
-        if iwr6843_runtime is not None:
+        if iwr6843_runtime is not None and trigger_type != "hardware":
             iwr6843_runtime.capture_monitor.arm()
     else:
         monitor.start(shot_callback=on_shot_detected, live_callback=on_live_reading)
