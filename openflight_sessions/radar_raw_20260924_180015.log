@@ -1,0 +1,3 @@
+18:00:16.390 - [OPS] Clock sync: method=integer_rollover offset=1790265503.384s best_read_latency=1.1ms spread=988.7ms rollover_uncertainty=11.3ms (73/73 valid)
+18:00:46.404 - [OPS] Hardware trigger: no data received within 30s
+18:01:16.419 - [OPS] Hardware trigger: no data received within 30s

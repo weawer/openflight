@@ -1,0 +1,43 @@
+18:48:28.131 - [OPS] Clock sync: method=integer_rollover offset=1790268462.073s best_read_latency=2.3ms spread=987.3ms rollover_uncertainty=12.7ms (7/7 valid)
+18:48:47.962 - [OPS] Hardware trigger: first byte after 19.8s
+18:48:49.745 - [OPS] Hardware trigger: 41031 bytes in 21.6s
+18:48:51.602 - [OPS] Internal speed trigger re-armed (GC)
+18:48:58.559 - [OPS] Hardware trigger: first byte after 6.9s
+18:49:00.325 - [OPS] Hardware trigger: 41031 bytes in 8.7s
+18:49:02.174 - [OPS] Internal speed trigger re-armed (GC)
+18:49:11.697 - [OPS] Hardware trigger: first byte after 9.5s
+18:49:13.472 - [OPS] Hardware trigger: 41031 bytes in 11.3s
+18:49:15.314 - [OPS] Internal speed trigger re-armed (GC)
+18:49:23.873 - [OPS] Hardware trigger: first byte after 8.5s
+18:49:25.639 - [OPS] Hardware trigger: 41033 bytes in 10.3s
+18:49:27.486 - [OPS] Internal speed trigger re-armed (GC)
+18:49:38.978 - [OPS] Hardware trigger: first byte after 11.5s
+18:49:40.744 - [OPS] Hardware trigger: 41033 bytes in 13.2s
+18:49:42.594 - [OPS] Internal speed trigger re-armed (GC)
+18:49:43.982 - [OPS] Hardware trigger: first byte after 1.4s
+18:49:45.748 - [OPS] Hardware trigger: 41033 bytes in 3.1s
+18:49:47.602 - [OPS] Internal speed trigger re-armed (GC)
+18:50:03.260 - [OPS] Hardware trigger: first byte after 15.6s
+18:50:05.037 - [OPS] Hardware trigger: 41033 bytes in 17.4s
+18:50:06.886 - [OPS] Internal speed trigger re-armed (GC)
+18:50:15.003 - [OPS] Hardware trigger: first byte after 8.1s
+18:50:16.788 - [OPS] Hardware trigger: 41033 bytes in 9.9s
+18:50:18.642 - [OPS] Internal speed trigger re-armed (GC)
+18:50:27.141 - [OPS] Hardware trigger: first byte after 8.5s
+18:50:28.915 - [OPS] Hardware trigger: 41033 bytes in 10.3s
+18:50:30.766 - [OPS] Internal speed trigger re-armed (GC)
+18:50:31.934 - [OPS] Hardware trigger: first byte after 1.2s
+18:50:33.708 - [OPS] Hardware trigger: 41033 bytes in 2.9s
+18:50:35.558 - [OPS] Internal speed trigger re-armed (GC)
+18:50:44.156 - [OPS] Hardware trigger: first byte after 8.6s
+18:50:45.932 - [OPS] Hardware trigger: 41033 bytes in 10.4s
+18:50:47.786 - [OPS] Internal speed trigger re-armed (GC)
+18:51:01.547 - [OPS] Hardware trigger: first byte after 13.7s
+18:51:03.314 - [OPS] Hardware trigger: 41033 bytes in 15.5s
+18:51:05.166 - [OPS] Internal speed trigger re-armed (GC)
+18:51:11.074 - [OPS] Hardware trigger: first byte after 5.9s
+18:51:12.840 - [OPS] Hardware trigger: 41033 bytes in 7.7s
+18:51:14.682 - [OPS] Internal speed trigger re-armed (GC)
+18:51:24.055 - [OPS] Hardware trigger: first byte after 9.2s
+18:51:25.822 - [OPS] Hardware trigger: 41033 bytes in 11.0s
+18:51:27.670 - [OPS] Internal speed trigger re-armed (GC)

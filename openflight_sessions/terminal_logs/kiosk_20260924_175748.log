@@ -1,0 +1,37 @@
+[OpenFlight] Starting startup splash on port 8081...
+[OpenFlight] Launching kiosk shell (Electron)...
+Downloading Electron binary...
+[OpenFlight] Starting OpenFlight server on port 8080
+[OpenFlight] Waiting for server to start...
+Xlib:  extension "DRI2" missing on display ":0".
+libva error: vaGetDriverNames() failed with operation failed
+[2528:0924/175752.849792:ERROR:media/gpu/vaapi/vaapi_wrapper.cc:1801] vaInitialize failed: operation failed
+2026-09-24 17:57:54,277 - openflight.rolling_buffer.monitor - INFO - [MONITOR] Rolling buffer monitor stopped
+2026-09-24 17:57:54,277 - openflight.rolling_buffer.monitor - INFO - [MONITOR] Rolling buffer monitor stopped
+2026-09-24 17:57:54,277 - openflight.server - INFO - [SERVER] Shutdown step launch monitor stop completed in 4.4ms
+==================================================
+  OpenFlight UI Server
+==================================================
+
+Session logging enabled (location: range)
+Ballistic carry model: ENABLED (simulator + drag/Magnus)
+[MODE] Rolling buffer mode (trigger: sound, sample_rate: 30ksps)
+Traceback (most recent call last):
+  File "/home/jamorro/openflight/.venv/bin/openflight-server", line 10, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/home/jamorro/openflight/src/openflight/server.py", line 4947, in main
+    start_monitor(
+  File "/home/jamorro/openflight/src/openflight/server.py", line 3738, in start_monitor
+    monitor.connect()
+  File "/home/jamorro/openflight/src/openflight/rolling_buffer/monitor.py", line 234, in connect
+    self.radar.connect()
+  File "/home/jamorro/openflight/src/openflight/ops243.py", line 265, in connect
+    raise ConnectionError(
+ConnectionError: No OPS243 radar found on USB. If it is wired to the Pi GPIO UART (J3 pins 6/7), pass the port explicitly — e.g. --radar-port /dev/ttyAMA0 — since a raw UART has no USB descriptors to auto-detect.
+[OpenFlight] ERROR: OpenFlight server exited during startup
+[OpenFlight] ERROR: Check the connected radar hardware and terminal log, then relaunch OpenFlight.
+[OpenFlight] Startup stopped. Use Return to desktop on the splash to close it.
+[OpenFlight] Shutting down...
+[OpenFlight] Closing kiosk shell...
+/home/jamorro/openflight/ui/node_modules/electron/dist/electron exited with signal SIGTERM

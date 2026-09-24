@@ -1,0 +1,1 @@
+./scripts/start-kiosk.sh   --debug   --ops-port /dev/ttyAMA0   --trigger hardware   --trigger-threshold 25   --trigger-magnitude 25   --pre-trigger-segments 6   --sample-rate 30   --iwr6843   --camera-capture   --camera-capture-width 320   --camera-capture-height 200   --camera-capture-fps 450   --camera-capture-pre-ms 150   --camera-capture-post-ms 50   --session-location home

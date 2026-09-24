@@ -1,0 +1,4 @@
+17:44:58.675 - [OPS] Clock sync: method=integer_rollover offset=1790262614.668s best_read_latency=2.3ms spread=987.2ms rollover_uncertainty=12.8ms (17/17 valid)
+17:45:13.413 - [OPS] Hardware trigger: first byte after 14.7s
+17:45:15.187 - [OPS] Hardware trigger: 41035 bytes in 16.5s
+17:45:17.029 - [OPS] Internal speed trigger re-armed (GC)

@@ -1,0 +1,20 @@
+18:41:29.692 - [OPS] Clock sync: method=integer_rollover offset=1790268044.684s best_read_latency=2.3ms spread=987.1ms rollover_uncertainty=12.9ms (69/69 valid)
+18:41:54.665 - [OPS] Hardware trigger: first byte after 25.0s
+18:41:56.451 - [OPS] Hardware trigger: 41031 bytes in 26.8s
+18:41:58.289 - [OPS] Internal speed trigger re-armed (GC)
+18:42:28.448 - [OPS] Hardware trigger: no data received within 30s
+18:42:46.335 - [OPS] Hardware trigger: first byte after 17.9s
+18:42:48.109 - [OPS] Hardware trigger: 41033 bytes in 19.7s
+18:42:49.957 - [OPS] Internal speed trigger re-armed (GC)
+18:42:51.567 - [OPS] Hardware trigger: first byte after 1.6s
+18:42:53.332 - [OPS] Hardware trigger: 41033 bytes in 3.4s
+18:42:55.189 - [OPS] Internal speed trigger re-armed (GC)
+18:43:25.203 - [OPS] Hardware trigger: no data received within 30s
+18:43:55.207 - [OPS] Hardware trigger: no data received within 30s
+18:44:25.210 - [OPS] Hardware trigger: no data received within 30s
+18:44:55.217 - [OPS] Hardware trigger: no data received within 30s
+18:45:25.223 - [OPS] Hardware trigger: no data received within 30s
+18:45:55.230 - [OPS] Hardware trigger: no data received within 30s
+18:46:25.233 - [OPS] Hardware trigger: no data received within 30s
+18:46:55.239 - [OPS] Hardware trigger: no data received within 30s
+18:47:25.243 - [OPS] Hardware trigger: no data received within 30s
