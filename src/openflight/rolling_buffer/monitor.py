@@ -11,7 +11,9 @@ import time
 from datetime import datetime
 from typing import Callable, List, Optional
 
-from ..launch_monitor import ClubType, Shot, estimate_carry_distance, summarize_shots
+from ..clubs import ClubType
+from ..clubs.physics import get_club_physics
+from ..launch_monitor import Shot, estimate_carry_distance, summarize_shots
 from ..ops243 import OPS243Radar, SpeedReading
 from ..session_logger import get_session_logger, log_session_error
 from .processor import RollingBufferProcessor
@@ -61,32 +63,7 @@ def get_optimal_spin_for_ball_speed(
             optimal = base_rpm + (upper - ball_speed_mph) * rpm_per_mph
             break
 
-    # Adjust for club type - irons need more spin
-    club_spin_multipliers = {
-        ClubType.DRIVER: 1.0,
-        ClubType.WOOD_3: 1.15,
-        ClubType.WOOD_5: 1.25,
-        ClubType.WOOD_7: 1.32,
-        ClubType.HYBRID_3: 1.45,
-        ClubType.HYBRID_5: 1.55,
-        ClubType.HYBRID_7: 1.65,
-        ClubType.HYBRID_9: 1.75,
-        ClubType.IRON_2: 1.5,
-        ClubType.IRON_3: 1.6,
-        ClubType.IRON_4: 1.8,
-        ClubType.IRON_5: 2.0,
-        ClubType.IRON_6: 2.2,
-        ClubType.IRON_7: 2.5,
-        ClubType.IRON_8: 2.8,
-        ClubType.IRON_9: 3.2,
-        ClubType.PW: 3.6,
-        ClubType.GW: 4.1,
-        ClubType.SW: 4.3,
-        ClubType.LW: 4.6,
-        ClubType.UNKNOWN: 1.0,
-    }
-
-    multiplier = club_spin_multipliers.get(club, 1.0)
+    multiplier = get_club_physics(club).optimal_spin_multiplier
     return optimal * multiplier
 
 
@@ -161,32 +138,7 @@ def estimate_carry_with_spin(
     if club_speed_mph and club_speed_mph > 0:
         smash = ball_speed_mph / club_speed_mph
 
-        # Optimal smash factors by club type
-        optimal_smash = {
-            ClubType.DRIVER: 1.48,
-            ClubType.WOOD_3: 1.44,
-            ClubType.WOOD_5: 1.42,
-            ClubType.WOOD_7: 1.41,
-            ClubType.HYBRID_3: 1.39,
-            ClubType.HYBRID_5: 1.37,
-            ClubType.HYBRID_7: 1.35,
-            ClubType.HYBRID_9: 1.33,
-            ClubType.IRON_2: 1.36,
-            ClubType.IRON_3: 1.35,
-            ClubType.IRON_4: 1.33,
-            ClubType.IRON_5: 1.31,
-            ClubType.IRON_6: 1.29,
-            ClubType.IRON_7: 1.27,
-            ClubType.IRON_8: 1.25,
-            ClubType.IRON_9: 1.23,
-            ClubType.PW: 1.21,
-            ClubType.GW: 1.19,
-            ClubType.SW: 1.18,
-            ClubType.LW: 1.17,
-            ClubType.UNKNOWN: 1.35,
-        }
-
-        target_smash = optimal_smash.get(club, 1.35)
+        target_smash = get_club_physics(club).carry_smash_reference
         smash_delta = target_smash - smash
 
         if smash_delta > 0:
@@ -273,16 +225,30 @@ class RollingBufferMonitor:
         """
         Connect to radar and configure based on trigger type.
 
-        Sound uses the persisted rolling-buffer configuration. Speed handles
-        its own mode transition when a qualifying speed is detected.
+        Sound uses the persisted rolling-buffer configuration. The opt-in
+        hardware trigger configures the OPS243 internal speed trigger. Speed
+        handles its own mode transition when a qualifying speed is detected.
 
         Returns:
             True if successful
         """
         self.radar.connect()
 
+        if self.trigger_type == "hardware":
+            self.radar.configure_for_internal_speed_trigger(
+                trigger_threshold_mph=self.trigger.trigger_threshold_mph,
+                pre_trigger_segments=self.trigger.pre_trigger_segments,
+                trigger_magnitude=self.trigger.trigger_magnitude,
+                sample_rate_ksps=self.sample_rate_ksps,
+            )
+            logger.info(
+                "[MONITOR] Internal hardware trigger configured (threshold %.1f, S#%d, SM%d)",
+                self.trigger.trigger_threshold_mph,
+                self.trigger.pre_trigger_segments,
+                self.trigger.trigger_magnitude,
+            )
         # Speed trigger handles its own configuration (starts in speed mode).
-        if self.trigger_type != "speed":
+        elif self.trigger_type != "speed":
             pre_trigger_segments = getattr(self.trigger, "pre_trigger_segments", 12)
             self.radar.prepare_persisted_rolling_buffer(
                 pre_trigger_segments=pre_trigger_segments,
@@ -799,15 +765,6 @@ class RollingBufferMonitor:
                 "%.0f" % spin.spin_rpm if spin else "N/A",
             )
 
-        # Calculate carry distance.
-        # Use spin-adjusted carry only for reliable, plausible spin readings.
-        has_reliable_spin = bool(
-            processed.has_spin
-            and club_spin_rejection_reason is None
-            and spin is not None
-            and not spin.at_lower_rail
-            and not spin.at_upper_rail
-        )
         has_reportable_spin = bool(
             spin is not None
             and spin.spin_rpm > 0
@@ -835,16 +792,6 @@ class RollingBufferMonitor:
                 spin_rejection_reason = (
                     f"Upper-rail spin candidate {spin.spin_rpm:.0f} RPM kept as diagnostic only"
                 )
-
-        if has_reliable_spin:
-            carry = estimate_carry_with_spin(
-                processed.ball_speed_mph,
-                spin.spin_rpm,
-                self._current_club,
-                club_speed_mph=processed.club_speed_mph,
-            )
-        else:
-            carry = estimate_carry_distance(processed.ball_speed_mph, self._current_club)
 
         spin_rpm = spin.spin_rpm if has_reportable_spin else None
         spin_confidence = spin.confidence if has_reportable_spin else None
@@ -894,7 +841,6 @@ class RollingBufferMonitor:
             spin_phase_agreement_pct=spin.phase_agreement_pct if spin else None,
             spin_phase_confirmed=spin.phase_confirmed if spin else False,
             spin_rejection_reason=spin_rejection_reason,
-            carry_spin_adjusted=carry if has_reliable_spin else None,
             mode="rolling-buffer",
         )
 

@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List, Optional
 
+from ..launch_monitor import SPIN_CONFIDENCE_RELIABLE
+
 
 @dataclass
 class IQCapture:
@@ -282,7 +284,7 @@ class SpinResult:
     @property
     def is_reliable(self) -> bool:
         """Whether spin detection is considered reliable."""
-        return self.confidence >= 0.6 and self.quality in ("high", "medium")
+        return self.confidence >= SPIN_CONFIDENCE_RELIABLE and self.quality in ("high", "medium")
 
     @classmethod
     def no_spin_detected(
