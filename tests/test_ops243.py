@@ -791,6 +791,55 @@ class TestInternalSpeedTrigger:
         radar.serial = serial_obj
         return radar
 
+    @pytest.mark.parametrize("internal_trigger", [True, False])
+    def test_reads_internal_capture_already_buffered(self, internal_trigger):
+        class BufferedSerial(_InternalTriggerSerial):
+            def __init__(self):
+                super().__init__()
+                self.pending = b"".join(TestWaitForHardwareTrigger._DUMP)
+
+            @property
+            def in_waiting(self):
+                return len(self.pending)
+
+            def reset_input_buffer(self):
+                self.pending = b""
+
+            def read(self, count):
+                result, self.pending = self.pending[:count], self.pending[count:]
+                return result
+
+        radar = self._radar(BufferedSerial())
+        radar._internal_speed_trigger_config = (25.0, 6, 25, 30) if internal_trigger else None
+
+        response = radar.wait_for_hardware_trigger(timeout=0.05)
+        expected = b"".join(TestWaitForHardwareTrigger._DUMP).decode("ascii")
+        assert response == (expected if internal_trigger else "")
+
+    @pytest.mark.parametrize("initial_setup", [True, False])
+    def test_preserves_capture_arriving_during_arming(self, monkeypatch, initial_setup):
+        serial_obj = _InternalTriggerSerial()
+        pending = []
+        serial_obj.reset_input_buffer = pending.clear
+        radar = self._radar(serial_obj)
+        radar._internal_speed_trigger_config = (25.0, 6, 25, 30)
+        monkeypatch.setattr(time, "sleep", lambda _: None)
+        monkeypatch.setattr(radar, "validate_internal_trigger_firmware", lambda: "1.3.2")
+        monkeypatch.setattr(radar, "_send_command", lambda _: "")
+        monkeypatch.setattr(radar, "_drain_rearm_serial", lambda: None)
+        monkeypatch.setattr(
+            radar,
+            "_restore_internal_speed_trigger_settings",
+            lambda: pending.append(b"".join(TestWaitForHardwareTrigger._DUMP)),
+        )
+
+        if initial_setup:
+            radar.configure_for_internal_speed_trigger()
+        else:
+            assert radar.rearm_internal_speed_trigger() is True
+
+        assert pending == [b"".join(TestWaitForHardwareTrigger._DUMP)]
+
     def test_configuration_uses_gc_trigger_order_and_six_pre_segments(self, monkeypatch):
         """Internal trigger setup must restore GC-reset settings in order."""
         radar = self._radar(_InternalTriggerSerial())

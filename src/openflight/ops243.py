@@ -1560,8 +1560,9 @@ class OPS243Radar:
         if dump_grace is None:
             dump_grace = self.transfer_budget_s(floor=8.0)
 
-        # Clear any stale data
-        self.serial.reset_input_buffer()
+        # An internal trigger may finish before the host starts this read.
+        if getattr(self, "_internal_speed_trigger_config", None) is None:
+            self.serial.reset_input_buffer()
 
         response_lines = []
         idle_bytes = bytearray()
@@ -1842,7 +1843,6 @@ class OPS243Radar:
             sample_rate_ksps,
         )
         self._restore_internal_speed_trigger_settings()
-        self.serial.reset_input_buffer()
 
         # A 4,096-sample buffer takes about 136.5 ms at 30 ksps.
         time.sleep(0.3)
@@ -1912,7 +1912,6 @@ class OPS243Radar:
             time.sleep(0.15)
             self._send_internal_trigger_threshold(self.INTERNAL_TRIGGER_GUARD_THRESHOLD)
             self._restore_internal_speed_trigger_settings()
-            self.serial.reset_input_buffer()
         except serial.SerialTimeoutException as error:
             self._hardware_trigger_recovery_required = True
             logger.warning(

@@ -712,6 +712,14 @@ class HardwareTriggeredCapture(TriggerStrategy):
         self.min_ball_speed_mph = float(min_ball_speed_mph)
         self.trigger_magnitude = trigger_magnitude
         self.sample_rate_ksps = sample_rate_ksps
+        self._rearm_pending = False
+
+    def _rearm(self, radar: "OPS243Radar") -> None:
+        self._rearm_pending = True
+        try:
+            self._rearm_pending = not radar.rearm_internal_speed_trigger(self.sample_rate_ksps)
+        except Exception as error:  # pylint: disable=broad-exception-caught
+            logger.warning("[TRIGGER] Internal trigger re-arm failed: %s", error, exc_info=True)
 
     def wait_for_trigger(
         self,
@@ -729,6 +737,8 @@ class HardwareTriggeredCapture(TriggerStrategy):
         response = radar.wait_for_hardware_trigger(timeout=timeout)
         if not response:
             logger.info("[TRIGGER] OPS hardware trigger timeout — no dump received")
+            if self._rearm_pending:
+                self._rearm(radar)
             return None
 
         response_bytes = len(response)
@@ -749,14 +759,10 @@ class HardwareTriggeredCapture(TriggerStrategy):
             parse_error = error
             logger.warning("[TRIGGER] Hardware capture parse failed: %s", error, exc_info=True)
         finally:
-            try:
-                rearmed = radar.rearm_internal_speed_trigger(self.sample_rate_ksps)
-            except Exception as error:  # pylint: disable=broad-exception-caught
-                rearmed = False
-                logger.warning("[TRIGGER] Internal trigger re-arm failed: %s", error, exc_info=True)
+            self._rearm(radar)
 
         trigger_latency_ms = (time.time() - started_at) * 1000.0
-        if not rearmed:
+        if self._rearm_pending:
             logger.warning("[TRIGGER] Hardware capture retained while radar re-arm is pending")
 
         if capture is None or parse_error is not None:

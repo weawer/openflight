@@ -587,6 +587,34 @@ class TestHardwareTriggeredCapture:
             q_samples=[2048],
         )
 
+    def test_retries_failed_rearm_without_another_dump(self):
+        radar = MagicMock()
+        radar.wait_for_hardware_trigger.side_effect = ['{"Q": [1]}', "", "", ""]
+        radar.rearm_internal_speed_trigger.side_effect = [False, False, True]
+        processor = MagicMock()
+        processor.parse_capture.return_value = self._capture()
+        processor.process_standard.return_value = SpeedTimeline([], 937.5)
+        trigger = HardwareTriggeredCapture()
+
+        for _ in range(4):
+            assert trigger.wait_for_trigger(radar, processor, timeout=0.01) is None
+
+        assert radar.rearm_internal_speed_trigger.call_count == 3
+
+    def test_retries_rearm_exception_without_another_dump(self):
+        radar = MagicMock()
+        radar.wait_for_hardware_trigger.side_effect = ['{"Q": [1]}', ""]
+        radar.rearm_internal_speed_trigger.side_effect = [OSError("UART busy"), True]
+        processor = MagicMock()
+        processor.parse_capture.return_value = self._capture()
+        processor.process_standard.return_value = SpeedTimeline([], 937.5)
+        trigger = HardwareTriggeredCapture()
+
+        for _ in range(2):
+            assert trigger.wait_for_trigger(radar, processor, timeout=0.01) is None
+
+        assert radar.rearm_internal_speed_trigger.call_count == 2
+
     def test_accepts_ball_capture_and_rearms_after_parsing(self):
         """A valid board dump is parsed before GC re-arm and returned."""
         radar = MagicMock()
