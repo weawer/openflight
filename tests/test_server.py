@@ -13,9 +13,10 @@ import pytest
 
 from openflight import server as server_module
 from openflight.camera.replay import ReplayNotFoundError, ReplayPreparationError
+from openflight.clubs import ClubType
 from openflight.iwr6843 import Calibration
 from openflight.kld7.types import KLD7Angle
-from openflight.launch_monitor import ClubType, Shot
+from openflight.launch_monitor import Shot
 from openflight.ops243 import UART_BAUD_COMMANDS
 from openflight.power import PowerState
 from openflight.server import (
@@ -4481,3 +4482,321 @@ class TestOpsBaudValidation:
         a stricter check would reject a legitimate fallback to 115200, which the
         flag's own help text tells operators to use."""
         assert good in UART_BAUD_COMMANDS
+
+
+class TestHardwareTriggerPlumbing:
+    """Server-side forwarding and validation for the opt-in trigger mode."""
+
+    def test_server_cli_accepts_trigger_speed_alias(self, monkeypatch):
+        """The Pi's --trigger-speed spelling reaches hardware trigger setup."""
+        captured = {}
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "openflight-server",
+                "--mock",
+                "--no-logging",
+                "--trigger",
+                "hardware",
+                "--trigger-speed",
+                "10",
+            ],
+        )
+        monkeypatch.setattr(
+            server_module,
+            "start_monitor",
+            lambda **kwargs: captured.update(kwargs),
+        )
+        monkeypatch.setattr(server_module, "load_sim_config", lambda: [])
+        monkeypatch.setattr(server_module, "build_connectors", lambda *args, **kwargs: [])
+        monkeypatch.setattr(server_module, "init_session_logger", lambda **kwargs: None)
+        monkeypatch.setattr(server_module, "_cleanup_hardware_for_shutdown", lambda: None)
+        monkeypatch.setattr(server_module.socketio, "run", lambda *args, **kwargs: None)
+
+        server_module.main()
+
+        assert captured["trigger_type"] == "hardware"
+        assert captured["trigger_kwargs"]["trigger_threshold_mph"] == 10.0
+
+    def test_server_cli_forwards_hardware_flags_and_preserves_sound_alias(self, monkeypatch):
+        """Argparse selects the new kwargs only for hardware mode."""
+        captured = {}
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "openflight-server",
+                "--mock",
+                "--no-logging",
+                "--trigger",
+                "hardware",
+                "--trigger-threshold",
+                "31",
+                "--trigger-magnitude",
+                "52",
+                "--pre-trigger-segments",
+                "20",
+            ],
+        )
+        monkeypatch.setattr(
+            server_module,
+            "start_monitor",
+            lambda **kwargs: captured.update(kwargs),
+        )
+        monkeypatch.setattr(server_module, "load_sim_config", lambda: [])
+        monkeypatch.setattr(server_module, "build_connectors", lambda *args, **kwargs: [])
+        monkeypatch.setattr(server_module, "init_session_logger", lambda **kwargs: None)
+        monkeypatch.setattr(server_module, "_cleanup_hardware_for_shutdown", lambda: None)
+        monkeypatch.setattr(server_module.socketio, "run", lambda *args, **kwargs: None)
+
+        server_module.main()
+
+        assert captured["trigger_type"] == "hardware"
+        assert captured["sample_rate_ksps"] == 30
+        assert captured["trigger_kwargs"] == {
+            "trigger_threshold_mph": 31.0,
+            "trigger_magnitude": 52,
+            "pre_trigger_segments": 20,
+        }
+
+        captured.clear()
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "openflight-server",
+                "--mock",
+                "--no-logging",
+                "--trigger",
+                "sound",
+                "--sound-pre-trigger",
+                "18",
+            ],
+        )
+        server_module.main()
+
+        assert captured["trigger_type"] == "sound"
+        assert captured["trigger_kwargs"] == {"pre_trigger_segments": 18}
+
+    @pytest.mark.parametrize("trigger", ["speed"])
+    def test_server_cli_does_not_reuse_sound_pre_trigger_for_other_triggers(
+        self, monkeypatch, trigger
+    ):
+        """Non-sound strategies keep their constructor pre-trigger defaults."""
+        captured = {}
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "openflight-server",
+                "--mock",
+                "--no-logging",
+                "--trigger",
+                trigger,
+                "--sound-pre-trigger",
+                "16",
+            ],
+        )
+        monkeypatch.setattr(
+            server_module,
+            "start_monitor",
+            lambda **kwargs: captured.update(kwargs),
+        )
+        monkeypatch.setattr(server_module, "load_sim_config", lambda: [])
+        monkeypatch.setattr(server_module, "build_connectors", lambda *args, **kwargs: [])
+        monkeypatch.setattr(server_module, "init_session_logger", lambda **kwargs: None)
+        monkeypatch.setattr(server_module, "_cleanup_hardware_for_shutdown", lambda: None)
+        monkeypatch.setattr(server_module.socketio, "run", lambda *args, **kwargs: None)
+
+        server_module.main()
+
+        assert captured["trigger_type"] == trigger
+        assert captured["trigger_kwargs"] == {}
+
+    def test_start_monitor_forwards_hardware_trigger_kwargs(self, monkeypatch):
+        """The server passes threshold, magnitude, split, and sample rate through."""
+        captured = {}
+
+        class FakeMonitor:
+            def __init__(self, **kwargs):
+                captured.update(kwargs)
+
+            def connect(self):
+                captured["connected"] = True
+
+            def start(self, **kwargs):
+                captured["started"] = kwargs
+
+            def stop(self):
+                captured["stopped"] = True
+
+            def disconnect(self):
+                captured["disconnected"] = True
+
+        monkeypatch.setattr("openflight.rolling_buffer.RollingBufferMonitor", FakeMonitor)
+        monkeypatch.setattr(server_module, "monitor", None)
+        monkeypatch.setattr(server_module, "get_session_logger", lambda: None)
+
+        server_module.start_monitor(
+            port="/dev/ops",
+            trigger_type="hardware",
+            sample_rate_ksps=30,
+            trigger_kwargs={
+                "trigger_threshold_mph": 25.0,
+                "trigger_magnitude": 40,
+                "pre_trigger_segments": 6,
+            },
+        )
+
+        assert captured["port"] == "/dev/ops"
+        assert captured["trigger_type"] == "hardware"
+        assert captured["sample_rate_ksps"] == 30
+        assert captured["trigger_threshold_mph"] == 25.0
+        assert captured["trigger_magnitude"] == 40
+        assert captured["pre_trigger_segments"] == 6
+        assert captured["connected"] is True
+
+        server_module.stop_monitor()
+
+    def test_start_monitor_rejects_non_30_ksps_hardware_mode(self, monkeypatch):
+        """Hardware mode must not start with an untested sample rate."""
+        monkeypatch.setattr(server_module, "monitor", None)
+
+        with pytest.raises(ValueError, match="30 ksps"):
+            server_module.start_monitor(
+                trigger_type="hardware",
+                sample_rate_ksps=25,
+            )
+class TestBallisticCarryPrecedence:
+    """Finalization is the single writer of carry_spin_adjusted.
+
+    The simulator owns carry whenever it can run; the spin table owns it
+    otherwise. Anything already on the shot is replaced either way.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _isolate_finalization(self, monkeypatch):
+        server_module._reset_shot_sequence()
+        monkeypatch.setattr(server_module, "monitor", None)
+        monkeypatch.setattr(server_module, "kld7_vertical", None)
+        monkeypatch.setattr(server_module, "kld7_horizontal", None)
+        monkeypatch.setattr(server_module, "camera_capture_runtime", None)
+        monkeypatch.setattr(server_module, "ball_speed_correction_enabled", False)
+        monkeypatch.setattr(server_module, "calculated_spin_enabled", False)
+        monkeypatch.setattr(server_module, "debug_mode", False)
+        monkeypatch.setattr(server_module, "sim_connectors", [])
+        monkeypatch.setattr(server_module, "get_session_logger", lambda: None)
+        monkeypatch.setattr(server_module.socketio, "emit", lambda *_args, **_kwargs: None)
+        yield
+        _wait_for_shot_finalization_idle()
+
+    @staticmethod
+    def _shot(*, launch_angle: float | None, prefilled_carry: float | None) -> Shot:
+        # Field report, 2026-09-23: a 7-iron where the kiosk showed the 119 yd
+        # spin-table number while the simulator and a commercial launch
+        # monitor both landed near 143 yd.
+        return Shot(
+            ball_speed_mph=104.2,
+            club_speed_mph=83.7,
+            timestamp=datetime(2026, 9, 23, 12, 0, 0),
+            impact_timestamp=100.0,
+            club=ClubType.IRON_7,
+            spin_rpm=5164.0,
+            spin_confidence=0.9,
+            launch_angle_vertical=launch_angle,
+            launch_angle_confidence=0.9 if launch_angle is not None else None,
+            carry_spin_adjusted=prefilled_carry,
+            mode="rolling-buffer",
+        )
+
+    def test_simulator_overrides_prefilled_table_carry(self, monkeypatch):
+        monkeypatch.setattr(server_module, "ballistics_enabled", True)
+        shot = self._shot(launch_angle=19.1, prefilled_carry=119.2)
+
+        server_module._finalize_shot_detected(shot, emit_event="shot")
+
+        expected = server_module.simulate(server_module.resolve_launch(shot)).carry_yards
+        assert shot.carry_spin_adjusted == pytest.approx(expected)
+        assert shot.carry_spin_adjusted != pytest.approx(119.2)
+        assert shot.carry_spin_adjusted > 135.0
+
+    def test_table_fallback_replaces_prefilled_carry_when_ballistics_disabled(self, monkeypatch):
+        monkeypatch.setattr(server_module, "ballistics_enabled", False)
+        shot = self._shot(launch_angle=19.1, prefilled_carry=999.0)
+
+        server_module._finalize_shot_detected(shot, emit_event="shot")
+
+        expected = server_module.estimate_carry_with_spin(
+            104.2, 5164.0, ClubType.IRON_7, club_speed_mph=83.7
+        )
+        assert shot.carry_spin_adjusted == pytest.approx(expected)
+
+    def test_table_fallback_replaces_prefilled_carry_without_launch_angle(self, monkeypatch):
+        monkeypatch.setattr(server_module, "ballistics_enabled", True)
+        monkeypatch.setattr(server_module, "_ensure_user_facing_launch_angles", lambda _shot: None)
+        shot = self._shot(launch_angle=None, prefilled_carry=999.0)
+
+        server_module._finalize_shot_detected(shot, emit_event="shot")
+
+        assert shot.carry_spin_adjusted is not None
+        assert shot.carry_spin_adjusted != pytest.approx(999.0)
+        assert 0 < shot.carry_spin_adjusted < 200
+
+    @pytest.mark.parametrize(
+        ("offset_from_floor", "uses_measured_spin"),
+        [(0.0, True), (-0.01, False)],
+    )
+    def test_table_fallback_spin_gate_matches_monitor_reliability(
+        self, monkeypatch, offset_from_floor, uses_measured_spin
+    ):
+        """The fallback trusts measured spin on the same floor SpinResult.is_reliable uses."""
+        from openflight.launch_monitor import SPIN_CONFIDENCE_RELIABLE
+        from openflight.rolling_buffer.types import SpinResult
+
+        confidence = SPIN_CONFIDENCE_RELIABLE + offset_from_floor
+        assert (
+            SpinResult(spin_rpm=5164, confidence=confidence, snr=10.0, quality="medium").is_reliable
+            is uses_measured_spin
+        )
+
+        monkeypatch.setattr(server_module, "ballistics_enabled", False)
+        shot = self._shot(launch_angle=19.1, prefilled_carry=None)
+        shot.spin_confidence = confidence
+
+        server_module._finalize_shot_detected(shot, emit_event="shot")
+
+        measured = server_module.estimate_carry_with_spin(
+            104.2, 5164.0, ClubType.IRON_7, club_speed_mph=83.7
+        )
+        optimal = server_module.estimate_carry_with_spin(
+            104.2,
+            server_module.get_optimal_spin_for_ball_speed(104.2, ClubType.IRON_7),
+            ClubType.IRON_7,
+            club_speed_mph=83.7,
+        )
+        assert measured != pytest.approx(optimal)
+        expected = measured if uses_measured_spin else optimal
+        assert shot.carry_spin_adjusted == pytest.approx(expected)
+
+    def test_table_fallback_fills_empty_carry(self, monkeypatch):
+        monkeypatch.setattr(server_module, "ballistics_enabled", False)
+        shot = self._shot(launch_angle=19.1, prefilled_carry=None)
+
+        server_module._finalize_shot_detected(shot, emit_event="shot")
+
+        assert shot.carry_spin_adjusted is not None
+        assert shot.carry_spin_adjusted > 0
+
+    def test_simulator_carry_reaches_sim_connectors(self, monkeypatch):
+        monkeypatch.setattr(server_module, "ballistics_enabled", True)
+        forwarded = []
+        monkeypatch.setattr(server_module, "_forward_shot_to_simulators", forwarded.append)
+        shot = self._shot(launch_angle=19.1, prefilled_carry=None)
+
+        server_module._finalize_shot_detected(shot, emit_event="shot")
+
+        assert forwarded == [shot]
+        resolved = server_module.resolve_shot(forwarded[0], server_module.SimPlayerState())
+        assert resolved.carry_yards == pytest.approx(shot.carry_spin_adjusted)
+        assert resolved.carry_yards > 135.0

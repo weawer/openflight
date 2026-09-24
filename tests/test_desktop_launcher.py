@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 import shutil
 import subprocess
 from pathlib import Path
@@ -69,7 +70,7 @@ def test_installer_creates_terminal_free_desktop_entry_and_preserves_launcher(tm
     assert launcher_path.exists()
     assert os.access(launcher_path, os.X_OK)
     desktop_entry = desktop_path.read_text(encoding="utf-8")
-    assert f"Exec=/bin/bash -lc {launcher_path}" in desktop_entry
+    assert f"Exec=/bin/bash -ilc {launcher_path}" in desktop_entry
     assert "Terminal=false" in desktop_entry
     assert "StartupNotify=false" in desktop_entry
     assert "lxterminal" not in desktop_entry
@@ -95,6 +96,50 @@ def test_installer_creates_terminal_free_desktop_entry_and_preserves_launcher(tm
     assert launcher_path.read_text(encoding="utf-8") == ("#!/bin/bash\n# local calibration\n")
     assert "Replace it? [y/N]" in repeated_install.stderr
     assert "Existing desktop entry preserved" in repeated_install.stdout
+
+
+def test_desktop_entry_loads_interactive_shell_path(tmp_path):
+    home = tmp_path / "home"
+    desktop = home / "Desktop"
+    fake_bin = home / "interactive-bin"
+    home.mkdir()
+    fake_bin.mkdir()
+    (home / ".bash_profile").write_text('source "$HOME/.bashrc"\n', encoding="utf-8")
+    (home / ".bashrc").write_text(
+        '[[ $- == *i* ]] || return\nexport PATH="$HOME/interactive-bin:$PATH"\n',
+        encoding="utf-8",
+    )
+    npm = fake_bin / "npm"
+    npm.write_text('#!/bin/bash\nprintf "npm-from-interactive-shell\\n"\n', encoding="utf-8")
+    npm.chmod(0o755)
+    env = {
+        **os.environ,
+        "HOME": str(home),
+        "PATH": "/usr/bin:/bin",
+        "OPENFLIGHT_DESKTOP_DIR": str(desktop),
+        "OPENFLIGHT_SKIP_DESKTOP_TRUST": "true",
+    }
+
+    subprocess.run(["bash", str(INSTALLER)], check=True, cwd=REPO_ROOT, env=env)
+
+    launcher_path, desktop_path = installed_paths(home)
+    launcher_path.write_text("#!/bin/bash\nnpm --prefix ui run build\n", encoding="utf-8")
+    launcher_path.chmod(0o755)
+    exec_line = next(
+        line.removeprefix("Exec=")
+        for line in desktop_path.read_text(encoding="utf-8").splitlines()
+        if line.startswith("Exec=")
+    )
+    result = subprocess.run(
+        shlex.split(exec_line),
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "npm-from-interactive-shell" in result.stdout
 
 
 def test_installer_prompts_before_replacing_and_backs_up_existing_desktop_entry(tmp_path):
