@@ -37,6 +37,13 @@ change only the config argument to:
 --iwr6843-config config/iwr6843_l3dump_dense_36f2ms_53bin_iq8.cfg
 ```
 
+To test dense sampling while retaining the wide profile's late-flight window,
+use the experimental profile:
+
+```text
+--iwr6843-config config/iwr6843_l3dump_dense_36f2ms_53bin_iq8_wide_late.cfg
+```
+
 Passing `--iwr6843-config` explicitly keeps the selected profile visible in the
 launch command and session log.
 
@@ -86,4 +93,3 @@ ball track does not meet the acceptance gates.
 In debug mode, verify that the session contains an `iwr6843_capture` entry, a
 `temperature_report` object, and a `capture_path` pointing to the saved
 `.l3dump` file.
-

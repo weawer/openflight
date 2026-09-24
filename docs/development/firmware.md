@@ -22,6 +22,7 @@ then choose a profile by passing its `.cfg` to OpenFlight.
 | Flash image | `firmware/releases/l3_dump_configurable_capture_20260818.bin` |
 | Default config | `config/iwr6843_l3dump_wide_24f3ms_53bin_iq16.cfg` |
 | Dense config | `config/iwr6843_l3dump_dense_36f2ms_53bin_iq8.cfg` |
+| Dense/wide-late config | `config/iwr6843_l3dump_dense_36f2ms_53bin_iq8_wide_late.cfg` |
 | Reference calibration | `config/iwr6843_calibration_reference.json` |
 | Native build | `make -C firmware build-native` |
 | Container build | `make -C firmware docker-build` |
@@ -37,16 +38,16 @@ sha256sum firmware/releases/l3_dump_configurable_capture_20260818.bin
 
 ## Choose A Capture Profile
 
-| Profile | Wide/default | Dense/advanced |
-|---|---:|---:|
-| Config | `iwr6843_l3dump_wide_24f3ms_53bin_iq16.cfg` | `iwr6843_l3dump_dense_36f2ms_53bin_iq8.cfg` |
-| Frames | 24 | 36 |
-| Frame spacing | 3 ms | 2 ms |
-| Movie duration | 72 ms | 72 ms |
-| Saved bins per frame | 53 | 53 |
-| Stored sample format | IQ16 | Fixed-scale IQ8 |
-| Payload bytes | 732,672 | 549,504 |
-| Primary goal | Robust ball flight | Dense impact sampling |
+| Profile | Wide/default | Dense/advanced | Dense/wide-late experimental |
+|---|---:|---:|---:|
+| Config | `iwr6843_l3dump_wide_24f3ms_53bin_iq16.cfg` | `iwr6843_l3dump_dense_36f2ms_53bin_iq8.cfg` | `iwr6843_l3dump_dense_36f2ms_53bin_iq8_wide_late.cfg` |
+| Frames | 24 | 36 | 36 |
+| Frame spacing | 3 ms | 2 ms | 2 ms |
+| Movie duration | 72 ms | 72 ms | 72 ms |
+| Saved bins per frame | 53 | 53 | 53 |
+| Stored sample format | IQ16 | Fixed-scale IQ8 | Fixed-scale IQ8 |
+| Payload bytes | 732,672 | 549,504 | 549,504 |
+| Primary goal | Robust ball flight | Dense impact sampling | Isolate late-window coverage |
 
 Use **wide/default** unless you are deliberately testing dense impact data. Its
 53-bin windows tolerate more variation in tee distance, launch speed, and setup
@@ -64,7 +65,13 @@ zero IQ8 overruns or EDMA errors. The 53-bin dense profile still needs
 source-of-truth TrackMan validation; horizontal launch and club metrics remain
 experimental.
 
-Both profiles use 3 TX, 4 RX, 12 TDM loops, 128 acquired ADC samples, and the
+The dense/wide-late profile keeps the dense profile's cadence, precision, and
+payload size, but keeps all ball-phase frames in bins 47-99. The standard dense
+profile shifts its final six ball frames outward to bins 64-116. Comparing the
+two profiles isolates late-window placement without changing IQ precision or
+timing.
+
+All profiles use 3 TX, 4 RX, 12 TDM loops, 128 acquired ADC samples, and the
 same 72 ms capture duration. Changing profiles does not require reflashing.
 
 The supported normal-TX profiles use a fixed positive TDM sign. This physical
@@ -145,6 +152,7 @@ matching host-parser change and regression tests in the same commit.
 | `firmware/flash_iwr6843.py` | Pi-compatible IWR6843 ROM bootloader client |
 | `config/iwr6843_l3dump_wide_24f3ms_53bin_iq16.cfg` | Default wide IQ16 capture profile |
 | `config/iwr6843_l3dump_dense_36f2ms_53bin_iq8.cfg` | Dense IQ8 capture profile |
+| `config/iwr6843_l3dump_dense_36f2ms_53bin_iq8_wide_late.cfg` | Experimental dense IQ8 capture with the wide late-flight window |
 | `src/openflight/iwr6843/dump.py` | Python decoder and executable format reference |
 
 ## Where To Build, Flash, And Run

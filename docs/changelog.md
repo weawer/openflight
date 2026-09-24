@@ -7,7 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Chromium fallback is reachable during Electron upgrades.** If `ui/dist`
+  already exists, a missing Electron install no longer requires Node 22.12 and
+  a successful `npm install` before the kiosk can start. Old Node or a failed
+  install warns and continues to system Chromium. A missing UI still requires
+  Node 22.12+ and a successful build.
+- **First switch from Chromium to Electron resets browser-local UI state.**
+  Electron persists its own session under `~/.config/openflight-ui` (Linux),
+  not the system Chromium profile. Units, language, theme, pinned Live metric,
+  and validation annotations in `localStorage` do not carry over. Export the
+  Shots CSV on Chromium before switching. Profiles and shot logs are
+  server-owned and unaffected. See
+  [Electron Kiosk Shell](electron-kiosk-shell.md#browser-local-state-breaking-on-first-electron-launch).
+
 ### Fixed
+- **A crash-looping boot service no longer kills the desktop kiosk.** Every
+  launcher exit ran a `pkill` that matched the Electron binary path, so an
+  `openflight.service` that failed at startup (for example because systemd's
+  PATH hides `~/.local/bin/uv`) restarted every 5 s and killed whichever
+  kiosk was on screen; Chromium then died with "GPU process isn't usable.
+  Goodbye." `start-kiosk.sh` now launches the browser in its own process
+  group and stops only that group (`scripts/kiosk-browser.sh`), refuses to
+  start while another instance holds `/tmp/openflight-kiosk-<port>.lock`
+  (exit 3, `OPENFLIGHT_KIOSK_LOCK_FILE` overrides the path), finds `uv` in
+  `~/.local/bin` / `~/.cargo/bin` when PATH omits them, and prints the
+  recovery hint to the terminal and journal. The unit file stops retrying
+  after five failures in five minutes and never retries exit 3. Re-copy
+  `scripts/setup/openflight.service` (or rerun `scripts/setup/setup.sh`) on
+  existing Pis to pick up the unit changes.
+- **Kiosk startup no longer rebuilds the UI after Electron has already launched.**
+  `ensure_kiosk_ui` now runs before the splash browser. The helper is also
+  stored with Unix line endings so a Windows checkout cannot make `ui/dist`
+  look missing (a CR in the path) and run `npm install` over a live Electron
+  GPU process.
 - **On-screen keyboard for profile names.** Adding or renaming a profile on the
   Pi kiosk now shows a full-screen keyboard. Chromium in `--kiosk` mode does not
   surface a system keyboard, so the native text field was unusable on the
@@ -20,6 +53,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   full horizontal speed, overstating attack angle on any shot with club path.
 
 ### Added
+- **Electron kiosk shell.** `scripts/start-kiosk.sh` now opens the UI in a pinned
+  Electron window (`electron@44`) instead of whichever system browser happens to
+  be installed. Chromium remains a fallback if Electron is not installed (including
+  when Node is older than 22.12 or `npm install` fails and `ui/dist` already
+  exists). Installing Electron needs **Node.js 22.12 or newer**. See
+  [Electron Kiosk Shell](electron-kiosk-shell.md).
 - **PAR-TEE connector.** `"type": "partee"` in `config/sim.json` streams shots
   to the [PAR-TEE](https://playpartee.com) iPhone app over OpenConnect V1 on the
   phone's Wi-Fi address (port 921 by default). Same shared codec as GSPro and
@@ -63,6 +102,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and a trigger-frame impact marker. MP4 conversion starts only after a manual
   Replay selection, caches the result beside the raw capture, and reports
   retryable preparation or playback failures without affecting shot results.
+- **Opt-in OPS243 internal hardware trigger.** `--trigger hardware` configures
+  the radar's internal speed trigger with 25 mph, magnitude 25, and the tested
+  `S#6` split at 30 ksps. Captures are parsed and the radar is re-armed with
+  `GC` after each dump. The existing sound-trigger default and
+  `--sound-pre-trigger` behavior are unchanged. Hardware mode requires and
+  validates OPS243-A firmware v1.3.2 or newer in the 1.3 release train;
+  firmware v1.3.1 is rejected because of a vendor data-sequence bug. See
+  [OPS243 Internal Hardware Trigger](hardware-trigger.md).
 - **Battery and external-power status for Raspberry Pi UPS boards.** OpenFlight
   can now display charging state and battery percentage, issue dismissible 20%
   and 10% warnings while discharging, and record throttled power telemetry in
@@ -144,6 +191,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   trusting it.
 
 ### Changed
+- Club physics and simulation defaults now lives in one immutable registry
 - Core server, session logging, kiosk startup, and UI code now share canonical
   shot/session helpers and omit redundant compatibility paths.
 - Session JSONL format version is now 2 after consolidating trigger and shot

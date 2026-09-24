@@ -24,13 +24,14 @@ For a plain-language explanation and the July 2026 TrackMan baseline, see the
 
 ## Current Configuration
 
-Flash one configurable firmware image, then select one of two runtime profiles:
+Flash one configurable firmware image, then select a runtime profile:
 
 | Component | Current file or value |
 |---|---|
 | Firmware | `firmware/releases/l3_dump_configurable_capture_20260818.bin` |
 | Wide/default config | `config/iwr6843_l3dump_wide_24f3ms_53bin_iq16.cfg` |
 | Dense/advanced config | `config/iwr6843_l3dump_dense_36f2ms_53bin_iq8.cfg` |
+| Dense/wide-late experimental config | `config/iwr6843_l3dump_dense_36f2ms_53bin_iq8_wide_late.cfg` |
 | Reference array calibration | `config/iwr6843_calibration_reference.json` |
 | Firmware size | 346,820 bytes |
 | Firmware SHA-256 | `823ddd18a231d0004020de6262160d6863384cccac6674bae6f7d0fcea58f955` |
@@ -40,13 +41,13 @@ Flash one configurable firmware image, then select one of two runtime profiles:
 
 ### Choose A Profile
 
-| Profile | Wide/default | Dense/advanced |
-|---|---:|---:|
-| Frames and spacing | 24 at 3 ms | 36 at 2 ms |
-| Saved window | 53 bins | 53 bins |
-| Storage | IQ16 | Fixed-scale IQ8 |
-| Complete dump | 732,812 bytes | 549,764 bytes |
-| Choose it for | Ball flight and setup tolerance | Dense impact sampling |
+| Profile | Wide/default | Dense/advanced | Dense/wide-late experimental |
+|---|---:|---:|---:|
+| Frames and spacing | 24 at 3 ms | 36 at 2 ms | 36 at 2 ms |
+| Saved window | 53 bins | 53 bins | 53 bins |
+| Storage | IQ16 | Fixed-scale IQ8 | Fixed-scale IQ8 |
+| Complete dump | 732,812 bytes | 549,764 bytes | 549,764 bytes |
+| Choose it for | Ball flight and setup tolerance | Dense impact sampling | Testing slower-shot late-flight coverage |
 
 Start with **wide/default**. Its wider range window is more tolerant of tee
 placement, ball speed, and setup geometry, while IQ16 retains full signal
@@ -60,8 +61,14 @@ cadence testing with a 0.0089% HWA miss rate and no EDMA errors, but the 53-bin
 dense profile still needs source-of-truth TrackMan MAE validation; its
 horizontal and club metrics remain experimental.
 
+The **dense/wide-late experimental** profile is identical to dense/advanced
+except that its final six ball frames remain in bins 47-99 instead of shifting
+outward to bins 64-116. Use it to test whether the outward late-flight shift,
+rather than IQ8 storage, causes reduced accuracy on slower shots. It has not
+been validated against TrackMan.
+
 Changing profiles does not require reflashing. It changes only the config
-passed to `--iwr6843-config`. Both profiles use the same host-side mount-tilt
+passed to `--iwr6843-config`. All profiles use the same host-side mount-tilt
 path, including live inclinometer correction when `--inclinometer` is enabled.
 They also use the measured positive TDM sign for normal TX order. Automatic
 sign selection is reserved for offline diagnostics because multipath can select

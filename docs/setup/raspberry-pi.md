@@ -15,7 +15,7 @@ Make sure you have all the hardware. See the **[Parts List](../get-started/parts
 - SparkFun SEN-14262 sound detector (wired per the [Sound Trigger Wiring Guide](../build/sound-trigger.md))
 
 **Optional:**
-- TI IWR6843LEVM + data cable — measured launch angle and experimental club path; see the [IWR6843 Operator Guide](../iwr6843/index.md)
+- TI IWR6843LEVM + data-capable micro-USB cable — measured launch angle and experimental club path; see the [IWR6843 Operator Guide](../iwr6843/index.md)
 - Geekworm X1202 or X1206 UPS HAT — portable Pi 5 power using four separately purchased 18650 or 21700 cells; see the [battery monitoring overview](../using/battery.md) and [Geekworm operator guide](../build/battery.md)
 - InnoMaker OV9281 global-shutter camera (~$30) — experimental vision work; see [Camera and YOLO Experiments](../development/camera-yolo.md)
 
@@ -34,6 +34,19 @@ Run the following command:
 
 ```bash
 sudo apt update && sudo apt install -y swig liblgpio-dev python3-dev
+```
+
+The UI/Electron kiosk shell needs **Node.js 22.12 or newer** to *install*
+Electron. Raspberry Pi OS `apt` Node is often 18 or 20 and will print
+`EBADENGINE` (or fail) for `electron@44`. A Pi that already has `ui/dist` can
+still start: `start-kiosk.sh` falls back to system Chromium until Node is
+upgraded and `npm install` in `ui/` succeeds. Install Node 22 LTS before a
+first UI build or to actually run the Electron shell:
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt-get install -y nodejs
+node -v   # should report v22.12.0 or later
 ```
 
 If `./scripts/setup/setup.sh` updates `~/.bashrc`, you may need to run `source ~/.bashrc` (or open a new terminal) so your current shell picks up the new environment variables immediately without needing to reboot or re-login.
@@ -283,6 +296,27 @@ If the mapping is missing or points at the wrong radar, re-run the wizard:
 `./scripts/setup/setup_kld7_devices.sh`. Look for `[KLD7] Connected on
 /dev/ttyUSB...` in the server logs. See [K-LD7 Troubleshooting](../legacy/troubleshooting.md)
 for "Wrong length reply" and other connection issues.
+
+### Kiosk Window Closes Seconds After Loading
+
+If the UI appears and then vanishes with `GPU process launch failed`,
+`Failed to send GetTerminationStatus message to zygote`, and finally
+`GPU process isn't usable. Goodbye.` in the terminal, something outside the
+window killed Electron's helper processes. The usual culprit is a second
+copy of `start-kiosk.sh`, typically a failing boot service restarting in a
+loop while you launch by hand:
+
+```bash
+sudo systemctl status openflight --no-pager   # "activating (auto-restart)" = looping
+journalctl -u openflight -n 40 --no-pager     # the recovery hint is printed here
+```
+
+Fix whatever the journal reports, or `sudo systemctl disable openflight` if
+you launch from the desktop instead. Current launchers refuse to start while
+another instance holds `/tmp/openflight-kiosk-<port>.lock` (exit code 3) and
+only ever stop the browser they started, so an old unit file is the one thing
+left to update: re-copy `scripts/setup/openflight.service` as shown in
+[Auto-Start on Boot](#auto-start-on-boot).
 
 ### Service Won't Start
 

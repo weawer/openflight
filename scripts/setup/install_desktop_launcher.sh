@@ -63,7 +63,7 @@ trap cleanup EXIT
     printf '%s\n' 'Type=Application'
     printf 'Name=%s\n' "$application_name"
     printf '%s\n' 'Comment=OpenFlight golf launch monitor'
-    printf 'Exec=/bin/bash -lc %s\n' "$launcher_path"
+    printf 'Exec=/bin/bash -ilc %s\n' "$launcher_path"
     printf 'Path=%s\n' "$project_dir"
     printf 'Icon=%s\n' "$project_dir/ui/public/openflight-icon-black.png"
     printf '%s\n' 'Terminal=false'

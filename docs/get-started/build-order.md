@@ -78,6 +78,27 @@ The largest step, and itself ordered: [wiring](../iwr6843/wiring.md) →
 **Verify:** [the first capture](../iwr6843/verify.md#verify-the-first-capture)
 returns a sane launch angle.
 
+## 6. Put it in the case
+
+**→ [openflight-enclosure](https://github.com/open-flight/openflight-enclosure)**
+
+Itself ordered:
+[choose a variant](https://github.com/open-flight/openflight-enclosure/blob/main/docs/choosing-a-variant.md)
+→ [required hardware](https://github.com/open-flight/openflight-enclosure/blob/main/docs/hardware.md)
+→ [print](https://github.com/open-flight/openflight-enclosure/blob/main/docs/printing.md)
+→ [assemble](https://github.com/open-flight/openflight-enclosure/blob/main/docs/assembly.md).
+
+Not an extra. Nothing measures repeatably until the boards are held in a
+fixed, repeatable arrangement, and the same printed set covers both builds:
+the radar front carries mounts for the OPS243 and the IWR6843, so an OPS-only
+build prints the same parts and leaves the IWR mounts empty.
+
+> The older [IARC case](../build/enclosure.md) page describes the housing this
+> replaced. It is kept for existing builds; do not print it for a new one.
+
+**Verify:** the unit sits square behind the ball, and nothing shifts when you
+pick it up and set it down again.
+
 ## Optional extras
 
 Any order, once the above works.
@@ -86,7 +107,6 @@ Any order, once the above works.
 | --- | --- | --- |
 | Inclinometer | [LIS3DH](../build/inclinometer.md) | Compensates enclosure tilt so the IWR6843 angle stays honest if the unit is bumped |
 | Battery | [Geekworm X1202/X1206](../build/battery.md) | Portable operation with real telemetry and low-battery warnings |
-| Enclosure | [IARC v3 case](../build/enclosure.md) | Printed housing for the whole assembly |
 | Simulators | [Connectors](../using/simulator/index.md) | Stream shots to GSPro, OpenGolfSim, PAR-TEE, E6 |
 | Cloud sync | [Cloud sync](../using/cloud-sync.md) | Push filtered sessions to FlightWeb |
 | Log shipping | [Observability](../using/observability.md) | Query sessions in Grafana Cloud |

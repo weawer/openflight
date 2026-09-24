@@ -78,6 +78,52 @@ one blurred lump. The chirp must be removed first.
    other monitors work if they have `shot_number_of`, `match_quality`,
    `spin_tm`, and `ball_speed_tm` columns.
 
+## Dedicated OPS diagnostic capture
+
+Use the dedicated capture tool when the normal session log is not enough to
+explain missing or implausible spin. Stop the kiosk first so only one process
+owns the OPS serial port, then run:
+
+```bash
+uv run --no-sync python scripts/hardware-test/capture_ops_spin.py \
+    --club driver \
+    --environment outdoor-range \
+    --ball-label "range ball" \
+    --radar-to-ball-ft 1.5 \
+    --max-captures 20
+```
+
+The radar must already boot in persisted rolling-buffer mode. The tool uses the
+production 30 ksps, `S#12` post-heavy capture by default and never writes radar
+flash. Each output record is flushed immediately to an
+`ops_spin_capture_*.jsonl` file under `~/openflight_sessions`.
+
+The JSONL preserves:
+
+- the verbatim OPS response and SHA-256 before parsing;
+- partial or malformed dumps and acquisition errors;
+- all raw I/Q samples and ADC clipping/dynamic-range statistics;
+- standard and overlapping speed timelines;
+- impact timing, production multitaper output, the envelope-FFT comparison,
+  and every spin candidate;
+- OPS clock sync, radar identity/state queries, transport speed, software
+  revision, processor constants, and physical setup metadata.
+
+Replay the complete session or plot one capture directly:
+
+```bash
+uv run --no-sync python scripts/analysis/replay_captures.py \
+    ~/openflight_sessions/ops_spin_capture_YYYYMMDD_HHMMSS.jsonl
+
+uv run --no-sync python scripts/analysis/plot_spin_debug.py \
+    --log ~/openflight_sessions/ops_spin_capture_YYYYMMDD_HHMMSS.jsonl \
+    --shot 1
+```
+
+Collect reference-monitor spin when possible. Raw OPS evidence can explain
+clipping, fades, truncation, and estimator disagreement, but truth-paired spin
+is what distinguishes a plausible wrong answer from a correct one.
+
 ## Running
 
 ```bash

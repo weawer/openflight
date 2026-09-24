@@ -4,7 +4,7 @@ icon: lucide/flag
 
 # Get Started
 
-Four pages, in order. If you are deciding whether to build one, start with the
+Five pages, in order. If you are deciding whether to build one, start with the
 overview; if you have already decided, go straight to the parts list.
 
 <div class="grid cards" markdown>
@@ -18,6 +18,11 @@ overview; if you have already decided, go straight to the parts list.
 
     Everything to buy, with links and a cost summary. Some items have long lead
     times — order first.
+
+- :material-power-plug-outline: **[Power](power.md)**
+
+    How to feed the unit: the official supply, a UPS HAT, or USB-C PD. Read the
+    polarity warning before wiring a DC jack.
 
 - :material-format-list-numbered: **[Build order](build-order.md)**
 

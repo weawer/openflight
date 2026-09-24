@@ -22,6 +22,7 @@ nav = [
     "get-started/index.md",
     "get-started/overview.md",
     "get-started/parts.md",
+    "get-started/power.md",
     "get-started/build-order.md",
     "get-started/quick-start.md",
   ] },
@@ -52,6 +53,7 @@ nav = [
     "setup/rolling-buffer.md",
     "setup/auto-start.md",
     "setup/splash-screen.md",
+    "electron-kiosk-shell.md",
     "setup/diagnostic.md",
   ] },
 
