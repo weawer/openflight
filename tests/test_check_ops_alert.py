@@ -104,3 +104,25 @@ def test_speed_control_drains_serial_without_waiting_for_a_dump(monkeypatch):
     radar.wait_for_hardware_trigger.assert_not_called()
     assert records[-2] == ("uart", {"text": '{"ALERT": "High Speed"}'})
     assert records[-1][0] == "finished"
+
+
+def test_object_detect_mode_enables_ig_instead_of_speed_alert(monkeypatch):
+    radar = MagicMock()
+    radar.serial.in_waiting = 0
+    times = iter([0.0, 0.0, 2.0])
+    monkeypatch.setattr(check_ops_alert.time, "monotonic", lambda: next(times))
+    monkeypatch.setattr(check_ops_alert.time, "sleep", lambda _: None)
+    records = []
+
+    check_ops_alert.run_test(
+        radar,
+        MagicMock(is_pressed=False),
+        "speed",
+        1,
+        lambda event, **fields: records.append((event, fields)),
+        signal="object-detect",
+    )
+
+    assert [call.args[0] for call in radar._send_command.call_args_list] == ["IG"]
+    assert records[-2][0] == "ready"
+    assert records[-2][1]["signal"] == "object-detect"

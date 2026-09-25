@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Compare J3 pin 2 alert timing with an internal-trigger UART dump.
+"""Compare an OPS243 GPIO detection edge with an internal-trigger UART dump.
 
-Stop the kiosk before running. Connect OPS J3 pin 2 to Pi BCM17 (physical
-pin 11), with a shared ground. GPIO is input-only. No flash settings are saved.
-Stand still during setup; move only after the ready event. Each internal run
-collects one dump. Use --mode speed as a wiring/alert positive control.
+Stop the kiosk before running. Connect the selected OPS output to Pi BCM17
+(physical pin 11), with a shared ground. Use J3 pin 2 for ``high-alert`` and
+J3 pin 3 for ``object-detect``. The Pi GPIO is input-only. No flash settings
+are saved. Stand still during setup; move only after the ready event. Each
+internal run collects one dump. Use --mode speed as a positive control.
 """
 
 import argparse
@@ -32,6 +33,7 @@ def run_test(
     trigger_magnitude=45,
     pre_trigger_segments=8,
     alert_threshold=20,
+    signal="high-alert",
 ):
     """Log setup edges separately from the armed observation window."""
     phase = "setup"
@@ -46,9 +48,12 @@ def run_test(
     else:
         radar.configure_for_speed_trigger()
 
-    # Set the alert after GC, which can reset detector settings.
-    emit("alert_setting", response=radar._send_command(f"Y<{alert_threshold:g}"))
-    emit("alert_readback", response=radar._send_command("Y?"))
+    # Set the output after GC, which can reset detector and pin settings.
+    if signal == "object-detect":
+        emit("interrupt_setting", response=radar._send_command("IG"))
+    else:
+        emit("alert_setting", response=radar._send_command(f"Y<{alert_threshold:g}"))
+        emit("alert_readback", response=radar._send_command("Y?"))
     phase = "observe"
     emit(
         "ready",
@@ -59,6 +64,7 @@ def run_test(
         trigger_magnitude=trigger_magnitude,
         pre_trigger_segments=pre_trigger_segments,
         alert_threshold_mph=alert_threshold,
+        signal=signal,
     )
     if mode == "speed":
         deadline = time.monotonic() + duration
@@ -98,6 +104,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", default="/dev/ttyAMA0")
     parser.add_argument("--gpio", type=int, default=17, help="BCM pin number")
+    parser.add_argument(
+        "--signal",
+        choices=["high-alert", "object-detect"],
+        default="high-alert",
+        help="OPS output under test: J3 pin 2 or J3 pin 3",
+    )
     parser.add_argument("--mode", choices=["internal", "speed"], default="internal")
     parser.add_argument("--duration", type=float, default=60)
     parser.add_argument("--trigger-threshold", type=float, default=20.0)
@@ -148,6 +160,7 @@ def main():
                     trigger_magnitude=args.trigger_magnitude,
                     pre_trigger_segments=args.pre_trigger_segments,
                     alert_threshold=args.alert_threshold,
+                    signal=args.signal,
                 )
         finally:
             radar.disconnect()
