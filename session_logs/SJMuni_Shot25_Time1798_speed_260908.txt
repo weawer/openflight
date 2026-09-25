@@ -1,0 +1,268 @@
+{"time":1798.507000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.507500, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.508000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.508500, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.509000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.509500, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.510000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.510500, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.511000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.511500, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.512000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.512500, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.513000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.513500, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.514000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.514500, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.515000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.515500, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.516000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.516500, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.517000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.517500, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.518000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.518500, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.519000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.519500, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.520000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.520500, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.521000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.521500, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.522000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.522500, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.523000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.523500, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.524000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.524500, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.525000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.525500, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.526000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.526500, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.527000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.527500, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.528000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.528500, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.529000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.529500, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.530000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.530500, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.531000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.531500, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.532000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.532500, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.533000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.533500, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.534000, "unit" : "mph", "magnitude":[23.6], "speed":[-21.9]}
+{"time":1798.534500, "unit" : "mph", "magnitude":[45.9], "speed":[-22.2]}
+{"time":1798.535000, "unit" : "mph", "magnitude":[73.8], "speed":[-22.6]}
+{"time":1798.535500, "unit" : "mph", "magnitude":[97.6], "speed":[-22.9]}
+{"time":1798.536000, "unit" : "mph", "magnitude":[111.5], "speed":[-23.5]}
+{"time":1798.536500, "unit" : "mph", "magnitude":[110.5, 35.9], "speed":[-24.6, -33.7]}
+{"time":1798.537000, "unit" : "mph", "magnitude":[98.5, 67.2], "speed":[-26.0, -33.9]}
+{"time":1798.537500, "unit" : "mph", "magnitude":[93.5, 91.7], "speed":[-33.7, -28.7]}
+{"time":1798.538000, "unit" : "mph", "magnitude":[115.4], "speed":[-32.3]}
+{"time":1798.538500, "unit" : "mph", "magnitude":[119.9, 94.9], "speed":[-33.2, -41.7]}
+{"time":1798.539000, "unit" : "mph", "magnitude":[148.2, 104.5], "speed":[-42.2, -34.4]}
+{"time":1798.539500, "unit" : "mph", "magnitude":[206.4], "speed":[-42.6]}
+{"time":1798.540000, "unit" : "mph", "magnitude":[254.2], "speed":[-42.9]}
+{"time":1798.540500, "unit" : "mph", "magnitude":[280.3, 26.6], "speed":[-43.6, -52.5]}
+{"time":1798.541000, "unit" : "mph", "magnitude":[280.9], "speed":[-44.8]}
+{"time":1798.541500, "unit" : "mph", "magnitude":[267.6], "speed":[-46.2]}
+{"time":1798.542000, "unit" : "mph", "magnitude":[252.9], "speed":[-47.9]}
+{"time":1798.542500, "unit" : "mph", "magnitude":[233.9], "speed":[-49.8]}
+{"time":1798.543000, "unit" : "mph", "magnitude":[206.9], "speed":[-51.7]}
+{"time":1798.543500, "unit" : "mph", "magnitude":[186.5], "speed":[-53.9]}
+{"time":1798.544000, "unit" : "mph", "magnitude":[183.7, 26.1], "speed":[-55.9, -28.3]}
+{"time":1798.544500, "unit" : "mph", "magnitude":[183.3, 32.8], "speed":[-57.3, -29.5]}
+{"time":1798.545000, "unit" : "mph", "magnitude":[178.1, 32.8], "speed":[-58.5, -30.5]}
+{"time":1798.545500, "unit" : "mph", "magnitude":[171.4, 28.9], "speed":[-59.7, -33.1]}
+{"time":1798.546000, "unit" : "mph", "magnitude":[166.6, 27.6], "speed":[-61.0, -34.2]}
+{"time":1798.546500, "unit" : "mph", "magnitude":[159.1, 23.7], "speed":[-62.4, -35.4]}
+{"time":1798.547000, "unit" : "mph", "magnitude":[144.2, 21.0], "speed":[-63.8, -37.5]}
+{"time":1798.547500, "unit" : "mph", "magnitude":[127.7, 20.8], "speed":[-65.3, -39.1]}
+{"time":1798.548000, "unit" : "mph", "magnitude":[118.4], "speed":[-66.8]}
+{"time":1798.548500, "unit" : "mph", "magnitude":[115.5], "speed":[-68.2]}
+{"time":1798.549000, "unit" : "mph", "magnitude":[112.1], "speed":[-69.3]}
+{"time":1798.549500, "unit" : "mph", "magnitude":[104.0], "speed":[-70.2]}
+{"time":1798.550000, "unit" : "mph", "magnitude":[90.8], "speed":[-71.1]}
+{"time":1798.550500, "unit" : "mph", "magnitude":[78.3], "speed":[-72.4]}
+{"time":1798.551000, "unit" : "mph", "magnitude":[73.5, 20.8], "speed":[-73.6, -67.1]}
+{"time":1798.551500, "unit" : "mph", "magnitude":[73.8], "speed":[-74.3]}
+{"time":1798.552000, "unit" : "mph", "magnitude":[75.3], "speed":[-74.7]}
+{"time":1798.552500, "unit" : "mph", "magnitude":[74.1], "speed":[-75.3]}
+{"time":1798.553000, "unit" : "mph", "magnitude":[69.5], "speed":[-76.1]}
+{"time":1798.553500, "unit" : "mph", "magnitude":[66.1], "speed":[-77.2]}
+{"time":1798.554000, "unit" : "mph", "magnitude":[64.9], "speed":[-77.8]}
+{"time":1798.554500, "unit" : "mph", "magnitude":[64.0], "speed":[-78.2]}
+{"time":1798.555000, "unit" : "mph", "magnitude":[60.9], "speed":[-78.4]}
+{"time":1798.555500, "unit" : "mph", "magnitude":[54.6], "speed":[-79.0]}
+{"time":1798.556000, "unit" : "mph", "magnitude":[47.7], "speed":[-79.7]}
+{"time":1798.556500, "unit" : "mph", "magnitude":[40.2], "speed":[-79.9]}
+{"time":1798.557000, "unit" : "mph", "magnitude":[31.4], "speed":[-79.7]}
+{"time":1798.557500, "unit" : "mph", "magnitude":[22.7], "speed":[-76.9]}
+{"time":1798.558000, "unit" : "mph", "magnitude":[23.0], "speed":[-75.2]}
+{"time":1798.558500, "unit" : "mph", "magnitude":[22.8], "speed":[-75.1]}
+{"time":1798.559000, "unit" : "mph", "magnitude":[23.4], "speed":[-75.6]}
+{"time":1798.559500, "unit" : "mph", "magnitude":[26.4], "speed":[-76.0]}
+{"time":1798.560000, "unit" : "mph", "magnitude":[29.6], "speed":[-76.0]}
+{"time":1798.560500, "unit" : "mph", "magnitude":[32.3], "speed":[-75.9]}
+{"time":1798.561000, "unit" : "mph", "magnitude":[34.8], "speed":[-76.1]}
+{"time":1798.561500, "unit" : "mph", "magnitude":[36.8], "speed":[-76.2]}
+{"time":1798.562000, "unit" : "mph", "magnitude":[38.0], "speed":[-76.3]}
+{"time":1798.562500, "unit" : "mph", "magnitude":[38.6], "speed":[-76.4]}
+{"time":1798.563000, "unit" : "mph", "magnitude":[38.9], "speed":[-76.5]}
+{"time":1798.563500, "unit" : "mph", "magnitude":[39.6], "speed":[-76.5]}
+{"time":1798.564000, "unit" : "mph", "magnitude":[41.2], "speed":[-76.4]}
+{"time":1798.564500, "unit" : "mph", "magnitude":[43.3], "speed":[-76.1]}
+{"time":1798.565000, "unit" : "mph", "magnitude":[45.6], "speed":[-75.5]}
+{"time":1798.565500, "unit" : "mph", "magnitude":[49.3], "speed":[-74.8]}
+{"time":1798.566000, "unit" : "mph", "magnitude":[55.5], "speed":[-74.0]}
+{"time":1798.566500, "unit" : "mph", "magnitude":[58.4], "speed":[-73.6]}
+{"time":1798.567000, "unit" : "mph", "magnitude":[54.8, 25.2], "speed":[-73.2, -58.3]}
+{"time":1798.567500, "unit" : "mph", "magnitude":[43.9, 43.2], "speed":[-72.9, -58.3]}
+{"time":1798.568000, "unit" : "mph", "magnitude":[60.2, 29.4], "speed":[-58.1, -72.3]}
+{"time":1798.568500, "unit" : "mph", "magnitude":[70.7], "speed":[-57.9]}
+{"time":1798.569000, "unit" : "mph", "magnitude":[72.4], "speed":[-57.4]}
+{"time":1798.569500, "unit" : "mph", "magnitude":[66.8, 28.5], "speed":[-56.6, -119.3]}
+{"time":1798.570000, "unit" : "mph", "magnitude":[62.1, 42.1], "speed":[-55.4, -119.9]}
+{"time":1798.570500, "unit" : "mph", "magnitude":[63.4, 57.2], "speed":[-54.1, -120.2]}
+{"time":1798.571000, "unit" : "mph", "magnitude":[72.5, 66.1], "speed":[-120.3, -53.0]}
+{"time":1798.571500, "unit" : "mph", "magnitude":[86.2, 67.8], "speed":[-120.4, -51.9]}
+{"time":1798.572000, "unit" : "mph", "magnitude":[97.2, 74.5, 22.5], "speed":[-120.5, -51.1, -57.9]}
+{"time":1798.572500, "unit" : "mph", "magnitude":[105.1, 88.1, 22.6], "speed":[-120.5, -50.5, -58.0]}
+{"time":1798.573000, "unit" : "mph", "magnitude":[109.8, 108.2], "speed":[-120.6, -49.9]}
+{"time":1798.573500, "unit" : "mph", "magnitude":[134.4, 111.7], "speed":[-49.3, -120.6]}
+{"time":1798.574000, "unit" : "mph", "magnitude":[160.2, 110.7, 21.9], "speed":[-48.6, -120.6, -57.7]}
+{"time":1798.574500, "unit" : "mph", "magnitude":[174.2, 107.9, 20.9], "speed":[-48.0, -120.6, -58.1]}
+{"time":1798.575000, "unit" : "mph", "magnitude":[165.6, 104.0], "speed":[-46.8, -120.6]}
+{"time":1798.575500, "unit" : "mph", "magnitude":[158.2, 99.7, 23.3], "speed":[-44.8, -120.6, -58.9]}
+{"time":1798.576000, "unit" : "mph", "magnitude":[167.6, 95.6, 69.7, 27.3], "speed":[-43.4, -120.6, -51.4, -58.8]}
+{"time":1798.576500, "unit" : "mph", "magnitude":[178.7, 91.4, 57.4, 24.8], "speed":[-42.1, -120.5, -52.2, -59.4]}
+{"time":1798.577000, "unit" : "mph", "magnitude":[191.8, 86.9, 52.1, 24.5], "speed":[-41.0, -120.5, -51.8, -59.2]}
+{"time":1798.577500, "unit" : "mph", "magnitude":[197.1, 81.9, 54.7, 25.0], "speed":[-40.2, -120.5, -51.3, -59.4]}
+{"time":1798.578000, "unit" : "mph", "magnitude":[193.6, 77.1, 50.9, 22.5], "speed":[-39.3, -120.5, -51.6, -59.3]}
+{"time":1798.578500, "unit" : "mph", "magnitude":[185.5, 73.1, 44.1, 21.3], "speed":[-38.4, -120.5, -52.1, -59.1]}
+{"time":1798.579000, "unit" : "mph", "magnitude":[177.2, 70.3, 41.6, 23.3], "speed":[-37.4, -120.5, -51.9, -59.5]}
+{"time":1798.579500, "unit" : "mph", "magnitude":[169.4, 68.5, 39.3, 24.6], "speed":[-36.4, -120.5, -52.2, -59.7]}
+{"time":1798.580000, "unit" : "mph", "magnitude":[161.8, 67.2, 34.6, 24.3], "speed":[-35.6, -120.5, -52.5, -59.7]}
+{"time":1798.580500, "unit" : "mph", "magnitude":[155.4, 66.2, 33.4, 24.9], "speed":[-34.9, -120.6, -52.6, -59.2]}
+{"time":1798.581000, "unit" : "mph", "magnitude":[149.6, 65.8, 31.5, 25.8], "speed":[-34.4, -120.7, -52.4, -59.7]}
+{"time":1798.581500, "unit" : "mph", "magnitude":[145.1, 66.1, 30.7, 25.7], "speed":[-33.7, -120.7, -52.3, -59.8]}
+{"time":1798.582000, "unit" : "mph", "magnitude":[143.0, 67.3, 27.3, 25.2], "speed":[-32.9, -120.8, -52.7, -59.3]}
+{"time":1798.582500, "unit" : "mph", "magnitude":[143.5, 69.4, 26.8], "speed":[-32.1, -120.9, -57.8]}
+{"time":1798.583000, "unit" : "mph", "magnitude":[142.1, 71.8, 25.6], "speed":[-31.4, -120.9, -58.9]}
+{"time":1798.583500, "unit" : "mph", "magnitude":[135.2, 73.8, 24.8], "speed":[-30.7, -120.9, -59.3]}
+{"time":1798.584000, "unit" : "mph", "magnitude":[123.0, 75.4, 24.6], "speed":[-29.8, -121.0, -59.1]}
+{"time":1798.584500, "unit" : "mph", "magnitude":[110.2, 76.2, 26.7], "speed":[-28.8, -121.0, -58.2]}
+{"time":1798.585000, "unit" : "mph", "magnitude":[98.3, 76.5, 28.0], "speed":[-27.9, -121.1, -58.2]}
+{"time":1798.585500, "unit" : "mph", "magnitude":[88.2, 76.9, 27.7], "speed":[-27.0, -121.1, -58.8]}
+{"time":1798.586000, "unit" : "mph", "magnitude":[80.0, 77.6, 27.8], "speed":[-26.4, -121.1, -58.9]}
+{"time":1798.586500, "unit" : "mph", "magnitude":[78.5, 72.8, 28.6], "speed":[-121.1, -25.9, -58.5]}
+{"time":1798.587000, "unit" : "mph", "magnitude":[79.8, 66.4, 30.6], "speed":[-121.2, -25.3, -57.7]}
+{"time":1798.587500, "unit" : "mph", "magnitude":[81.4, 60.5, 31.2], "speed":[-121.2, -24.7, -57.5]}
+{"time":1798.588000, "unit" : "mph", "magnitude":[82.9, 54.1, 29.9], "speed":[-121.2, -24.3, -57.6]}
+{"time":1798.588500, "unit" : "mph", "magnitude":[84.1, 46.5, 27.8], "speed":[-121.1, -23.9, -57.6]}
+{"time":1798.589000, "unit" : "mph", "magnitude":[85.0, 40.1, 26.0], "speed":[-121.1, -23.4, -57.3]}
+{"time":1798.589500, "unit" : "mph", "magnitude":[85.4, 37.3, 24.9], "speed":[-121.2, -22.7, -56.7]}
+{"time":1798.590000, "unit" : "mph", "magnitude":[85.3, 36.6, 23.3], "speed":[-121.2, -22.2, -56.4]}
+{"time":1798.590500, "unit" : "mph", "magnitude":[84.9, 34.8, 20.9], "speed":[-121.2, -22.1, -56.7]}
+{"time":1798.591000, "unit" : "mph", "magnitude":[84.6, 31.3], "speed":[-121.3, -22.0]}
+{"time":1798.591500, "unit" : "mph", "magnitude":[84.5, 26.8], "speed":[-121.3, -21.7]}
+{"time":1798.592000, "unit" : "mph", "magnitude":[84.6, 22.0, 21.4], "speed":[-121.3, -21.3, -54.2]}
+{"time":1798.592500, "unit" : "mph", "magnitude":[84.9, 23.7], "speed":[-121.3, -52.6]}
+{"time":1798.593000, "unit" : "mph", "magnitude":[84.8], "speed":[-121.3]}
+{"time":1798.593500, "unit" : "mph", "magnitude":[84.0], "speed":[-121.4]}
+{"time":1798.594000, "unit" : "mph", "magnitude":[82.8], "speed":[-121.4]}
+{"time":1798.594500, "unit" : "mph", "magnitude":[81.2], "speed":[-121.4]}
+{"time":1798.595000, "unit" : "mph", "magnitude":[79.8, 25.7], "speed":[-121.4, -51.8]}
+{"time":1798.595500, "unit" : "mph", "magnitude":[78.8, 28.0], "speed":[-121.4, -52.1]}
+{"time":1798.596000, "unit" : "mph", "magnitude":[78.4, 24.1], "speed":[-121.4, -52.5]}
+{"time":1798.596500, "unit" : "mph", "magnitude":[77.8], "speed":[-121.3]}
+{"time":1798.597000, "unit" : "mph", "magnitude":[76.8], "speed":[-121.3]}
+{"time":1798.597500, "unit" : "mph", "magnitude":[75.6], "speed":[-121.3]}
+{"time":1798.598000, "unit" : "mph", "magnitude":[74.5, 22.9], "speed":[-121.3, -51.9]}
+{"time":1798.598500, "unit" : "mph", "magnitude":[73.8, 30.8], "speed":[-121.3, -51.1]}
+{"time":1798.599000, "unit" : "mph", "magnitude":[73.4, 35.2], "speed":[-121.3, -50.9]}
+{"time":1798.599500, "unit" : "mph", "magnitude":[73.0, 35.9], "speed":[-121.3, -50.8]}
+{"time":1798.600000, "unit" : "mph", "magnitude":[72.6, 33.7], "speed":[-121.3, -50.9]}
+{"time":1798.600500, "unit" : "mph", "magnitude":[72.2, 29.2], "speed":[-121.4, -51.1]}
+{"time":1798.601000, "unit" : "mph", "magnitude":[71.9, 23.8], "speed":[-121.4, -51.5]}
+{"time":1798.601500, "unit" : "mph", "magnitude":[71.5], "speed":[-121.3]}
+{"time":1798.602000, "unit" : "mph", "magnitude":[70.9], "speed":[-121.3]}
+{"time":1798.602500, "unit" : "mph", "magnitude":[69.8], "speed":[-121.3]}
+{"time":1798.603000, "unit" : "mph", "magnitude":[68.5], "speed":[-121.4]}
+{"time":1798.603500, "unit" : "mph", "magnitude":[67.3], "speed":[-121.4]}
+{"time":1798.604000, "unit" : "mph", "magnitude":[66.1], "speed":[-121.4]}
+{"time":1798.604500, "unit" : "mph", "magnitude":[65.1], "speed":[-121.3]}
+{"time":1798.605000, "unit" : "mph", "magnitude":[64.6], "speed":[-121.3]}
+{"time":1798.605500, "unit" : "mph", "magnitude":[64.6, 20.6], "speed":[-121.3, -48.0]}
+{"time":1798.606000, "unit" : "mph", "magnitude":[64.7, 22.9], "speed":[-121.4, -47.7]}
+{"time":1798.606500, "unit" : "mph", "magnitude":[64.5, 26.0], "speed":[-121.4, -47.2]}
+{"time":1798.607000, "unit" : "mph", "magnitude":[64.1, 28.9], "speed":[-121.3, -46.9]}
+{"time":1798.607500, "unit" : "mph", "magnitude":[63.3, 30.8], "speed":[-121.3, -46.8]}
+{"time":1798.608000, "unit" : "mph", "magnitude":[62.1, 31.3], "speed":[-121.3, -46.8]}
+{"time":1798.608500, "unit" : "mph", "magnitude":[60.8, 30.3], "speed":[-121.3, -46.9]}
+{"time":1798.609000, "unit" : "mph", "magnitude":[59.7, 27.6], "speed":[-121.3, -47.0]}
+{"time":1798.609500, "unit" : "mph", "magnitude":[59.2, 23.8], "speed":[-121.3, -47.2]}
+{"time":1798.610000, "unit" : "mph", "magnitude":[59.2], "speed":[-121.3]}
+{"time":1798.610500, "unit" : "mph", "magnitude":[59.5], "speed":[-121.3]}
+{"time":1798.611000, "unit" : "mph", "magnitude":[59.7], "speed":[-121.2]}
+{"time":1798.611500, "unit" : "mph", "magnitude":[59.4], "speed":[-121.2]}
+{"time":1798.612000, "unit" : "mph", "magnitude":[59.1, 24.3], "speed":[-121.2, -45.6]}
+{"time":1798.612500, "unit" : "mph", "magnitude":[58.8, 29.9], "speed":[-121.2, -45.1]}
+{"time":1798.613000, "unit" : "mph", "magnitude":[58.6, 34.6], "speed":[-121.2, -44.7]}
+{"time":1798.613500, "unit" : "mph", "magnitude":[58.2, 37.4], "speed":[-121.2, -44.1]}
+{"time":1798.614000, "unit" : "mph", "magnitude":[57.5, 38.6], "speed":[-121.2, -43.7]}
+{"time":1798.614500, "unit" : "mph", "magnitude":[56.6, 38.4], "speed":[-121.2, -43.4]}
+{"time":1798.615000, "unit" : "mph", "magnitude":[55.9, 37.2], "speed":[-121.3, -43.2]}
+{"time":1798.615500, "unit" : "mph", "magnitude":[55.5, 35.5], "speed":[-121.3, -43.1]}
+{"time":1798.616000, "unit" : "mph", "magnitude":[55.4, 33.4], "speed":[-121.3, -42.9]}
+{"time":1798.616500, "unit" : "mph", "magnitude":[55.2, 31.2], "speed":[-121.2, -42.6]}
+{"time":1798.617000, "unit" : "mph", "magnitude":[54.7, 29.6], "speed":[-121.2, -42.3]}
+{"time":1798.617500, "unit" : "mph", "magnitude":[53.9, 28.9], "speed":[-121.2, -42.0]}
+{"time":1798.618000, "unit" : "mph", "magnitude":[53.1, 28.5], "speed":[-121.2, -41.6]}
+{"time":1798.618500, "unit" : "mph", "magnitude":[52.6, 28.5], "speed":[-121.2, -41.2]}
+{"time":1798.619000, "unit" : "mph", "magnitude":[52.5, 28.5], "speed":[-121.2, -40.8]}
+{"time":1798.619500, "unit" : "mph", "magnitude":[52.5, 27.8], "speed":[-121.1, -40.5]}
+{"time":1798.620000, "unit" : "mph", "magnitude":[52.3, 26.5], "speed":[-121.2, -40.3]}
+{"time":1798.620500, "unit" : "mph", "magnitude":[51.5, 25.2], "speed":[-121.2, -40.2]}
+{"time":1798.621000, "unit" : "mph", "magnitude":[50.3, 24.2], "speed":[-121.2, -40.0]}
+{"time":1798.621500, "unit" : "mph", "magnitude":[49.3, 23.5], "speed":[-121.2, -39.8]}
+{"time":1798.622000, "unit" : "mph", "magnitude":[48.8, 23.1], "speed":[-121.2, -39.4]}
+{"time":1798.622500, "unit" : "mph", "magnitude":[48.8, 22.6], "speed":[-121.1, -39.0]}
+{"time":1798.623000, "unit" : "mph", "magnitude":[48.9, 22.1], "speed":[-121.0, -38.7]}
+{"time":1798.623500, "unit" : "mph", "magnitude":[48.7, 21.8], "speed":[-121.0, -38.5]}
+{"time":1798.624000, "unit" : "mph", "magnitude":[47.9, 21.7], "speed":[-121.0, -38.4]}
+{"time":1798.624500, "unit" : "mph", "magnitude":[46.8, 21.3], "speed":[-121.1, -38.2]}
+{"time":1798.625000, "unit" : "mph", "magnitude":[46.0, 20.2], "speed":[-121.1, -38.0]}
+{"time":1798.625500, "unit" : "mph", "magnitude":[45.5], "speed":[-121.0]}
+{"time":1798.626000, "unit" : "mph", "magnitude":[45.5], "speed":[-121.0]}
+{"time":1798.626500, "unit" : "mph", "magnitude":[45.5], "speed":[-121.0]}
+{"time":1798.627000, "unit" : "mph", "magnitude":[45.4], "speed":[-120.9]}
+{"time":1798.627500, "unit" : "mph", "magnitude":[44.9], "speed":[-121.0]}
+{"time":1798.628000, "unit" : "mph", "magnitude":[43.9], "speed":[-121.0]}
+{"time":1798.628500, "unit" : "mph", "magnitude":[42.8], "speed":[-121.0]}
+{"time":1798.629000, "unit" : "mph", "magnitude":[41.8], "speed":[-121.0]}
+{"time":1798.629500, "unit" : "mph", "magnitude":[41.3], "speed":[-121.0]}
+{"time":1798.630000, "unit" : "mph", "magnitude":[41.3], "speed":[-121.0]}
+{"time":1798.630500, "unit" : "mph", "magnitude":[41.3], "speed":[-121.0]}
+{"time":1798.631000, "unit" : "mph", "magnitude":[41.3], "speed":[-120.9]}
+{"time":1798.631500, "unit" : "mph", "magnitude":[40.9], "speed":[-120.9]}
+{"time":1798.632000, "unit" : "mph", "magnitude":[40.3], "speed":[-120.8]}
+{"time":1798.632500, "unit" : "mph", "magnitude":[39.5], "speed":[-120.8]}
+{"time":1798.633000, "unit" : "mph", "magnitude":[38.8], "speed":[-120.9]}
+{"time":1798.633500, "unit" : "mph", "magnitude":[38.4], "speed":[-120.8]}
+{"time":1798.634000, "unit" : "mph", "magnitude":[38.5], "speed":[-120.8]}
+{"time":1798.634500, "unit" : "mph", "magnitude":[39.0], "speed":[-120.7]}
+{"time":1798.635000, "unit" : "mph", "magnitude":[39.3], "speed":[-120.7]}
+{"time":1798.635500, "unit" : "mph", "magnitude":[39.3], "speed":[-120.7]}
+{"time":1798.636000, "unit" : "mph", "magnitude":[38.9], "speed":[-120.7]}
+{"time":1798.636500, "unit" : "mph", "magnitude":[38.2], "speed":[-120.7]}
+{"time":1798.637000, "unit" : "mph", "magnitude":[37.6], "speed":[-120.8]}
+{"time":1798.637500, "unit" : "mph", "magnitude":[37.3], "speed":[-120.9]}
+{"time":1798.638000, "unit" : "mph", "magnitude":[37.1], "speed":[-120.8]}
+{"time":1798.638500, "unit" : "mph", "magnitude":[36.7], "speed":[-120.8]}
+{"time":1798.639000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.639500, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.640000, "unit" : "mph", "magnitude":0, "speed":0.0}
+{"time":1798.640500, "unit" : "mph", "magnitude":0, "speed":0.0}
