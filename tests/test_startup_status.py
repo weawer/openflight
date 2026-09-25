@@ -344,6 +344,11 @@ def test_server_publishes_ops_failure_and_cleans_up(tmp_path, monkeypatch):
             "IWR6843 serial port is unavailable",
             "Check the TI radar USB and power connections, then relaunch OpenFlight.",
         ),
+        (
+            "config rejected: 'autoTriggerCfg': Error: unknown command",
+            "Flash l3_dump_autonomous_trigger_20260925.bin, reset the TI radar, "
+            "then relaunch OpenFlight.",
+        ),
     ],
 )
 def test_server_publishes_specific_ti_recovery(

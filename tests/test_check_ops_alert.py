@@ -37,15 +37,7 @@ def test_records_edges_and_dump_without_sending_a_capture_trigger():
     radar.configure_for_internal_speed_trigger.side_effect = lambda **_: gpio.when_pressed()
     radar.wait_for_hardware_trigger.side_effect = capture
     check_ops_alert.run_test(
-        radar,
-        gpio,
-        "internal",
-        1,
-        lambda event, **fields: records.append((event, fields)),
-        trigger_threshold=20,
-        trigger_magnitude=45,
-        pre_trigger_segments=8,
-        alert_threshold=20,
+        radar, gpio, "internal", 1, lambda event, **fields: records.append((event, fields))
     )
 
     edges = [(event, fields["phase"]) for event, fields in records if event.startswith("alert_f")]
@@ -59,12 +51,7 @@ def test_records_edges_and_dump_without_sending_a_capture_trigger():
     ]
     assert records[-1][1]["post_trigger_ms"] == pytest.approx(110.533333)
     assert records[-2][1]["response"] == response
-    assert [call.args[0] for call in radar._send_command.call_args_list] == ["Y<20", "Y?"]
-    radar.configure_for_internal_speed_trigger.assert_called_once_with(
-        trigger_threshold_mph=20,
-        trigger_magnitude=45,
-        pre_trigger_segments=8,
-    )
+    assert [call.args[0] for call in radar._send_command.call_args_list] == ["Y<40", "Y?"]
     radar.trigger_capture.assert_not_called()
     radar.rearm_internal_speed_trigger.assert_not_called()
 
@@ -104,25 +91,3 @@ def test_speed_control_drains_serial_without_waiting_for_a_dump(monkeypatch):
     radar.wait_for_hardware_trigger.assert_not_called()
     assert records[-2] == ("uart", {"text": '{"ALERT": "High Speed"}'})
     assert records[-1][0] == "finished"
-
-
-def test_object_detect_mode_enables_ig_instead_of_speed_alert(monkeypatch):
-    radar = MagicMock()
-    radar.serial.in_waiting = 0
-    times = iter([0.0, 0.0, 2.0])
-    monkeypatch.setattr(check_ops_alert.time, "monotonic", lambda: next(times))
-    monkeypatch.setattr(check_ops_alert.time, "sleep", lambda _: None)
-    records = []
-
-    check_ops_alert.run_test(
-        radar,
-        MagicMock(is_pressed=False),
-        "speed",
-        1,
-        lambda event, **fields: records.append((event, fields)),
-        signal="object-detect",
-    )
-
-    assert [call.args[0] for call in radar._send_command.call_args_list] == ["IG"]
-    assert records[-2][0] == "ready"
-    assert records[-2][1]["signal"] == "object-detect"

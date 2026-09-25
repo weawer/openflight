@@ -546,9 +546,11 @@ class TestIWR6843ShotIntegration:
             net_range_m=4.6,
             tx_order="auto",
             capture_timeout_s=12.0,
+            trigger_source="radar",
         )
 
         assert "freeze_delay_s" not in captured
+        assert captured["autonomous_trigger"] is True
         assert captured["armed"] is False
         assert server_module.iwr6843_runtime.tdm_sign_policy == "positive"
         assert server_module.iwr6843_runtime_config["tdm_sign_policy"] == "positive"
@@ -4659,7 +4661,7 @@ class TestHardwareTriggerPlumbing:
 
         server_module.stop_monitor()
 
-    def test_hardware_trigger_arms_iwr_before_monitor_and_forwards_timestamp(self, monkeypatch):
+    def test_hardware_trigger_arms_iwr_without_forwarding_ops_timestamp(self, monkeypatch):
         events = []
 
         class FakeCaptureMonitor:
@@ -4706,11 +4708,7 @@ class TestHardwareTriggerPlumbing:
 
         server_module.start_monitor(trigger_type="hardware")
 
-        assert events == [
-            ("armed", None),
-            ("started", None),
-            ("notified", 1234.5),
-        ]
+        assert events == [("armed", None), ("started", None)]
         server_module.stop_monitor()
 
     def test_hardware_trigger_notifies_camera_when_iwr_is_disabled(self, monkeypatch):

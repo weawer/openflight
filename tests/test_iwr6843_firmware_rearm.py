@@ -8,6 +8,7 @@ FIRMWARE = Path(__file__).parents[1] / "firmware" / "iwr6843" / "l3_dump.c"
 FIRMWARE_MAKEFILE = Path(__file__).parents[1] / "firmware" / "Makefile"
 CONFIG_DIR = Path(__file__).parents[1] / "config"
 WIDE_CONFIG = CONFIG_DIR / "iwr6843_l3dump_wide_24f3ms_53bin_iq16.cfg"
+AUTOTRIGGER_CONFIG = CONFIG_DIR / "iwr6843_l3dump_wide_24f3ms_53bin_iq16_autotrigger.cfg"
 DENSE_CONFIG = CONFIG_DIR / "iwr6843_l3dump_dense_36f2ms_53bin_iq8.cfg"
 DENSE_WIDE_LATE_CONFIG = CONFIG_DIR / "iwr6843_l3dump_dense_36f2ms_53bin_iq8_wide_late.cfg"
 
@@ -95,8 +96,8 @@ def test_sensor_stop_cancels_post_capture_at_next_completed_frame():
     assert "l3_hwaMaybeQueueRearm()" in shutdown_freeze
     assert "l3_freezeHwaForShutdown" in shutdown_stop
     assert "l3_finishCaptureStop" in shutdown_stop
-    assert "if (!gCaptureActive)" in sensor_stop
-    assert "return l3_stopCaptureForShutdown()" in sensor_stop
+    assert "if (!gCaptureActive && !gAutoCaptureReady)" in sensor_stop
+    assert "status = l3_stopCaptureForShutdown()" in sensor_stop
 
 
 def test_shutdown_waits_for_iq8_pack_without_rearming():
@@ -171,7 +172,7 @@ def test_production_build_uses_configurable_compression_and_single_release():
     assert "--define=L3_IQ8_SPARSE_SCALE=1" not in target
     assert "--define=LOOPS=" not in target
     assert "--define=RING_FRAMES=" not in target
-    assert "RELEASE_NAME ?= l3_dump_configurable_capture_20260818.bin" in source
+    assert "RELEASE_NAME ?= l3_dump_autonomous_trigger_20260925.bin" in source
     assert '"$(RELEASE_DIR)/$(RELEASE_NAME)"' in target
     assert source.count("\nbuild-native:") == 1
 
@@ -190,6 +191,15 @@ def test_wide_profile_uses_24_frames_at_3ms_with_53_bin_iq16_windows():
     assert "frameCfg 0 2 12 0 3 1 0" in lines
     assert "captureFormat iq16" in lines
     assert "phaseCaptureCfg 20 53 9 32 53 7 47 53 47 8 1" in lines
+
+
+def test_autonomous_profile_gates_motion_beyond_the_tee():
+    lines = _config_lines(AUTOTRIGGER_CONFIG)
+
+    assert "frameCfg 0 2 12 0 3 1 0" in lines
+    assert "captureFormat iq16" in lines
+    assert "phaseCaptureCfg 20 53 9 32 53 7 47 53 47 8 1" in lines
+    assert "autoTriggerCfg 37 9 10000 250 2" in lines
 
 
 def test_dense_profile_uses_36_frames_at_2ms_with_53_bin_iq8_windows():
@@ -212,6 +222,7 @@ def test_dense_wide_late_profile_keeps_dense_timing_and_near_late_window():
 def test_supported_profiles_keep_the_same_72ms_movie():
     for path, expected_frames, expected_period_ms in (
         (WIDE_CONFIG, 24, 3.0),
+        (AUTOTRIGGER_CONFIG, 24, 3.0),
         (DENSE_CONFIG, 36, 2.0),
         (DENSE_WIDE_LATE_CONFIG, 36, 2.0),
     ):
@@ -245,3 +256,42 @@ def test_dynamic_window_start_is_recorded_per_ring_slot():
 
     assert "gFrameBinStart[ringSlot % RING_FRAMES]" in output
     assert "UART_writePolling(gDataUart, gFrameBinStart" in dump
+
+
+def test_autonomous_trigger_scores_completed_iq16_frames_before_rearming():
+    source = FIRMWARE.read_text(encoding="utf-8")
+    score = _function_source(
+        source,
+        "static uint8_t l3_autoTriggerFrameQualifies",
+        "static void l3_requestAutoTriggerFreeze",
+    )
+    rearm = _function_source(
+        source,
+        "static void l3_hwaRearmTask",
+        "/* Fill the 20-byte fixed dump header",
+    )
+
+    assert "chirp - N_TX" in score
+    assert "gAutoTriggerMinMeanPower" in score
+    assert "gAutoTriggerMotionPermille" in score
+    assert rearm.index("l3_autoTriggerFrameQualifies") < rearm.index("l3_restartCompletedHwaFrame")
+
+
+def test_autonomous_trigger_freezes_post_frames_and_exposes_uart_events():
+    source = FIRMWARE.read_text(encoding="utf-8")
+    request = _function_source(
+        source,
+        "static void l3_requestAutoTriggerFreeze",
+        "static int32_t l3_freezeHwaAfterPostFrames",
+    )
+    rearm = _function_source(
+        source,
+        "static void l3_hwaRearmTask",
+        "/* Fill the 20-byte fixed dump header",
+    )
+    dump = _function_source(source, "int32_t l3_cli_dump", "static int32_t l3_cli_stats")
+
+    assert "gPostCaptureStarted = 1U" in request
+    assert 'CLI_write("IWR_TRIGGER' in rearm
+    assert 'CLI_write("IWR_READY' in rearm
+    assert "gAutoCaptureReady" in dump

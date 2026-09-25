@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import threading
+
 import numpy as np
 import pytest
 
@@ -122,6 +124,69 @@ class FakeSerial:
         chunk = self.payload[:nbytes]
         del self.payload[:nbytes]
         return bytes(chunk)
+
+
+def test_wait_for_autonomous_capture_notifies_on_trigger_then_reads_frozen_dump(monkeypatch):
+    radar = IWR6843Radar.__new__(IWR6843Radar)
+    radar.ser = FakeSerial(b"noise\r\nIWR_TRIGGER frame=42\r\nIWR_READY frame=50\r\n")
+    raw = pack_dump(np.ones((1, 3, 4, 4), dtype=complex), n_tx=3, version=3)
+    events = []
+
+    def read_dump():
+        events.append("dump")
+        return raw
+
+    monkeypatch.setattr(radar, "read_dump", read_dump)
+    timestamps = []
+
+    def on_trigger(timestamp):
+        timestamps.append(timestamp)
+        events.append("trigger")
+
+    result = radar.wait_for_autonomous_capture(
+        on_trigger=on_trigger,
+        cancel_event=None,
+        clock=lambda: 1234.5,
+    )
+
+    assert result == (1234.5, raw)
+    assert timestamps == [1234.5]
+    assert events == ["trigger", "dump"]
+
+
+def test_arm_response_preserves_immediate_autonomous_trigger(monkeypatch):
+    cancel_event = threading.Event()
+
+    class EmptySerial(FakeSerial):
+        def read(self, nbytes: int):
+            cancel_event.set()
+            return super().read(nbytes)
+
+    radar = IWR6843Radar.__new__(IWR6843Radar)
+    radar.ser = EmptySerial(b"")
+    monkeypatch.setattr(
+        radar,
+        "cmd",
+        lambda *_args: (
+            "autoTriggerStart\r\n"
+            "Done\r\nl3dump:/>IWR_TRIGGER frame=1 mean_power=2 "
+            "motion_permille=3 bin=4\r\n"
+            "IWR_READY frame=16\r\nDone\r\nl3dump:/>"
+        ),
+    )
+    raw = pack_dump(np.ones((1, 3, 4, 4), dtype=complex), n_tx=3, version=3)
+    monkeypatch.setattr(radar, "read_dump", lambda: raw)
+    timestamps = []
+
+    radar.start_autonomous_trigger()
+    result = radar.wait_for_autonomous_capture(
+        on_trigger=timestamps.append,
+        cancel_event=cancel_event,
+        clock=lambda: 4321.0,
+    )
+
+    assert result == (4321.0, raw)
+    assert timestamps == [4321.0]
 
 
 def test_read_dump_waits_for_cli_ready_after_binary_payload():

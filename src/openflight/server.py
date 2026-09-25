@@ -1095,8 +1095,9 @@ def init_iwr6843(
     azimuth_offset_deg: float = 0.0,
     horizontal_phase_reference_rad: float | None = None,
     save_dumps: bool = False,
+    trigger_source: str = "gpio",
 ) -> bool:
-    """Initialize GPIO-triggered TI capture and the frozen LCMF-v1 estimator."""
+    """Initialize TI capture and the frozen LCMF-v1 estimator."""
     global iwr6843_runtime, iwr6843_runtime_config  # pylint: disable=global-statement
     try:
         from .iwr6843 import Calibration
@@ -1125,6 +1126,7 @@ def init_iwr6843(
             port=port,
             gpio_pin=trigger_pin,
             save_dumps=save_dumps,
+            autonomous_trigger=trigger_source == "radar",
             trigger_observers=(
                 [camera_capture_runtime.notify_trigger]
                 if camera_capture_runtime is not None
@@ -1153,7 +1155,8 @@ def init_iwr6843(
             "port": capture_monitor.port,
             "config": str(config_path),
             "calibration": str(calibration_path),
-            "trigger_pin_bcm": trigger_pin,
+            "trigger_pin_bcm": trigger_pin if trigger_source == "gpio" else None,
+            "trigger_source": trigger_source,
             "tee_slant_range_m": tee_range_m,
             "net_range_m": net_range_m,
             "tx_order": resolved_order,
@@ -1170,9 +1173,9 @@ def init_iwr6843(
         }
         logger.info(
             "[SERVER] IWR6843 initialized "
-            "(port=%s, BCM%d, estimator=LCMF-v1, firmware boundary freeze)",
+            "(port=%s, trigger=%s, estimator=LCMF-v1, firmware boundary freeze)",
             capture_monitor.port,
-            trigger_pin,
+            trigger_source,
         )
         return True
     except Exception as error:  # pylint: disable=broad-exception-caught
@@ -1191,6 +1194,11 @@ def init_iwr6843(
 def _iwr6843_startup_recovery(error: object) -> str:
     """Translate a known TI initialization failure into operator guidance."""
     normalized_error = str(error or "").casefold()
+    if "autotrigger" in normalized_error:
+        return (
+            "Flash l3_dump_autonomous_trigger_20260925.bin, reset the TI radar, "
+            "then relaunch OpenFlight."
+        )
     if "press reset and retry" in normalized_error or "firmware may be wedged" in normalized_error:
         return "Press RESET on the TI radar, then relaunch OpenFlight."
     return "Check the TI radar USB and power connections, then relaunch OpenFlight."
@@ -3676,10 +3684,8 @@ def on_swing_speed_detected(event: SwingSpeedEvent):
 
 
 def _notify_ops_hardware_trigger(trigger_timestamp: float) -> None:
-    """Freeze the angle-radar and camera rings from one OPS trigger."""
-    if iwr6843_runtime is not None:
-        iwr6843_runtime.capture_monitor.notify_trigger(trigger_timestamp)
-    elif camera_capture_runtime is not None:
+    """Trigger a camera-only setup when no IWR radar owns the event."""
+    if iwr6843_runtime is None and camera_capture_runtime is not None:
         camera_capture_runtime.notify_trigger(trigger_timestamp)
 
 
@@ -4531,6 +4537,12 @@ def main():
         help="BCM GPIO receiving the shared sound-trigger edge (default: 17)",
     )
     parser.add_argument(
+        "--iwr6843-trigger-source",
+        choices=("radar", "gpio"),
+        default="gpio",
+        help="IWR capture trigger source (default: shared GPIO)",
+    )
+    parser.add_argument(
         "--iwr6843-tee-m",
         type=float,
         default=1.575,
@@ -4920,6 +4932,7 @@ def main():
             azimuth_offset_deg=args.iwr6843_azimuth_offset_deg,
             horizontal_phase_reference_rad=args.iwr6843_horizontal_phase_reference_rad,
             save_dumps=args.debug,
+            trigger_source=args.iwr6843_trigger_source,
         ):
             calibration = iwr6843_runtime.calibration
             ball_speed_correction_distance_ft = args.iwr6843_tee_m * 3.28084
@@ -4928,7 +4941,8 @@ def main():
             ) * 3.28084
             print(
                 "IWR6843 enabled (LCMF-v1 launch angle, "
-                f"BCM{args.iwr6843_trigger_pin}, {iwr6843_runtime.tx_order} TX order)"
+                f"{args.iwr6843_trigger_source} trigger, "
+                f"{iwr6843_runtime.tx_order} TX order)"
             )
             if args.debug:
                 print(f"IWR6843 raw dumps enabled: {iwr_output_dir}")

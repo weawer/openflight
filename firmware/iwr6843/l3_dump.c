@@ -399,6 +399,20 @@ static volatile uint32_t gPostFramesObserved;
 static volatile uint8_t  gPostCaptureStarted;
 static volatile uint8_t  gActiveFrameIsPost;
 static volatile uint8_t  gActiveFrameShouldKeep;
+static volatile uint8_t  gAutoTriggerEnabled;
+static volatile uint8_t  gAutoTriggerInFlight;
+static volatile uint8_t  gAutoCaptureReady;
+static volatile uint8_t  gAutoReadyPending;
+static uint8_t  gAutoTriggerStartBin;
+static uint8_t  gAutoTriggerBinCount;
+static uint8_t  gAutoTriggerConfirmFrames;
+static uint8_t  gAutoTriggerConsecutive;
+static uint32_t gAutoTriggerMinMeanPower;
+static uint32_t gAutoTriggerMotionPermille;
+static uint32_t gAutoTriggerLastMeanPower;
+static uint32_t gAutoTriggerLastMotionPermille;
+static uint8_t  gAutoTriggerLastBin;
+static uint32_t gAutoTriggerCount;
 #ifdef L3_RING_IQ8
 static volatile uint8_t  gIq8Pending;
 static volatile uint32_t gIq8PendingSlot;
@@ -431,6 +445,9 @@ static int32_t l3_cli_stats(int32_t argc, char *argv[]);
 #ifdef CONFIGURABLE_CAPTURE
 static int32_t l3_cli_captureCfg(int32_t argc, char *argv[]);
 static int32_t l3_cli_phaseCaptureCfg(int32_t argc, char *argv[]);
+static int32_t l3_cli_autoTriggerCfg(int32_t argc, char *argv[]);
+static int32_t l3_cli_autoTriggerStart(int32_t argc, char *argv[]);
+static int32_t l3_cli_autoTriggerStop(int32_t argc, char *argv[]);
 #ifdef L3_RING_IQ8
 static int32_t l3_cli_captureFormat(int32_t argc, char *argv[]);
 #ifdef L3_IQ8_EDMA_PACK
@@ -461,6 +478,18 @@ static int32_t l3_parseU8(const char *text, uint8_t *value)
         return -1;
     }
     *value = (uint8_t)parsed;
+    return 0;
+}
+
+static int32_t l3_parseU32(const char *text, uint32_t *value)
+{
+    char *end = NULL;
+    unsigned long parsed = strtoul(text, &end, 10);
+
+    if (text == end || end == NULL || *end != '\0' || parsed > 0xFFFFFFFFUL) {
+        return -1;
+    }
+    *value = (uint32_t)parsed;
     return 0;
 }
 
@@ -867,6 +896,79 @@ static int32_t l3_cli_phaseCaptureCfg(int32_t argc, char *argv[])
     gCapturePlan.usedBytes = 0U;
     return 0;
 }
+
+/* autoTriggerCfg <startBin> <binCount> <minMeanPower>
+ *                <motionPermille> <confirmFrames> */
+static int32_t l3_cli_autoTriggerCfg(int32_t argc, char *argv[])
+{
+    uint8_t startBin;
+    uint8_t binCount;
+    uint8_t confirmFrames;
+    uint32_t minMeanPower;
+    uint32_t motionPermille;
+
+    if (gCaptureActive || gAutoCaptureReady) {
+        CLI_write("Error: stop the sensor before autoTriggerCfg\n");
+        return -1;
+    }
+    if (argc != 6 ||
+        l3_parseU8(argv[1], &startBin) != 0 ||
+        l3_parseU8(argv[2], &binCount) != 0 ||
+        l3_parseU32(argv[3], &minMeanPower) != 0 ||
+        l3_parseU32(argv[4], &motionPermille) != 0 ||
+        l3_parseU8(argv[5], &confirmFrames) != 0) {
+        CLI_write("Error: autoTriggerCfg needs startBin binCount "
+                  "minMeanPower motionPermille confirmFrames\n");
+        return -1;
+    }
+    if (binCount == 0U || confirmFrames == 0U || confirmFrames > 10U ||
+        minMeanPower == 0U || motionPermille == 0U || motionPermille > 4000U ||
+        startBin < gCapturePlan.preStart ||
+        ((uint32_t)startBin + binCount) >
+            ((uint32_t)gCapturePlan.preStart + gCapturePlan.preBins)) {
+        CLI_write("Error: auto trigger window must fit inside the pre window; "
+                  "thresholds and confirmation must be nonzero\n");
+        return -1;
+    }
+    gAutoTriggerStartBin = startBin;
+    gAutoTriggerBinCount = binCount;
+    gAutoTriggerMinMeanPower = minMeanPower;
+    gAutoTriggerMotionPermille = motionPermille;
+    gAutoTriggerConfirmFrames = confirmFrames;
+    gAutoTriggerConsecutive = 0U;
+    return 0;
+}
+
+static int32_t l3_cli_autoTriggerStart(int32_t argc, char *argv[])
+{
+    (void)argc;
+    (void)argv;
+    if (!gCaptureActive || gAutoTriggerBinCount == 0U) {
+        CLI_write("Error: active capture and autoTriggerCfg required\n");
+        return -1;
+    }
+#ifdef L3_RING_IQ8
+    if (l3_captureUsesIq8()) {
+        CLI_write("Error: autonomous trigger currently requires iq16\n");
+        return -1;
+    }
+#endif
+    gAutoTriggerConsecutive = 0U;
+    gAutoTriggerInFlight = 0U;
+    gAutoCaptureReady = 0U;
+    gAutoReadyPending = 0U;
+    gAutoTriggerEnabled = 1U;
+    return 0;
+}
+
+static int32_t l3_cli_autoTriggerStop(int32_t argc, char *argv[])
+{
+    (void)argc;
+    (void)argv;
+    gAutoTriggerEnabled = 0U;
+    gAutoTriggerConsecutive = 0U;
+    return 0;
+}
 #endif
 
 #ifdef ENABLE_HWA_SMOKE
@@ -1102,6 +1204,7 @@ static void l3_hwaMaybeQueueRearm(void)
     uintptr_t key;
     uint8_t queue = 0U;
     uint8_t freeze = 0U;
+    uint8_t autoReady = 0U;
 
     key = Hwi_disable();
     if (gCaptureActive && gHwaDoneSeen && gHwaOutputSeen && !gHwaRearmPending) {
@@ -1173,10 +1276,18 @@ static void l3_hwaMaybeQueueRearm(void)
 #endif
         }
     }
+#ifdef CONFIGURABLE_CAPTURE
+    if (freeze && gAutoTriggerInFlight) {
+        gAutoCaptureReady = 1U;
+        gAutoReadyPending = 1U;
+        autoReady = 1U;
+    }
+#endif
     Hwi_restore(key);
     if (freeze && gHwaFreezeSemaphore != NULL) {
         Semaphore_post(gHwaFreezeSemaphore);
-    } else if (queue && gHwaRearmSemaphore != NULL) {
+    }
+    if ((queue || autoReady) && gHwaRearmSemaphore != NULL) {
         Semaphore_post(gHwaRearmSemaphore);
     }
 }
@@ -1853,6 +1964,102 @@ static int32_t l3_restartCompletedHwaFrame(void)
     return errCode;
 }
 
+#ifdef CONFIGURABLE_CAPTURE
+static uint8_t l3_autoTriggerFrameQualifies(uint32_t slot)
+{
+    const int16_t *frame;
+    uint32_t binOffset;
+    uint32_t bin;
+
+    if (!gAutoTriggerEnabled || gAutoTriggerInFlight ||
+        gPostCaptureStarted || slot >= gCapturePlan.preFrames ||
+        gFrameBinStart[slot] != gCapturePlan.preStart ||
+        gAutoTriggerStartBin < gCapturePlan.preStart) {
+        return 0U;
+    }
+    binOffset = (uint32_t)gAutoTriggerStartBin - gCapturePlan.preStart;
+    if (binOffset + gAutoTriggerBinCount > gCapturePlan.preBins) {
+        return 0U;
+    }
+
+    frame = (const int16_t *)&g_ring[gFrameOffset[slot]];
+    gAutoTriggerLastMeanPower = 0U;
+    gAutoTriggerLastMotionPermille = 0U;
+    for (bin = 0U; bin < gAutoTriggerBinCount; bin++) {
+        uint32_t chirp;
+        uint32_t rx;
+        uint32_t sampleCount = 0U;
+        uint64_t power = 0U;
+        uint64_t motion = 0U;
+
+        for (chirp = N_TX; chirp < gCapturePlan.chirpsPerFrame; chirp++) {
+            for (rx = 0U; rx < N_RX; rx++) {
+                uint32_t current =
+                    (((chirp * N_RX + rx) * gCapturePlan.preBins) +
+                     binOffset + bin) * 2U;
+                uint32_t previous =
+                    ((((chirp - N_TX) * N_RX + rx) * gCapturePlan.preBins) +
+                     binOffset + bin) * 2U;
+                int32_t imag = frame[current];
+                int32_t real = frame[current + 1U];
+                int32_t deltaImag = imag - frame[previous];
+                int32_t deltaReal = real - frame[previous + 1U];
+
+                power += (uint64_t)((int64_t)imag * imag) +
+                         (uint64_t)((int64_t)real * real);
+                motion += (uint64_t)((int64_t)deltaImag * deltaImag) +
+                          (uint64_t)((int64_t)deltaReal * deltaReal);
+                sampleCount++;
+            }
+        }
+        if (sampleCount > 0U && power > 0U) {
+            uint32_t meanPower = (uint32_t)(power / sampleCount);
+            uint64_t ratio64 = (motion * 1000U) / power;
+            uint32_t motionPermille =
+                (ratio64 > 0xFFFFFFFFULL) ? 0xFFFFFFFFU : (uint32_t)ratio64;
+
+            if (meanPower >= gAutoTriggerMinMeanPower &&
+                motionPermille >= gAutoTriggerMotionPermille) {
+                gAutoTriggerLastMeanPower = meanPower;
+                gAutoTriggerLastMotionPermille = motionPermille;
+                gAutoTriggerLastBin =
+                    (uint8_t)(gAutoTriggerStartBin + bin);
+                return 1U;
+            }
+            if (meanPower > gAutoTriggerLastMeanPower) {
+                gAutoTriggerLastMeanPower = meanPower;
+            }
+            if (motionPermille > gAutoTriggerLastMotionPermille) {
+                gAutoTriggerLastMotionPermille = motionPermille;
+            }
+        }
+    }
+    return 0U;
+}
+
+static void l3_requestAutoTriggerFreeze(void)
+{
+    uintptr_t key;
+
+    while (Semaphore_pend(gHwaFreezeSemaphore, BIOS_NO_WAIT)) {
+        /* Discard a stale completion before the autonomous request. */
+    }
+    key = Hwi_disable();
+    gHwaFreezeRequested = 1U;
+    gHwaFreezeRequestFrame = gRingFrame;
+    gPostCaptureStarted = 1U;
+    gPostFramesCaptured = 0U;
+    gPostFramesObserved = 0U;
+    gActiveFrameShouldKeep = 1U;
+    gHwaFreezeTargetFrame = 0U;
+    gHwaFreezeRequests++;
+    gAutoTriggerInFlight = 1U;
+    gAutoTriggerEnabled = 0U;
+    gAutoTriggerCount++;
+    Hwi_restore(key);
+}
+#endif
+
 static int32_t l3_freezeHwaAfterPostFrames(void)
 {
     uintptr_t key;
@@ -1961,6 +2168,13 @@ static int32_t l3_stopCaptureAtBoundary(void)
 static int32_t l3_stopCaptureForShutdown(void)
 {
     if (!gCaptureActive) {
+#ifdef CONFIGURABLE_CAPTURE
+        if (gAutoCaptureReady) {
+            gAutoCaptureReady = 0U;
+            gAutoTriggerInFlight = 0U;
+            return l3_finishCaptureStop();
+        }
+#endif
         return 0;
     }
 #ifdef HWA_CHAINED_SNAPSHOT_RING
@@ -2061,6 +2275,8 @@ static void l3_hwaRearmTask(UArg arg0, UArg arg1)
             uintptr_t key;
             uint8_t shouldRearm = 0U;
             uint8_t freezeAfterPack = 0U;
+            uint8_t reportAutoReady = 0U;
+            uint32_t autoReadyFrame = 0U;
 #ifdef L3_RING_IQ8
             uint8_t hadPending = 0U;
             uint8_t pendingScratch = 0U;
@@ -2070,11 +2286,19 @@ static void l3_hwaRearmTask(UArg arg0, UArg arg1)
             int32_t errCode;
 
             key = Hwi_disable();
+            if (gAutoReadyPending) {
+                gAutoReadyPending = 0U;
+                reportAutoReady = 1U;
+                autoReadyFrame = gRingFrame;
+            }
             if (gCaptureActive) {
                 gHwaRearmBusy = 1U;
                 shouldRearm = 1U;
             }
             Hwi_restore(key);
+            if (reportAutoReady) {
+                CLI_write("IWR_READY frame=%u\n", (unsigned)autoReadyFrame);
+            }
             if (!shouldRearm) {
                 continue;
             }
@@ -2158,6 +2382,33 @@ static void l3_hwaRearmTask(UArg arg0, UArg arg1)
             if (l3_captureUsesIq8()) {
                 l3_waitForIq8EdmaScratch(nextScratch);
                 gIq8ActiveScratch = nextScratch;
+            }
+#endif
+#ifdef CONFIGURABLE_CAPTURE
+#ifdef L3_RING_IQ8
+            if (!l3_captureUsesIq8() && gAutoTriggerEnabled &&
+                !gPostCaptureStarted && gPreFramesCaptured > 0U)
+#else
+            if (gAutoTriggerEnabled && !gPostCaptureStarted &&
+                gPreFramesCaptured > 0U)
+#endif
+            {
+                uint32_t completedSlot =
+                    (gPreFramesCaptured - 1U) % gCapturePlan.preFrames;
+                if (l3_autoTriggerFrameQualifies(completedSlot)) {
+                    gAutoTriggerConsecutive++;
+                } else {
+                    gAutoTriggerConsecutive = 0U;
+                }
+                if (gAutoTriggerConsecutive >= gAutoTriggerConfirmFrames) {
+                    l3_requestAutoTriggerFreeze();
+                    CLI_write("IWR_TRIGGER frame=%u mean_power=%u "
+                              "motion_permille=%u bin=%u\n",
+                              (unsigned)gRingFrame,
+                              (unsigned)gAutoTriggerLastMeanPower,
+                              (unsigned)gAutoTriggerLastMotionPermille,
+                              (unsigned)gAutoTriggerLastBin);
+                }
             }
 #endif
             errCode = l3_restartCompletedHwaFrame();
@@ -2429,15 +2680,24 @@ int32_t l3_cli_dump(int32_t argc, char *argv[])
     uint32_t actualPre;
     uint32_t actualPost;
     uint32_t oldestPre;
+    uint8_t autonomousFrozen = gAutoCaptureReady;
 #endif
     (void)argc; (void)argv;
 
-    if (!gCaptureActive) {
+    if (!gCaptureActive
+#ifdef CONFIGURABLE_CAPTURE
+        && !autonomousFrozen
+#endif
+    ) {
         return -1;
     }
 
     /* Halt chirping only after HWA and both output EDMAs completed naturally. */
+#ifdef CONFIGURABLE_CAPTURE
+    if ((autonomousFrozen ? l3_finishCaptureStop() : l3_stopCaptureAtBoundary()) != 0) {
+#else
     if (l3_stopCaptureAtBoundary() != 0) {
+#endif
         return -1;
     }
 
@@ -2595,6 +2855,17 @@ int32_t l3_cli_dump(int32_t argc, char *argv[])
     gPostCaptureStarted = 0U;
     gActiveFrameIsPost = 0U;
     gActiveFrameShouldKeep = 1U;
+    gAutoTriggerEnabled = 0U;
+    gAutoTriggerInFlight = 0U;
+    gAutoCaptureReady = 0U;
+    gAutoReadyPending = 0U;
+    gAutoTriggerConsecutive = 0U;
+    gAutoTriggerLastMeanPower = 0U;
+    gAutoTriggerLastMotionPermille = 0U;
+    gAutoTriggerLastBin = 0U;
+    if (autonomousFrozen) {
+        gAutoTriggerEnabled = 1U;
+    }
 #endif
     if (l3_restartCompletedHwaFrame() < 0) {
         CLI_write("Error: completed HWA frame restart failed\n");
@@ -2737,6 +3008,24 @@ static int32_t l3_cli_stats(int32_t argc, char *argv[])
               (unsigned)gNumFrame, (unsigned)gNumWrap, (int)gCaptureActive,
               (unsigned)gCalibStatus, (unsigned)gRfFaults);
 #endif
+#endif
+#if defined(HWA_CHAINED_SNAPSHOT_RING) && defined(CONFIGURABLE_CAPTURE)
+    CLI_write("auto_enabled=%u auto_inflight=%u auto_ready=%u auto_count=%u "
+              "auto_window=%u/%u auto_min_power=%u auto_min_motion=%u "
+              "auto_confirm=%u auto_last_power=%u auto_last_motion=%u "
+              "auto_last_bin=%u\n",
+              (unsigned)gAutoTriggerEnabled,
+              (unsigned)gAutoTriggerInFlight,
+              (unsigned)gAutoCaptureReady,
+              (unsigned)gAutoTriggerCount,
+              (unsigned)gAutoTriggerStartBin,
+              (unsigned)gAutoTriggerBinCount,
+              (unsigned)gAutoTriggerMinMeanPower,
+              (unsigned)gAutoTriggerMotionPermille,
+              (unsigned)gAutoTriggerConfirmFrames,
+              (unsigned)gAutoTriggerLastMeanPower,
+              (unsigned)gAutoTriggerLastMotionPermille,
+              (unsigned)gAutoTriggerLastBin);
 #endif
     return 0;
 }
@@ -3232,6 +3521,14 @@ static int32_t l3_cli_sensorStart(int32_t argc, char *argv[])
     gPostCaptureStarted = 0U;
     gActiveFrameIsPost = 0U;
     gActiveFrameShouldKeep = 1U;
+    gAutoTriggerEnabled = 0U;
+    gAutoTriggerInFlight = 0U;
+    gAutoCaptureReady = 0U;
+    gAutoReadyPending = 0U;
+    gAutoTriggerConsecutive = 0U;
+    gAutoTriggerLastMeanPower = 0U;
+    gAutoTriggerLastMotionPermille = 0U;
+    gAutoTriggerLastBin = 0U;
 #ifdef L3_RING_IQ8
     gIq8Pending = 0U;
     gIq8PendingSlot = 0U;
@@ -3270,14 +3567,25 @@ static int32_t l3_cli_sensorStart(int32_t argc, char *argv[])
 
 static int32_t l3_cli_sensorStop(int32_t argc, char *argv[])
 {
+    int32_t status;
+
     (void)argc; (void)argv;
-    if (!gCaptureActive) {
+    if (!gCaptureActive && !gAutoCaptureReady) {
+        gAutoTriggerEnabled = 0U;
+        gAutoTriggerConsecutive = 0U;
         return 0;
     }
 #ifdef LIVE_SNAPSHOT_RING
     gRawFrameReadyMask = 0U;
 #endif
-    return l3_stopCaptureForShutdown();
+    status = l3_stopCaptureForShutdown();
+#ifdef CONFIGURABLE_CAPTURE
+    if (status == 0) {
+        gAutoTriggerEnabled = 0U;
+        gAutoTriggerConsecutive = 0U;
+    }
+#endif
+    return status;
 }
 
 /* System init task: UART, mmWave control, EDMA + ADCBUF + frame-start ISR, CLI. */
@@ -3489,6 +3797,16 @@ static void l3_initTask(UArg arg0, UArg arg1)
     cliCfg.tableEntry[10].cmdHandlerFxn = l3_cli_iq8Scale;
 #endif
 #endif
+    cliCfg.tableEntry[11].cmd           = "autoTriggerCfg";
+    cliCfg.tableEntry[11].helpString    =
+        "autoTriggerCfg startBin binCount minMeanPower motionPermille confirmFrames";
+    cliCfg.tableEntry[11].cmdHandlerFxn = l3_cli_autoTriggerCfg;
+    cliCfg.tableEntry[12].cmd           = "autoTriggerStart";
+    cliCfg.tableEntry[12].helpString    = "Enable device-side motion trigger";
+    cliCfg.tableEntry[12].cmdHandlerFxn = l3_cli_autoTriggerStart;
+    cliCfg.tableEntry[13].cmd           = "autoTriggerStop";
+    cliCfg.tableEntry[13].helpString    = "Disable device-side motion trigger";
+    cliCfg.tableEntry[13].cmdHandlerFxn = l3_cli_autoTriggerStop;
 #endif
     CLI_open(&cliCfg);
 }

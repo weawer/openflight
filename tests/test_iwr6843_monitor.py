@@ -41,6 +41,35 @@ class FakeRadar:
         self.shutdown_events.append("sensorStop")
 
 
+class FakeAutonomousRadar(FakeRadar):
+    """Transport double for a firmware-originated trigger and frozen dump."""
+
+    def __init__(self, raw: bytes):
+        super().__init__(raw)
+        self.auto_started = False
+        self.wait_started = threading.Event()
+        self.release_trigger = threading.Event()
+        self.trigger_timestamp = time.time()
+        self.capture_returned = False
+
+    def start_autonomous_trigger(self):
+        self.auto_started = True
+
+    def wait_for_autonomous_capture(self, *, on_trigger, cancel_event):
+        self.wait_started.set()
+        if self.capture_returned:
+            while not cancel_event.wait(timeout=0.01):
+                pass
+            return None
+        while not self.release_trigger.wait(timeout=0.01):
+            if cancel_event.is_set():
+                return None
+        timestamp = self.trigger_timestamp
+        on_trigger(timestamp)
+        self.capture_returned = True
+        return timestamp, self.raw
+
+
 class FakeButton:
     """gpiozero-compatible button double."""
 
@@ -196,6 +225,35 @@ def test_capture_monitor_can_configure_before_arming_gpio(tmp_path):
     assert monitor._button.when_pressed == monitor.notify_trigger  # pylint: disable=protected-access
     assert monitor.notify_trigger(edge)
     assert monitor.capture_for_shot(edge, timeout_s=1.0).valid
+    monitor.stop()
+
+
+def test_autonomous_monitor_uses_firmware_trigger_without_gpio(tmp_path):
+    config = tmp_path / "radar.cfg"
+    config.write_text("sensorStart\n", encoding="utf-8")
+    radar = FakeAutonomousRadar(_raw_dump())
+    observed = []
+    monitor = IWR6843CaptureMonitor(
+        config_path=config,
+        output_dir=tmp_path / "dumps",
+        radar=radar,
+        autonomous_trigger=True,
+        trigger_observers=[observed.append],
+    )
+
+    monitor.start(armed=False)
+    assert monitor._button is None  # pylint: disable=protected-access
+    assert not radar.auto_started
+
+    monitor.arm()
+    assert radar.auto_started
+    assert radar.wait_started.wait(timeout=0.5)
+    radar.release_trigger.set()
+    capture = monitor.capture_for_shot(radar.trigger_timestamp + 0.02, timeout_s=1.0)
+
+    assert capture is not None and capture.valid
+    assert capture.trigger_timestamp == radar.trigger_timestamp
+    assert observed == [radar.trigger_timestamp]
     monitor.stop()
 
 

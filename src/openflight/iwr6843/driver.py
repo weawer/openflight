@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import glob
 import logging
+import threading
 import time
+from collections.abc import Callable
 
 import serial
 
@@ -48,6 +50,7 @@ class IWR6843Radar:
                 raise RuntimeError("no IWR6843 CLI found — board on, flashed, single-port fw?")
         self.port = port
         self.ser = open_port(port, baud)
+        self._autonomous_pending = bytearray()
 
     @staticmethod
     def detect_port(baud: int = BAUD) -> str | None:
@@ -165,6 +168,50 @@ class IWR6843Radar:
             time.sleep(0.1)
         else:
             raise RuntimeError(f"IWR6843 did not enter active capture mode: {health.strip()}")
+
+    def start_autonomous_trigger(self) -> None:
+        """Enable the configured device-side motion trigger."""
+        response = self.cmd("autoTriggerStart", 1.5)
+        self._require_done("autoTriggerStart", response)
+        pending = getattr(self, "_autonomous_pending", bytearray())
+        for line in response.splitlines():
+            stripped = line.strip()
+            event_start = len(stripped)
+            for marker in ("IWR_TRIGGER", "IWR_READY"):
+                position = stripped.find(marker)
+                if 0 <= position < event_start:
+                    event_start = position
+            if event_start < len(stripped):
+                pending.extend(stripped[event_start:].encode("ascii") + b"\n")
+        self._autonomous_pending = pending
+
+    def wait_for_autonomous_capture(
+        self,
+        *,
+        on_trigger: Callable[[float], None],
+        cancel_event: threading.Event | None,
+        clock: Callable[[], float] = time.time,
+    ) -> tuple[float, bytes] | None:
+        """Wait for firmware trigger/ready events, then fetch its frozen ring."""
+        pending = bytearray(getattr(self, "_autonomous_pending", b""))
+        self._autonomous_pending = bytearray()
+        trigger_timestamp: float | None = None
+        while True:
+            while b"\n" in pending:
+                raw_line, _, remainder = pending.partition(b"\n")
+                pending = bytearray(remainder)
+                line = raw_line.strip()
+                if line.startswith(b"IWR_TRIGGER") and trigger_timestamp is None:
+                    trigger_timestamp = clock()
+                    on_trigger(trigger_timestamp)
+                elif line.startswith(b"IWR_READY") and trigger_timestamp is not None:
+                    return trigger_timestamp, self.read_dump()
+            if cancel_event is not None and cancel_event.is_set():
+                return None
+            waiting = self.ser.in_waiting
+            chunk = self.ser.read(waiting if waiting else 1)
+            if chunk:
+                pending.extend(chunk)
 
     def read_dump(self, timeout_s: float = 40.0, stall_tolerance_s: float = 4.0) -> bytes:
         """Fire `l3dump` and return one complete dump (best effort on stalls).

@@ -1,4 +1,4 @@
-"""GPIO-triggered IWR6843 L3 capture and OPS-shot correlation."""
+"""IWR6843 L3 capture and OPS-shot correlation."""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ def tx_order_from_config(config_path: str | Path) -> str:
 
 @dataclass(frozen=True)
 class IWR6843Capture:
-    """One GPIO edge and its completed L3 dump."""
+    """One trigger and its completed L3 dump."""
 
     sequence: int
     trigger_timestamp: float
@@ -58,11 +58,10 @@ class IWR6843Capture:
 
 
 class IWR6843CaptureMonitor:
-    """Capture TI rolling-buffer dumps on the same sound edge used by OPS.
+    """Capture TI rolling-buffer dumps from device or GPIO triggers.
 
-    The GPIO callback only timestamps and queues the edge. Serial transfer is
-    handled on a dedicated thread because one 768 KiB dump takes several
-    seconds at the firmware UART rate.
+    Serial transfer runs on a dedicated thread because one 768 KiB dump takes
+    several seconds at the firmware UART rate.
     """
 
     def __init__(
@@ -76,6 +75,7 @@ class IWR6843CaptureMonitor:
         button_factory: Callable | None = None,
         match_tolerance_s: float = 0.75,
         save_dumps: bool = False,
+        autonomous_trigger: bool = False,
         trigger_observers: list[Callable[[float], None]] | None = None,
     ):
         self.config_path = Path(config_path)
@@ -83,6 +83,7 @@ class IWR6843CaptureMonitor:
         self.gpio_pin = gpio_pin
         self.match_tolerance_s = match_tolerance_s
         self.save_dumps = save_dumps
+        self.autonomous_trigger = autonomous_trigger
         self.radar = radar or IWR6843Radar(port=port)
         self._button_factory = button_factory
         self._button = None
@@ -95,6 +96,7 @@ class IWR6843CaptureMonitor:
         self._captures: deque[IWR6843Capture] = deque()
         self._condition = threading.Condition()
         self._worker: threading.Thread | None = None
+        self._cancel_event = threading.Event()
         self._trigger_observers = list(trigger_observers or [])
 
     @property
@@ -103,7 +105,7 @@ class IWR6843CaptureMonitor:
         return self.radar.port
 
     def start(self, *, armed: bool = True) -> None:
-        """Configure the radar and GPIO, optionally arming trigger capture."""
+        """Configure the radar and selected trigger, optionally arming it."""
         if self._running:
             return
         if not self.config_path.is_file():
@@ -115,25 +117,25 @@ class IWR6843CaptureMonitor:
             self.radar.send_config(str(self.config_path))
             configured = True
 
-            button_factory = self._button_factory
-            if button_factory is None:
-                # Must precede the first gpiozero device: on a Pi 5 gpiozero's
-                # own auto-detection fails outright. See gpio_factory.
-                ensure_lgpio_pin_factory()
+            if not self.autonomous_trigger:
+                button_factory = self._button_factory
+                if button_factory is None:
+                    # Must precede the first gpiozero device: on a Pi 5 gpiozero's
+                    # own auto-detection fails outright. See gpio_factory.
+                    ensure_lgpio_pin_factory()
 
-                from gpiozero import Button  # pylint: disable=import-error,import-outside-toplevel
+                    from gpiozero import (  # pylint: disable=import-error,import-outside-toplevel
+                        Button,
+                    )
 
-                button_factory = Button
-            # No gpiozero debounce: lgpio delays delivery by the debounce interval,
-            # which previously cost the first 50 ms of ball flight.
-            self._button = button_factory(self.gpio_pin, pull_up=False, bounce_time=None)
+                    button_factory = Button
+                # No gpiozero debounce: lgpio delays delivery by the debounce interval,
+                # which previously cost the first 50 ms of ball flight.
+                self._button = button_factory(self.gpio_pin, pull_up=False, bounce_time=None)
             self._running = True
-            self._worker = threading.Thread(
-                target=self._capture_loop,
-                name="iwr6843-capture",
-                daemon=True,
-            )
-            self._worker.start()
+            self._cancel_event.clear()
+            if not self.autonomous_trigger:
+                self._start_worker(self._capture_loop)
             if armed:
                 self.arm()
         except Exception:
@@ -147,28 +149,42 @@ class IWR6843CaptureMonitor:
                 self.radar.close()
             raise
         logger.info(
-            "[IWR6843] Configured on BCM%d using %s (%s%s)",
-            self.gpio_pin,
+            "[IWR6843] Configured using %s (%s, trigger=%s%s)",
             self.port,
             self.config_path.name,
+            "radar" if self.autonomous_trigger else f"BCM{self.gpio_pin}",
             ", armed" if self._armed else ", waiting for OPS",
         )
 
+    def _start_worker(self, target: Callable[[], None]) -> None:
+        self._worker = threading.Thread(
+            target=target,
+            name="iwr6843-capture",
+            daemon=True,
+        )
+        self._worker.start()
+
     def arm(self) -> None:
-        """Accept GPIO edges after the OPS trigger path is fully initialized."""
+        """Accept triggers after the OPS capture path is fully initialized."""
         if not self._running:
             raise RuntimeError("cannot arm an IWR6843 monitor that is not running")
         if self._armed:
             return
-        # Attach while logically disarmed so a line already high from OPS
-        # startup cannot synchronously create a false capture.
-        self._button.when_pressed = self.notify_trigger
-        self._armed = True
-        logger.info("[IWR6843] Armed on BCM%d", self.gpio_pin)
+        if self.autonomous_trigger:
+            self.radar.start_autonomous_trigger()
+            self._armed = True
+            self._start_worker(self._autonomous_capture_loop)
+            logger.info("[IWR6843] Armed device-side motion trigger")
+        else:
+            # Attach while logically disarmed so a line already high from OPS
+            # startup cannot synchronously create a false capture.
+            self._button.when_pressed = self.notify_trigger
+            self._armed = True
+            logger.info("[IWR6843] Armed on BCM%d", self.gpio_pin)
 
     def notify_trigger(self, timestamp: float | None = None) -> bool:
         """Queue a GPIO edge without doing serial work in the callback."""
-        if not self._running or not self._armed:
+        if not self._running or not self._armed or self.autonomous_trigger:
             return False
         edge_timestamp = time.time() if timestamp is None else float(timestamp)
         with self._condition:
@@ -184,12 +200,15 @@ class IWR6843CaptureMonitor:
             self._last_edge_timestamp = edge_timestamp
             self._events.put_nowait(edge_timestamp)
             self._condition.notify_all()
+        self._notify_trigger_observers(edge_timestamp)
+        return True
+
+    def _notify_trigger_observers(self, trigger_timestamp: float) -> None:
         for observer in self._trigger_observers:
             try:
-                observer(edge_timestamp)
+                observer(trigger_timestamp)
             except Exception:  # pylint: disable=broad-exception-caught
                 logger.warning("[IWR6843] Trigger observer failed", exc_info=True)
-        return True
 
     def _validate_dump(self, raw: bytes) -> dict:
         if len(raw) < HEADER.size:
@@ -256,6 +275,65 @@ class IWR6843CaptureMonitor:
                 capture.dump_duration_s,
             )
 
+    def _autonomous_capture_loop(self) -> None:
+        while self._running:
+            edge_timestamp = None
+            sequence = None
+
+            def on_trigger(timestamp: float) -> None:
+                nonlocal edge_timestamp, sequence
+                edge_timestamp = timestamp
+                with self._condition:
+                    self._capture_active = True
+                    self._last_edge_timestamp = timestamp
+                    self._sequence += 1
+                    sequence = self._sequence
+                    self._condition.notify_all()
+                self._notify_trigger_observers(timestamp)
+
+            start = time.time()
+            raw = None
+            path = None
+            error = None
+            metadata = None
+            try:
+                result = self.radar.wait_for_autonomous_capture(
+                    on_trigger=on_trigger,
+                    cancel_event=self._cancel_event,
+                )
+                if result is None:
+                    break
+                edge_timestamp, raw = result
+                metadata = self._validate_dump(raw)
+                if self.save_dumps:
+                    path = self._capture_path(sequence, edge_timestamp)
+                    path.write_bytes(raw)
+            except Exception as exc:  # pylint: disable=broad-exception-caught
+                error = str(exc)
+                raw = None
+                logger.warning("[IWR6843] Autonomous capture failed: %s", exc, exc_info=True)
+                if edge_timestamp is None:
+                    if self._running:
+                        time.sleep(0.1)
+                    continue
+            completed = time.time()
+            capture = IWR6843Capture(
+                sequence=sequence,
+                trigger_timestamp=edge_timestamp,
+                completed_timestamp=completed,
+                dump_duration_s=completed - start,
+                raw=raw,
+                path=path,
+                error=error,
+                temperature_report=(
+                    metadata.get("temperature_report") if metadata is not None else None
+                ),
+            )
+            with self._condition:
+                self._capture_active = False
+                self._captures.append(capture)
+                self._condition.notify_all()
+
     def capture_for_shot(
         self,
         impact_timestamp: float | None,
@@ -315,6 +393,7 @@ class IWR6843CaptureMonitor:
             return
         self._armed = False
         self._running = False
+        self._cancel_event.set()
         if self._button is not None:
             self._button.when_pressed = None
             self._button.close()
