@@ -76,6 +76,7 @@ class IWR6843Radar:
                 raise RuntimeError("no IWR6843 CLI found — board on, flashed, single-port fw?")
         self.port = port
         self.ser = open_port(port, baud)
+        self._trigger_pending = b""
 
     @staticmethod
     def detect_port(baud: int = BAUD) -> str | None:
@@ -108,15 +109,26 @@ class IWR6843Radar:
         within about a millisecond. ``pending`` carries a partial line
         between calls; the tail kept is long enough to hold a split word.
         """
-        waiting = self.ser.in_waiting
-        pending += self.ser.read(waiting if waiting else 1)
+        pending += getattr(self, "_trigger_pending", b"")
+        self._trigger_pending = b""
+        if TRIGGER_NOTICE not in pending:
+            waiting = self.ser.in_waiting
+            pending += self.ser.read(waiting if waiting else 1)
         if TRIGGER_NOTICE in pending:
             return True, b""
         return False, pending[-_NOTICE_TAIL_BYTES:]
 
+    def _remember_trigger_notice(self, data: bytes) -> None:
+        pending = getattr(self, "_trigger_pending", b"") + data
+        self._trigger_pending = (
+            TRIGGER_NOTICE if TRIGGER_NOTICE in pending else pending[-_NOTICE_TAIL_BYTES:]
+        )
+
     def cmd(self, line: str, window: float = 1.5) -> str:
         """Send one CLI line; collect the response until Done/Error/timeout."""
-        self.ser.reset_input_buffer()
+        waiting = self.ser.in_waiting
+        if waiting:
+            self._remember_trigger_notice(self.ser.read(waiting))
         self.ser.write((line + "\n").encode())
         resp = b""
         deadline = time.time() + window
@@ -124,6 +136,7 @@ class IWR6843Radar:
             resp += self.ser.read(512)
             if b"Done" in resp or b"Error" in resp:
                 break
+        self._remember_trigger_notice(resp)
         return resp.decode(errors="replace")
 
     def drain_stale_output(
@@ -184,6 +197,7 @@ class IWR6843Radar:
         self.drain_stale_output()
         self._require_done("sensorStop", self.cmd("sensorStop", 3.0))
         self._require_done("flushCfg", self.cmd("flushCfg", 1.5))
+        self._trigger_pending = b""
         with open(cfg_path, encoding="utf-8") as cfg:
             for rawline in cfg:
                 line = rawline.strip()
@@ -423,6 +437,7 @@ class IWR6843Radar:
             chunk = self.ser.read(waiting if waiting else 1)
             if chunk:
                 response.extend(chunk)
+        self._remember_trigger_notice(bytes(response))
         return bytes(response)
 
     def stats(self) -> str:

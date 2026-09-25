@@ -201,6 +201,7 @@ class IWR6843CaptureMonitor:
         # Firmware picks the cells itself (l3track). Cleared if it cannot.
         self.onboard_tracking = onboard_tracking
         self._trigger_notice = b""
+        self._release_pending = False
 
     @property
     def watch_self_trigger(self) -> bool:
@@ -212,7 +213,7 @@ class IWR6843CaptureMonitor:
         """Connected TI serial port."""
         return self.radar.port
 
-    def start(self, *, armed: bool = True) -> None:
+    def start(self, *, armed: bool = True, onboard_track_config: str | None = None) -> None:
         """Configure the radar and GPIO, optionally arming trigger capture."""
         if self._running:
             return
@@ -226,20 +227,25 @@ class IWR6843CaptureMonitor:
             configured = True
             # Before the worker starts: after that only the worker may talk
             # to the radar.
+            if onboard_track_config is not None:
+                self._configure_onboard_tracking(onboard_track_config)
             self._apply_self_trigger()
 
-            button_factory = self._button_factory
-            if button_factory is None:
-                # Must precede the first gpiozero device: on a Pi 5 gpiozero's
-                # own auto-detection fails outright. See gpio_factory.
-                ensure_lgpio_pin_factory()
+            if not self.watch_self_trigger:
+                button_factory = self._button_factory
+                if button_factory is None:
+                    # Must precede the first gpiozero device: on a Pi 5 gpiozero's
+                    # own auto-detection fails outright. See gpio_factory.
+                    ensure_lgpio_pin_factory()
 
-                from gpiozero import Button  # pylint: disable=import-error,import-outside-toplevel
+                    from gpiozero import (
+                        Button,  # pylint: disable=import-error,import-outside-toplevel
+                    )
 
-                button_factory = Button
-            # No gpiozero debounce: lgpio delays delivery by the debounce interval,
-            # which previously cost the first 50 ms of ball flight.
-            self._button = button_factory(self.gpio_pin, pull_up=False, bounce_time=None)
+                    button_factory = Button
+                # No gpiozero debounce: lgpio delays delivery by the debounce interval,
+                # which previously cost the first 50 ms of ball flight.
+                self._button = button_factory(self.gpio_pin, pull_up=False, bounce_time=None)
             self._running = True
             self._worker = threading.Thread(
                 target=self._capture_loop,
@@ -267,6 +273,28 @@ class IWR6843CaptureMonitor:
             ", armed" if self._armed else ", waiting for OPS",
             f", self-trigger {self.self_trigger.command!r}" if self.self_trigger else "",
         )
+
+    def _configure_onboard_tracking(self, command: str) -> bool:
+        """Hand the rig limits to the firmware tracker; True when it accepts them.
+
+        Optional: older firmware has no ``trackCfg``, and any failure here only
+        means the host keeps planning cells over ``l3sparse``.
+        """
+        self.onboard_tracking = False
+        try:
+            reply = self.radar.cmd(command, 2.0)
+        except Exception as error:  # pylint: disable=broad-exception-caught
+            logger.warning("[IWR6843] trackCfg failed (%s); the host will plan cells", error)
+            return False
+        if "Error" in reply or "Done" not in reply:
+            logger.info(
+                "[IWR6843] Firmware has no on-chip tracker (%s); the host will plan cells",
+                reply.strip() or "no reply",
+            )
+            return False
+        self.onboard_tracking = True
+        logger.info("[IWR6843] On-chip tracker armed: %s", command)
+        return True
 
     def _apply_self_trigger(self) -> None:
         """Send ``triggerCfg`` for the configured self-trigger, if any."""
@@ -375,20 +403,16 @@ class IWR6843CaptureMonitor:
         The read returns as soon as a byte arrives, so the trigger reaches the
         OPS within about a millisecond of the notice instead of a poll period.
         """
-        found, self._trigger_notice = self.radar.wait_trigger_notice(self._trigger_notice)
-        if not found:
-            return
-        if self._armed:
-            self.notify_trigger()
-            return
-        # The firmware froze its ring and waits for l3sparse. Nobody will ask
-        # for this one, so release it now; otherwise the stale notice would
-        # fire a phantom capture at arm time and the ring would stay frozen.
-        logger.info("[IWR6843] Self-trigger fired while disarmed; releasing the frozen ring")
-        try:
-            self.radar.release_sparse_freeze()
-        except Exception:  # pylint: disable=broad-exception-caught
-            logger.warning("[IWR6843] Could not release the frozen ring", exc_info=True)
+        if not self._release_pending:
+            found, self._trigger_notice = self.radar.wait_trigger_notice(self._trigger_notice)
+            if not found:
+                return
+            if self.notify_trigger():
+                return
+            self._release_pending = True
+            logger.info("[IWR6843] Releasing an unaccepted self-trigger capture")
+        self.radar.release_sparse_freeze()
+        self._release_pending = False
 
     def _next_event(self):
         """Next queued edge/job/stop. Listens for the self-trigger while idle."""

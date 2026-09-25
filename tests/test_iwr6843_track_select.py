@@ -579,7 +579,7 @@ def test_runtime_planner_and_firmware_use_the_same_limits(lib):
         lib, summary, max_range_m=max_range, club_gate_m=(club_lo, club_hi)
     )
 
-    assert cells == set(runtime.plan_sparse_cells(summary))
+    assert cells == set(runtime.plan_sparse_cells(summary).cells)
 
 
 # --- end to end: firmware stream -> driver -> the same dump ------------------

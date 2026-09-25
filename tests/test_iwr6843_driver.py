@@ -246,3 +246,47 @@ def test_unrelated_cli_text_is_trimmed_to_a_split_word_tail():
 
     assert found is False
     assert len(pending) == len(b"Triggered") - 1
+
+
+@pytest.mark.parametrize("prefix,suffix", [(b"Triggered\n", b""), (b"Trig", b"gered\n")])
+def test_trigger_in_command_reply_survives_until_listener(prefix, suffix):
+    class CommandSerial(FakeSerial):
+        def write(self, data):
+            super().write(data)
+            self.payload.extend(b"Done\nl3dump:/>" + prefix)
+
+    radar = IWR6843Radar.__new__(IWR6843Radar)
+    radar.ser = CommandSerial(b"")
+    assert "Done" in radar.cmd("triggerCfg 14 1000 2")
+    radar.ser.payload.extend(suffix)
+    found, pending = radar.wait_trigger_notice()
+    assert found
+    assert radar.wait_trigger_notice(pending)[0] is False
+
+
+def test_notice_received_with_dump_trailer_is_preserved():
+    radar = IWR6843Radar.__new__(IWR6843Radar)
+    radar.ser = FakeSerial(b"")
+    radar._wait_for_dump_cli_ready(b"Done\nl3dump:/>Trig", timeout_s=0.1)
+    radar.ser.payload.extend(b"gered\n")
+    assert radar.wait_trigger_notice()[0]
+
+
+def test_watch_script_releases_a_trigger_in_the_arming_reply(monkeypatch):
+    import runpy
+    import sys
+    from unittest.mock import Mock, PropertyMock
+
+    script = runpy.run_path("scripts/iwr6843/watch_trigger.py")
+    main = script["main"]
+    radar = Mock()
+    radar.cmd.side_effect = ["Done\n", "Done\nTriggered\n", "Done\n"]
+    type(radar.ser).in_waiting = PropertyMock(side_effect=KeyboardInterrupt)
+    monkeypatch.setitem(main.__globals__, "IWR6843Radar", lambda **_kwargs: radar)
+    monkeypatch.setitem(main.__globals__, "tee_local_bin", lambda *_args: 14)
+    monkeypatch.setattr(sys, "argv", ["watch_trigger.py"])
+
+    main()
+
+    radar.release_sparse_freeze.assert_called_once()
+    radar.close.assert_called_once()

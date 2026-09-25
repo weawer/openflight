@@ -368,7 +368,9 @@ def test_track_config_takes_the_fields_the_runtime_sends():
 def test_stats_reports_trigger_state_and_debug_prints_on_phase_change_only():
     """A missed Triggered line must still be visible, without a per-frame UART write."""
     source = FIRMWARE.read_text(encoding="utf-8")
-    stats = _function_source(source, "static int32_t l3_cli_stats", "static int32_t l3_cli_hwaStats")
+    stats = _function_source(
+        source, "static int32_t l3_cli_stats", "static int32_t l3_cli_hwaStats"
+    )
     debug_write = _function_source(
         source,
         "static void l3_writeTriggerDebug",
@@ -386,3 +388,12 @@ def test_stats_reports_trigger_state_and_debug_prints_on_phase_change_only():
     assert "if (phase == gTriggerDebugPhase)" in debug_write
     assert debug_write.index("gTriggerDebugPhase = phase") < debug_write.index("CLI_write(")
     assert "gTriggerDebugPhase = 0xFFU" in debug_cfg
+
+
+def test_sensor_start_discards_the_previous_self_trigger_latch():
+    source = FIRMWARE.read_text(encoding="utf-8")
+    start = _function_source(
+        source, "static int32_t l3_cli_sensorStart", "static int32_t l3_cli_sensorStop"
+    )
+    assert start.index("gSelfTriggerLatched = 0U") < start.index("l3_armCapture()")
+    assert start.index("gTriggerEnabled = 0U") < start.index("l3_armCapture()")

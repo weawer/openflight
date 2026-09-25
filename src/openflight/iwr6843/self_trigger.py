@@ -66,6 +66,7 @@ class BallLeaveDetector:
         level: float = DEFAULT_LEVEL,
         hits: int = DEFAULT_HITS,
         approach_bins: int = APPROACH_BINS,
+        frame_period_s: float = 0.003,
     ) -> None:
         if level <= 0.0:
             raise ValueError(f"self-trigger level must be > 0, got {level}")
@@ -73,6 +74,9 @@ class BallLeaveDetector:
             raise ValueError(f"self-trigger hits must be >= 1, got {hits}")
         if approach_bins < 1:
             raise ValueError(f"approach bins must be >= 1, got {approach_bins}")
+        if not 0.0 < frame_period_s <= 0.06:
+            raise ValueError("frame period must be positive and at most 60 ms")
+        self.frame_period_s = frame_period_s
         self.level = float(level)
         self.hits = int(hits)
         self.approach_bins = int(approach_bins)
@@ -88,6 +92,9 @@ class BallLeaveDetector:
         self._run = 0
         self._peak_bin = 0
         self._have_peak = False
+        self._departure_bin = None
+        self._motion_frames = 0
+        self._missed_frames = 0
 
     def step(
         self,
@@ -100,55 +107,56 @@ class BallLeaveDetector:
         if self._latched:
             return self._observe(frame, "fired", float(self._tee), self._approach_power)
         if tee_local is None or tee_local < 0 or tee_local >= valid_bins or tee_local >= len(power):
+            self._clear()
             return self._observe(frame, "bin-outside", 0.0, 0.0)
         tee = float(power[tee_local])
         self._tee = tee
-        if tee < self.level:
+        if self._toward:
+            self._motion_frames += 1
+            if self._motion_frames * self.frame_period_s > 0.06:
+                self._clear()
+        if tee < self.level and not self._toward:
             self._clear()
             self._approach_power = 0.0
             return self._observe(frame, "tee-low", tee, 0.0)
-        self._run += 1
         if not self._ready:
+            self._run += 1
             if self._run >= self.hits:
                 self._ready = True
-            phase = "watching" if self._ready else "occupying"
-            return self._observe(frame, phase, tee, 0.0)
-        first = tee_local - self.approach_bins if tee_local > self.approach_bins else 0
-        have_peak = False
-        peak = 0.0
-        peak_bin = 0
-        for bin_index in range(first, tee_local):
-            if bin_index >= valid_bins:
-                break
-            value = float(power[bin_index])
-            if value >= self.level and (not have_peak or value > peak):
-                peak = value
-                peak_bin = bin_index
-                have_peak = True
-        if not have_peak:
+            return self._observe(frame, "watching" if self._ready else "occupying", tee, 0.0)
+        if self._toward:
+            last = min(valid_bins, len(power), tee_local + 1 + self.approach_bins)
+            past = power[tee_local + 1 : last]
+            if past.size and float(np.max(past)) >= self.level:
+                past_bin = tee_local + 1 + int(np.argmax(past))
+                if self._departure_bin is not None and past_bin > self._departure_bin:
+                    self._latch()
+                    return self._observe(frame, "fired", tee, float(np.max(past)))
+                if self._departure_bin is not None and past_bin < self._departure_bin:
+                    self._clear()
+                    return self._observe(frame, "watching", tee, 0.0)
+                self._departure_bin = past_bin
+                self._missed_frames = 0
+                return self._observe(frame, "away", tee, float(np.max(past)))
+        self._departure_bin = None
+        first = max(0, tee_local - self.approach_bins)
+        approach = power[first:tee_local]
+        if not approach.size or float(np.max(approach)) < self.level:
+            self._missed_frames += 1
+            if self._missed_frames > 2:
+                self._clear()
             return self._observe(frame, "no-approach", tee, 0.0)
+        self._missed_frames = 0
+        peak_bin = first + int(np.argmax(approach))
+        peak = float(power[peak_bin])
         if self._have_peak and peak_bin > self._peak_bin:
             self._toward = True
         elif self._toward and self._have_peak and peak_bin < self._peak_bin:
-            self._away = True
+            self._clear()
         self._peak_bin = peak_bin
         self._have_peak = True
         self._approach_power = peak
-        if self._away or self._departed(power, tee_local, valid_bins, peak):
-            self._latch()
-            return self._observe(frame, "fired", tee, peak)
-        phase = "toward" if self._toward else "watching"
-        return self._observe(frame, phase, tee, peak)
-
-    def _departed(self, power: np.ndarray, tee_local: int, valid_bins: int, approach_peak: float) -> bool:
-        """Ball energy has moved past the tee while the tee bin is still occupied."""
-        if not self._toward:
-            return False
-        last = min(valid_bins, len(power), tee_local + 1 + self.approach_bins)
-        if tee_local + 1 >= last:
-            return False
-        past = float(np.max(power[tee_local + 1 : last]))
-        return past >= self.level and past > approach_peak
+        return self._observe(frame, "toward" if self._toward else "watching", tee, peak)
 
     def _latch(self) -> None:
         self._clear()
@@ -195,7 +203,7 @@ def replay_dump(
     geometry = geometry_from_header(meta)
     absolute = int(round(tee_range_m / geometry.range_res_m))
     power = loop0_vertical_power(ranged, meta["n_tx"])
-    detector = BallLeaveDetector(level=level, hits=hits)
+    detector = BallLeaveDetector(level=level, hits=hits, frame_period_s=geometry.frame_period_s)
     observations: list[TriggerObservation] = []
     n_frames = meta["n_frames"]
     origin = meta["trigger_frame"] % n_frames

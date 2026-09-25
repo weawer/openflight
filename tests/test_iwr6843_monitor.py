@@ -430,7 +430,7 @@ def test_self_trigger_notice_starts_the_shot_listeners(tmp_path):
 
     capture = monitor.capture_for_shot(None, timeout_s=1.0)
 
-    assert monitor._button.when_pressed is None  # pylint: disable=protected-access
+    assert monitor._button is None  # pylint: disable=protected-access
     assert capture is not None and capture.valid
     assert len(heard) == 1
     assert heard[0] == capture.trigger_timestamp
@@ -834,3 +834,51 @@ def test_capture_carries_the_firmware_track(tmp_path):
     assert capture is not None and capture.valid
     assert capture.onboard_track == _ONBOARD
     monitor.stop()
+
+
+def test_self_trigger_does_not_allocate_a_gpio(tmp_path):
+    monitor = _self_trigger_monitor(tmp_path, SelfTriggerRadar(_raw_dump()))
+    monitor._button_factory = lambda *a, **k: pytest.fail("self-trigger allocated GPIO")
+    monitor.start()
+    monitor.stop()
+
+
+def test_tracker_configuration_precedes_trigger_and_listener(tmp_path):
+    radar = SelfTriggerRadar(_raw_dump())
+    monitor = _self_trigger_monitor(tmp_path, radar)
+    monitor.start(armed=False, onboard_track_config="trackCfg 0.000135 0.046875 4 1 1.6")
+    monitor.stop()
+    assert [command for command, _ in radar.commands] == [
+        "trackCfg 0.000135 0.046875 4 1 1.6",
+        "triggerCfg 12 1000.0 2",
+    ]
+    assert all(thread == threading.current_thread().name for _, thread in radar.commands)
+    assert monitor.onboard_tracking
+
+
+def test_rejected_self_trigger_is_released(tmp_path):
+    radar = SelfTriggerRadar(_raw_dump())
+    monitor = _self_trigger_monitor(tmp_path, radar)
+    monitor._running = monitor._armed = True
+    monitor._last_edge_timestamp = time.time()
+    radar.notices.append(b"Triggered\n")
+    monitor._listen_for_self_trigger()
+    assert radar.releases == 1
+
+
+def test_failed_release_is_retried_without_another_notice(tmp_path):
+    class RetryRadar(SelfTriggerRadar):
+        def release_sparse_freeze(self):
+            self.releases += 1
+            if self.releases == 1:
+                raise OSError("temporary failure")
+
+    radar = RetryRadar(_raw_dump())
+    monitor = _self_trigger_monitor(tmp_path, radar)
+    radar.notices.append(b"Triggered\n")
+    try:
+        monitor._listen_for_self_trigger()
+    except OSError:
+        pass
+    monitor._listen_for_self_trigger()
+    assert radar.releases == 2

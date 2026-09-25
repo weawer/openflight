@@ -44,8 +44,14 @@ def main() -> None:
         if "Done" not in reply:
             raise SystemExit(f"triggerCfg rejected: {reply.strip()}")
         print(reply.replace("Done", "").strip(), flush=True)
-        pending = b""
+        pending = reply.encode()
         while True:
+            if TRIGGER_NOTICE in pending:
+                pending = b""
+                radar.release_sparse_freeze()
+                print("\n-- fired: released the frozen ring, watching again --", flush=True)
+            else:
+                pending = pending[-(len(TRIGGER_NOTICE) - 1) :]
             waiting = radar.ser.in_waiting
             chunk = radar.ser.read(waiting or 1)
             if not chunk:
@@ -53,12 +59,6 @@ def main() -> None:
                 continue
             print(chunk.decode(errors="replace"), end="", flush=True)
             pending += chunk
-            if TRIGGER_NOTICE in pending:
-                pending = b""
-                radar.release_sparse_freeze()
-                print("\n-- fired: released the frozen ring, watching again --", flush=True)
-            else:
-                pending = pending[-(len(TRIGGER_NOTICE) - 1) :]
     except KeyboardInterrupt:
         print()
     finally:

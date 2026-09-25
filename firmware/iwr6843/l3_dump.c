@@ -397,6 +397,10 @@ static volatile uint8_t  gTriggerToward;
 static volatile uint8_t  gTriggerAway;
 static volatile uint32_t gTriggerPeakBin;
 static volatile uint8_t  gTriggerHavePeak;
+static volatile uint32_t gTriggerDepartureBin;
+static volatile uint8_t  gTriggerHaveDeparture;
+static volatile uint32_t gTriggerMotionFrames;
+static volatile uint32_t gTriggerMissedFrames;
 static volatile uint8_t  gTriggerPhase;
 static volatile uint32_t gTriggerTeePower;
 static volatile uint32_t gTriggerApproachPower;
@@ -449,6 +453,7 @@ static int32_t l3_cli_sensorStop(int32_t argc, char *argv[]);
 static int32_t l3_cli_stats(int32_t argc, char *argv[]);
 #ifdef CONFIGURABLE_CAPTURE
 static int32_t l3_cli_captureCfg(int32_t argc, char *argv[]);
+static int32_t l3_freezeCapture(void);
 static int32_t l3_cli_phaseCaptureCfg(int32_t argc, char *argv[]);
 #ifdef L3_RING_IQ8
 static int32_t l3_cli_captureFormat(int32_t argc, char *argv[]);
@@ -2455,14 +2460,15 @@ int32_t l3_cli_dump(int32_t argc, char *argv[])
 #endif
     (void)argc; (void)argv;
 
-    if (!gCaptureActive) {
+#ifdef CONFIGURABLE_CAPTURE
+    if (l3_freezeCapture() != 0) {
         return -1;
     }
-
-    /* Halt chirping only after HWA and both output EDMAs completed naturally. */
-    if (l3_stopCaptureAtBoundary() != 0) {
+#else
+    if (!gCaptureActive || l3_stopCaptureAtBoundary() != 0) {
         return -1;
     }
+#endif
 
     /* Oldest slot = time-order start (best-effort: a frame-start ISR racing
      * the stop can skew this by one; the host cross-checks with its own
@@ -2802,6 +2808,10 @@ static void l3_clearTriggerMotion(void)
     gTriggerRun = 0U;
     gTriggerPeakBin = 0U;
     gTriggerHavePeak = 0U;
+    gTriggerHaveDeparture = 0U;
+    gTriggerDepartureBin = 0U;
+    gTriggerMotionFrames = 0U;
+    gTriggerMissedFrames = 0U;
 }
 
 static const char *l3_triggerPhaseName(uint8_t phase)
@@ -2886,35 +2896,74 @@ static void l3_considerSelfTrigger(void)
         l3_noteTrigger(9U, (float)gTriggerTeePower, (float)gTriggerApproachPower);
         return;
     }
-    if (gPreFramesCaptured == 0U || gCapturePlan.preFrames == 0U || gCapturePlan.loops == 0U) {
+    if (gPreFramesCaptured < gCapturePlan.preFrames || gCapturePlan.preFrames == 0U || gCapturePlan.loops == 0U) {
         l3_noteTrigger(1U, 0.0F, 0.0F);
         return;
     }
     if (gTriggerBin >= gFrameBinCount[0] && gTriggerBin >= gCapturePlan.preBins) {
+        l3_clearTriggerMotion();
         l3_noteTrigger(2U, 0.0F, 0.0F);
         return;
     }
     slot = (gPreFramesCaptured - 1U) % gCapturePlan.preFrames;
     if (gTriggerBin >= gFrameBinCount[slot]) {
+        l3_clearTriggerMotion();
         l3_noteTrigger(2U, 0.0F, 0.0F);
         return;
     }
     tee = l3_verticalPowerAt(slot, gTriggerBin);
-    /* A real hit keeps the tee bin loud. Waiting for it to fall below the
-     * level never fires: the ball has already moved past the tee. */
-    if (tee < gTriggerPower) {
+    if (gTriggerToward) {
+        gTriggerMotionFrames++;
+        if (gTriggerMotionFrames * gFramePeriodUs > 60000U) {
+            l3_clearTriggerMotion();
+        }
+    }
+    if (tee < gTriggerPower && !gTriggerToward) {
         l3_clearTriggerMotion();
         l3_noteTrigger(3U, tee, 0.0F);
         return;
     }
-    gTriggerRun++;
     if (!gTriggerReady) {
+        gTriggerRun++;
         if (gTriggerRun >= gTriggerHits) {
             gTriggerReady = 1U;
         }
         l3_noteTrigger(gTriggerReady ? 5U : 4U, tee, 0.0F);
         return;
     }
+    if (gTriggerToward) {
+        uint32_t pastEnd = gTriggerBin + 1U + L3_TRIGGER_APPROACH_BINS;
+        uint32_t pastBin = 0U;
+        float pastPeak = 0.0F;
+
+        if (pastEnd > gFrameBinCount[slot]) {
+            pastEnd = gFrameBinCount[slot];
+        }
+        for (bin = gTriggerBin + 1U; bin < pastEnd; bin++) {
+            float past = l3_verticalPowerAt(slot, bin);
+            if (past > pastPeak) {
+                pastPeak = past;
+                pastBin = bin;
+            }
+        }
+        if (pastPeak >= gTriggerPower) {
+            if (gTriggerHaveDeparture && pastBin > gTriggerDepartureBin) {
+                l3_latchSelfTrigger(tee, pastPeak);
+                return;
+            }
+            if (gTriggerHaveDeparture && pastBin < gTriggerDepartureBin) {
+                l3_clearTriggerMotion();
+                l3_noteTrigger(5U, tee, 0.0F);
+                return;
+            }
+            gTriggerDepartureBin = pastBin;
+            gTriggerHaveDeparture = 1U;
+            gTriggerMissedFrames = 0U;
+            l3_noteTrigger(8U, tee, pastPeak);
+            return;
+        }
+    }
+    gTriggerHaveDeparture = 0U;
     first = (gTriggerBin > L3_TRIGGER_APPROACH_BINS) ? (gTriggerBin - L3_TRIGGER_APPROACH_BINS) : 0U;
     for (bin = first; bin < gTriggerBin; bin++) {
         float power;
@@ -2929,39 +2978,21 @@ static void l3_considerSelfTrigger(void)
         }
     }
     if (!havePeak) {
+        gTriggerMissedFrames++;
+        if (gTriggerMissedFrames > 2U) {
+            l3_clearTriggerMotion();
+        }
         l3_noteTrigger(6U, tee, 0.0F);
         return;
     }
-    /* gTriggerHavePeak, not gTriggerPeakBin != 0: bin 0 is a real bin. */
+    gTriggerMissedFrames = 0U;
     if (gTriggerHavePeak && peakBin > gTriggerPeakBin) {
         gTriggerToward = 1U;
     } else if (gTriggerToward && gTriggerHavePeak && peakBin < gTriggerPeakBin) {
-        gTriggerAway = 1U;
+        l3_clearTriggerMotion();
     }
     gTriggerPeakBin = peakBin;
     gTriggerHavePeak = 1U;
-    if (gTriggerAway) {
-        l3_latchSelfTrigger(tee, peak);
-        return;
-    }
-    if (gTriggerToward) {
-        uint32_t pastEnd = gTriggerBin + L3_TRIGGER_APPROACH_BINS;
-        float pastPeak = 0.0F;
-
-        if (pastEnd > gFrameBinCount[slot]) {
-            pastEnd = gFrameBinCount[slot];
-        }
-        for (bin = gTriggerBin + 1U; bin < pastEnd; bin++) {
-            float past = l3_verticalPowerAt(slot, bin);
-            if (past > pastPeak) {
-                pastPeak = past;
-            }
-        }
-        if (pastPeak >= gTriggerPower && pastPeak > peak) {
-            l3_latchSelfTrigger(tee, pastPeak);
-            return;
-        }
-    }
     l3_noteTrigger(gTriggerToward ? 7U : 5U, tee, peak);
 }
 #endif
@@ -2986,6 +3017,11 @@ static int32_t l3_sparseFreeze(void)
         return -1;
     }
 #endif
+    return l3_freezeCapture();
+}
+
+static int32_t l3_freezeCapture(void)
+{
     if (!gCaptureActive && !gSelfTriggerLatched) {
         return -1;
     }
@@ -2993,7 +3029,6 @@ static int32_t l3_sparseFreeze(void)
         if (gCaptureActive && gHwaFreezeSemaphore != NULL &&
             !Semaphore_pend(gHwaFreezeSemaphore, 250U)) {
             CLI_write("Error: self-trigger freeze timed out\n");
-            gSelfTriggerLatched = 0U;
             return -1;
         }
         gSelfTriggerLatched = 0U;
@@ -3373,6 +3408,10 @@ static int32_t l3_cli_triggerCfg(int32_t argc, char *argv[])
     gTriggerAway = 0U;
     gTriggerPeakBin = 0U;
     gTriggerHavePeak = 0U;
+    gTriggerHaveDeparture = 0U;
+    gTriggerDepartureBin = 0U;
+    gTriggerMotionFrames = 0U;
+    gTriggerMissedFrames = 0U;
     gTriggerEnabled = (hits > 0U) ? 1U : 0U;
     CLI_write("Done\n");
     return 0;
@@ -4009,6 +4048,9 @@ static int32_t l3_cli_sensorStart(int32_t argc, char *argv[])
     gHwaFreezeTimeouts = 0U;
     gHwaFreezeRestarts = 0U;
 #ifdef CONFIGURABLE_CAPTURE
+    gSelfTriggerLatched = 0U;
+    gTriggerEnabled = 0U;
+    l3_clearTriggerMotion();
     gPreFramesCaptured = 0U;
     gPostFramesCaptured = 0U;
     gPostFramesObserved = 0U;
