@@ -21,23 +21,45 @@ from openflight.ops243 import OPS243Radar  # noqa: E402
 from openflight.rolling_buffer.processor import RollingBufferProcessor  # noqa: E402
 
 
-def run_test(radar, gpio, mode, duration, emit):
+def run_test(
+    radar,
+    gpio,
+    mode,
+    duration,
+    emit,
+    *,
+    trigger_threshold=20,
+    trigger_magnitude=45,
+    pre_trigger_segments=8,
+    alert_threshold=20,
+):
     """Log setup edges separately from the armed observation window."""
     phase = "setup"
     gpio.when_pressed = lambda: emit("alert_falling", phase=phase)
     gpio.when_released = lambda: emit("alert_rising", phase=phase)
     if mode == "internal":
         radar.configure_for_internal_speed_trigger(
-            trigger_threshold_mph=5, trigger_magnitude=6, pre_trigger_segments=6
+            trigger_threshold_mph=trigger_threshold,
+            trigger_magnitude=trigger_magnitude,
+            pre_trigger_segments=pre_trigger_segments,
         )
     else:
         radar.configure_for_speed_trigger()
 
     # Set the alert after GC, which can reset detector settings.
-    emit("alert_setting", response=radar._send_command("Y<40"))
+    emit("alert_setting", response=radar._send_command(f"Y<{alert_threshold:g}"))
     emit("alert_readback", response=radar._send_command("Y?"))
     phase = "observe"
-    emit("ready", mode=mode, alert_active=bool(gpio.is_pressed), duration_s=duration)
+    emit(
+        "ready",
+        mode=mode,
+        alert_active=bool(gpio.is_pressed),
+        duration_s=duration,
+        trigger_threshold_mph=trigger_threshold,
+        trigger_magnitude=trigger_magnitude,
+        pre_trigger_segments=pre_trigger_segments,
+        alert_threshold_mph=alert_threshold,
+    )
     if mode == "speed":
         deadline = time.monotonic() + duration
         while time.monotonic() < deadline:
@@ -78,10 +100,20 @@ def main():
     parser.add_argument("--gpio", type=int, default=17, help="BCM pin number")
     parser.add_argument("--mode", choices=["internal", "speed"], default="internal")
     parser.add_argument("--duration", type=float, default=60)
+    parser.add_argument("--trigger-threshold", type=float, default=20.0)
+    parser.add_argument("--trigger-magnitude", type=int, default=45)
+    parser.add_argument("--pre-trigger-segments", type=int, default=8)
+    parser.add_argument("--alert-threshold", type=float, default=20.0)
     parser.add_argument("--output", type=Path, required=True, help="New JSONL evidence file")
     args = parser.parse_args()
     if not 0 < args.duration <= 600:
         parser.error("--duration must be greater than 0 and at most 600 seconds")
+    if args.trigger_threshold < 0 or args.alert_threshold < 0:
+        parser.error("trigger and alert thresholds must be non-negative")
+    if not 1 <= args.trigger_magnitude <= 2000:
+        parser.error("--trigger-magnitude must be between 1 and 2000")
+    if not 0 <= args.pre_trigger_segments <= 32:
+        parser.error("--pre-trigger-segments must be between 0 and 32")
 
     ensure_lgpio_pin_factory()
     from gpiozero import Button
@@ -106,7 +138,17 @@ def main():
             with Button(args.gpio, pull_up=True, bounce_time=None) as gpio:
                 radar.connect()
                 emit("connected", port=args.port, firmware=radar.get_firmware_version())
-                run_test(radar, gpio, args.mode, args.duration, emit)
+                run_test(
+                    radar,
+                    gpio,
+                    args.mode,
+                    args.duration,
+                    emit,
+                    trigger_threshold=args.trigger_threshold,
+                    trigger_magnitude=args.trigger_magnitude,
+                    pre_trigger_segments=args.pre_trigger_segments,
+                    alert_threshold=args.alert_threshold,
+                )
         finally:
             radar.disconnect()
 
