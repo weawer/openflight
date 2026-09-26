@@ -142,3 +142,20 @@ Resources:
 If timing or hardware results fail and cannot be fixed within the active-window
 optimisation, fall back to option 2 (`confirmFrames = 4`): 1/129 static false
 confirms offline, at the cost of roughly half the injected-ball detections.
+
+## Hardware finding: the first implementation's integration bug (2026-09-26)
+
+The first release (`l3_dump_2ms_iq16_adaptive_coherent_20260926.bin`) still
+failed the operator's own 100-cycle static soak at cycle 18, keeping 2 flight
+frames. Root cause: `l3_dump.c` called `l3_coherent_gate()` on the full
+128-bin array *after* masking everything outside the ~53-bin active window to
+zero, diluting the mean to ~41% of the true in-window value and weakening the
+intended 2x gate to an effective ~0.83x — weak enough for the recorded static
+clutter (which reached 1.51x the *true* in-window mean) to still pass. The
+offline evidence above was not wrong; it modeled the mean over the correct
+active-window slice throughout, which is what the fix now matches. Fixed by
+gating the active-window slice before the full-array masking, in
+`l3_dump_2ms_iq16_adaptive_coherent2_20260926.bin`. See that release's notes
+for the full writeup and `tests/test_iwr6843_live_selector.py::
+test_gate_mean_must_exclude_the_masked_out_bins` for the regression test,
+built from the operator's own cycle-18 capture.

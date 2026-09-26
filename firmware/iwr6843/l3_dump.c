@@ -1922,26 +1922,36 @@ static void l3_storeCompletedScratchFrame(uint32_t slot, uint8_t scratch)
             gShadowPreviousPower[bin] = current;
         }
         gShadowHavePrevious = 1U;
-        if (l3_captureUsesAdaptiveIq16() &&
-            slot < gCapturePlan.preFrames + gCapturePlan.impactFrames) {
-            for (bin = 0U; bin < N_SAMPLES; bin++) {
-                if (bin < gCapturePlan.impactStart ||
-                    bin >= gCapturePlan.impactStart + gCapturePlan.impactBins) {
-                    gShadowPower[bin] = 0U;
-                    gShadowCoherent[bin] = 0U;
+        {
+            uint32_t activeStart = 0U;
+            uint32_t activeBins = N_SAMPLES;
+            if (l3_captureUsesAdaptiveIq16() &&
+                slot < gCapturePlan.preFrames + gCapturePlan.impactFrames) {
+                activeStart = gCapturePlan.impactStart;
+                activeBins = gCapturePlan.impactBins;
+                for (bin = 0U; bin < N_SAMPLES; bin++) {
+                    if (bin < activeStart || bin >= activeStart + activeBins) {
+                        gShadowPower[bin] = 0U;
+                        gShadowCoherent[bin] = 0U;
+                    }
                 }
             }
-        }
-        /* Coherent gate (plans/iwr-coherent-gate.md): a rise bin is kept only
-         * if it is backed by a well-above-average coherent difference, which
-         * static/quasi-static clutter does not produce. Skipped on the first
-         * usable frame (no previous rows yet); gShadowGated is then all-zero,
-         * matching l3_live_select's existing "no candidates" behavior. */
-        if (hadPreviousRows) {
-            l3_coherent_gate(gShadowPower, gShadowCoherent, N_SAMPLES,
-                             L3_COHERENT_GATE_Q8, gShadowGated);
-        } else {
+            /* Coherent gate (plans/iwr-coherent-gate.md): a rise bin is kept
+             * only if it is backed by a well-above-average coherent
+             * difference, which static/quasi-static clutter does not
+             * produce. The gate's mean must be taken over the active
+             * analysis window only: averaging over the full N_SAMPLES array
+             * after the masking above zeros most of it dilutes the mean and
+             * weakens the gate far below its intended factor. Skipped on the
+             * first usable frame (no previous rows yet); gShadowGated is then
+             * all-zero, matching l3_live_select's existing "no candidates"
+             * behavior. */
             memset(gShadowGated, 0, sizeof(gShadowGated));
+            if (hadPreviousRows) {
+                l3_coherent_gate(&gShadowPower[activeStart],
+                                 &gShadowCoherent[activeStart], activeBins,
+                                 L3_COHERENT_GATE_Q8, &gShadowGated[activeStart]);
+            }
         }
         if (l3_live_select(gShadowGated, N_SAMPLES, &gShadowParams,
                            &gShadowState, &gShadowLast) != 0) {

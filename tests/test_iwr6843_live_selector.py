@@ -538,6 +538,7 @@ def test_isolated_jumping_peaks_never_become_a_retained_track(c_select, c_retent
 
 sys.path.insert(0, str(ROOT / "scripts" / "analysis"))
 from iwr_selector_replay import (  # noqa: E402
+    N_BINS,
     coherent_difference,
     hybrid_gated_rise,
     load_dump,
@@ -711,3 +712,61 @@ def test_coherent_gate_c_matches_python_on_recorded_captures(c_coherent_gate):
             _run_gate(c_coherent_gate, rise, coherent)
             checked += 1
     assert checked > 0
+
+
+def _to_absolute_bins(values: list[int], start: int) -> list[int]:
+    power = [0] * N_BINS
+    for offset, value in enumerate(values):
+        power[start + offset] = value
+    return power
+
+
+def test_gate_mean_must_exclude_the_masked_out_bins():
+    """2026-09-26 hardware regression: l3_dump.c passed the coherent gate the
+    full 128-bin array *after* masking everything outside the ~53-bin active
+    window to zero, diluting the mean to ~41% of the true in-window value and
+    weakening the intended 2x gate to an effective ~0.83x. Reproduced on the
+    operator's cycle-18 static-soak capture, which the (buggy) first coherent
+    release still false-confirmed at bin 42 despite a 0.92-1.02x true ratio
+    there. This test encodes the two call shapes so a future change cannot
+    silently regress to the diluted-mean integration.
+
+    The frames checked here are impact frames, whose *stored* window happens
+    to equal the active analysis window exactly (by construction: the impact
+    phase's retained window is defined as [impactStart, impactStart+
+    impactBins)). The firmware's actual gate call, though, always operates on
+    the full 128-bin scratch array regardless of what a frame's retained
+    window is, so the dilution has to be reproduced at that width, not at the
+    frame's own (already window-sized) sample count.
+    """
+    path = SESSIONS / "iwr-adaptive-coherent-soak" / "shadow-reference-018.l3dump"
+    if not path.exists():
+        pytest.skip("recorded regression capture not present")
+    meta, cube, starts, counts = load_dump(path)
+    active_start, active_bins = 32, 53  # this capture's impact window
+    # Frames where bin 42's own magnitude rise is nonzero, i.e. actually a
+    # candidate the gate has something to decide about (17 and 19 track the
+    # coasting prediction to a different bin and have nothing at 42 to gate).
+    for frame in (15, 16, 18):
+        rise = [int(v) for v in magnitude_rise(cube, frame, starts, counts)]
+        coherent = [int(v) for v in coherent_difference(cube, frame, starts, counts)]
+        full_rise = _to_absolute_bins(rise, starts[frame])
+        full_coherent = _to_absolute_bins(coherent, starts[frame])
+        for bin_index in range(N_BINS):
+            if bin_index < active_start or bin_index >= active_start + active_bins:
+                full_rise[bin_index] = 0
+                full_coherent[bin_index] = 0
+        # The bug: gate the already-masked full 128-bin array (mean diluted).
+        buggy = coherent_gate(full_rise, full_coherent)
+        # The fix: gate only the active-window slice, mean taken over just it.
+        fixed_slice = coherent_gate(
+            full_rise[active_start : active_start + active_bins],
+            full_coherent[active_start : active_start + active_bins],
+        )
+        assert buggy[42] != 0, (
+            "the diluted-mean call must still pass this static bin through "
+            "(this documents the bug, not the desired behavior)"
+        )
+        assert fixed_slice[42 - active_start] == 0, (
+            f"frame {frame}: the correctly-scoped gate must reject this static bin"
+        )
