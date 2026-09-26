@@ -1351,7 +1351,11 @@ class OPS243Radar:
         logger.info("[OPS] Rolling buffer mode restored for launch-monitor use")
 
     def prepare_persisted_rolling_buffer(
-        self, pre_trigger_segments: int = 16, sample_rate_ksps: int = 30
+        self,
+        pre_trigger_segments: int = 16,
+        sample_rate_ksps: int = 30,
+        trigger_speed_mph: Optional[float] = None,
+        trigger_magnitude: Optional[int] = None,
     ):
         """
         Prepare a radar that already booted in persisted rolling-buffer mode.
@@ -1360,6 +1364,20 @@ class OPS243Radar:
         board to boot in rolling-buffer mode from flash. If swing-speed mode
         has put the radar into speed-reporting mode, save rolling-buffer mode
         separately and physically power-cycle the radar before launch mode.
+
+        ``trigger_speed_mph``/``trigger_magnitude`` set the OPS243's own
+        *autonomous* rolling-buffer trigger (API commands ST/SM) -- it fires
+        the capture on its own, independent of the S! software trigger (the
+        IWR self-trigger, or a host-driven capture) and the HOST_INT hardware
+        sound-gate edge. That is a third, uncoordinated trigger source, so
+        both default to None (the documented disabled state) and are only
+        sent when explicitly given. Per OmniPreSense field testing, a driver
+        club head saturates the A/D during the backswing and can be misread
+        as a fast outbound speed by whatever *is* driving the trigger; their
+        tested fix if using this onboard trigger is trigger_speed_mph=-40.0
+        (40 mph outbound) and trigger_magnitude=600 (sized for a 460cc
+        driver head) -- see configure_for_speed_trigger's docstring for the
+        same guidance applied to the separate CW pre-detect path.
         """
         if not self.serial or not self.serial.is_open:
             raise ConnectionError("Not connected to radar")
@@ -1370,6 +1388,20 @@ class OPS243Radar:
         logger.info("[OPS] Transmit power: level 3 (reduced to avoid clipping)")
         self.set_sample_rate(sample_rate_ksps * 1000)
         logger.info("[OPS] Sample rate: %dksps", sample_rate_ksps)
+        if trigger_speed_mph is not None:
+            self._send_command(f"ST{trigger_speed_mph:g}")
+            logger.info(
+                "[OPS] Onboard rolling-buffer trigger speed: %g mph (ST%g)",
+                trigger_speed_mph,
+                trigger_speed_mph,
+            )
+        if trigger_magnitude is not None:
+            self._send_command(f"SM{trigger_magnitude:g}")
+            logger.info(
+                "[OPS] Onboard rolling-buffer trigger magnitude: %g (SM%g)",
+                trigger_magnitude,
+                trigger_magnitude,
+            )
         self.rearm_rolling_buffer(pre_trigger_segments=pre_trigger_segments)
         logger.info(
             "[OPS] Persisted rolling buffer prepared (S#%d, %dksps)",
@@ -1828,13 +1860,13 @@ class OPS243Radar:
         - 256 FFT size (X=2) for ~150-200Hz report rate (5-6ms between reports)
         - R>20 = minimum 20mph filter (eliminates leg movement, backswing noise)
         - R- = outbound only (ball/club going away from radar)
-        - ST-40 = trigger speed threshold, 40mph outbound; SM600 = magnitude
-          threshold sized for a 460cc driver head. Per OmniPreSense field
-          testing, R- alone is not enough with a driver at 1.5m: the club
-          head saturates the A/D during the backswing, and the saturated
-          signal is misread as a fast outbound speed, firing the trigger on
-          backswing noise instead of the ball. These two thresholds were
-          their tested fix (the other is moving the sensor to 1.8m).
+
+        Per OmniPreSense field testing, a driver's club head can saturate the
+        A/D during the backswing badly enough that R- alone doesn't catch it
+        -- the saturated signal is misread as a fast outbound speed. Their
+        tested fix uses the OPS243's *rolling-buffer* trigger thresholds
+        (ST/SM), not this CW pre-detect mode; see
+        OPS243Radar.prepare_persisted_rolling_buffer's docstring.
 
         This mode is used to detect the initial club swing, then we switch
         to rolling buffer mode (GC) to capture high-resolution ball data.
@@ -1886,26 +1918,6 @@ class OPS243Radar:
         self._send_command("R>20")
         time.sleep(0.05)
         logger.info("[OPS] Min speed filter: 20 mph (R>20)")
-
-        # OmniPreSense field report (v1.3.2 rolling buffer, sensor at 1.5 m):
-        # a driver's club head saturates the A/D during the backswing, and
-        # despite R- (outbound only) the saturated signal is misread as a
-        # fast outbound speed and fires the trigger -- captured data is then
-        # just the saturated backswing, with the club already out of the
-        # sensor's field of view by the time the real ball-bearing swing
-        # happens. Their tested fix: a trigger-speed threshold (outbound,
-        # 40 mph) and a magnitude threshold sized for a 460cc driver head
-        # (600) reject the saturated-backswing false trigger while still
-        # firing on the real forward swing. Their other fix -- mount 1.8 m
-        # back instead of 1.5 m -- is physical, not something this driver
-        # can enforce.
-        self._send_command("ST-40")
-        time.sleep(0.05)
-        logger.info("[OPS] Trigger speed threshold: 40 mph outbound (ST-40)")
-
-        self._send_command("SM600")
-        time.sleep(0.05)
-        logger.info("[OPS] Signal magnitude threshold: 600 (SM600)")
 
         # Enable JSON output for parsing
         self.enable_json_output(True)

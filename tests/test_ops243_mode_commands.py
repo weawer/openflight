@@ -198,30 +198,59 @@ def test_restore_rolling_buffer_uses_gc_and_no_flash_write(radar):
     assert b"A!" not in sent, "mode switching must not write flash"
 
 
-# --- speed trigger avoids driver-backswing saturation (vendor guidance) -----
+# --- ST/SM belong to rolling-buffer mode, not the CW speed-detect path -----
 
 
-def test_speed_trigger_sets_magnitude_and_trigger_speed_thresholds(radar):
-    """OmniPreSense field report (v1.3.2 rolling buffer, sensor at 1.5 m):
-
-    with a driver, the club saturates the A/D during the backswing; despite
-    R- (outbound only), the saturated backswing is misread as a fast outbound
-    speed and fires the trigger, leaving nothing but saturated backswing data
-    and no ball capture. Their tested fix: ST-40 (trigger speed threshold,
-    outbound) and SM600 (signal magnitude threshold, sized for a 460cc driver
-    head) reject the saturated-backswing false trigger while still firing on
-    the real forward swing. Their other fix is purely mechanical (mount at
-    1.8 m instead of 1.5 m) and is not something this driver can enforce.
+def test_speed_trigger_never_sends_rolling_buffer_thresholds(radar):
+    """ST ("Rolling Buffer Trigger Speed") and SM ("...Magnitude") are
+    documented rolling-buffer-mode commands (AN-010-AD), not part of this CW
+    pre-detect mode. An earlier version of this driver sent them here by
+    mistake, believing they applied to configure_for_speed_trigger's R>/R-
+    filter instead. See OPS243Radar.prepare_persisted_rolling_buffer for
+    where OmniPreSense's driver-backswing-saturation fix actually applies,
+    and why it must default off there too.
     """
     radar.configure_for_speed_trigger()
 
     sent = _sent(radar)
-    assert b"ST-40" in sent, (
-        f"expected ST-40 trigger-speed threshold, sent: {radar.serial.writes!r}"
+    assert b"ST" not in sent, f"ST is a rolling-buffer command, sent: {radar.serial.writes!r}"
+    assert b"SM" not in sent, f"SM is a rolling-buffer command, sent: {radar.serial.writes!r}"
+
+
+# --- onboard rolling-buffer trigger (ST/SM) is a separate, opt-in path -----
+#
+# ST/SM are documented as "Rolling Buffer Trigger Speed[/Magnitude]": an
+# autonomous trigger the OPS243 fires on its own, independent of the S!
+# software trigger (IWR self-trigger, or a host-driven capture) and the
+# HOST_INT hardware sound-gate edge. Enabling it is a real architectural
+# choice -- a third, uncoordinated trigger source -- so it must default off
+# and only appear when explicitly requested.
+
+
+def test_persisted_rolling_buffer_omits_onboard_trigger_by_default(radar):
+    radar.prepare_persisted_rolling_buffer(pre_trigger_segments=16, sample_rate_ksps=30)
+
+    sent = _sent(radar)
+    assert b"ST" not in sent, f"onboard trigger must default off, sent: {radar.serial.writes!r}"
+    assert b"SM" not in sent, f"onboard trigger must default off, sent: {radar.serial.writes!r}"
+
+
+def test_persisted_rolling_buffer_sends_onboard_trigger_thresholds_when_given(radar):
+    radar.prepare_persisted_rolling_buffer(
+        pre_trigger_segments=16,
+        sample_rate_ksps=30,
+        trigger_speed_mph=-40.0,
+        trigger_magnitude=600,
     )
-    assert b"SM600" in sent, f"expected SM600 magnitude threshold, sent: {radar.serial.writes!r}"
-    # Order matters here only in that both must land before the radar goes
-    # active (PA); a threshold set after PA would not take effect until the
-    # next arm.
-    assert sent.index(b"PA") > sent.index(b"ST-40")
-    assert sent.index(b"PA") > sent.index(b"SM600")
+
+    sent = _sent(radar)
+    assert b"ST-40" in sent, f"expected ST-40, sent: {radar.serial.writes!r}"
+    assert b"SM600" in sent, f"expected SM600, sent: {radar.serial.writes!r}"
+
+
+def test_persisted_rolling_buffer_onboard_trigger_thresholds_are_independent(radar):
+    """Either threshold can be set without the other."""
+    radar.prepare_persisted_rolling_buffer(trigger_speed_mph=-25.0)
+    sent = _sent(radar)
+    assert b"ST-25" in sent
+    assert b"SM" not in sent

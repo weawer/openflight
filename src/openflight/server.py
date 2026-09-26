@@ -3891,6 +3891,8 @@ def start_monitor(
     swing_speed_mode: bool = False,
     swing_speed_kwargs: Optional[dict] = None,
     ops_baud: Optional[int] = None,
+    ops_trigger_speed_mph: Optional[float] = None,
+    ops_trigger_magnitude: Optional[int] = None,
 ):
     """
     Start the monitor in launch monitor or swing speed mode.
@@ -3901,6 +3903,12 @@ def start_monitor(
         trigger_type: Trigger strategy (sound or speed)
         debug: Enable verbose debug output
         ops_baud: Target UART baud when the OPS243 is on the GPIO header
+        ops_trigger_speed_mph: Arm the OPS243's own onboard rolling-buffer
+            trigger (ST) instead of relying solely on the sound-gate edge or
+            the IWR self-trigger's S!. None (default) leaves it off -- see
+            RollingBufferMonitor's docstring for why this is a real
+            architectural choice, not a tuning knob.
+        ops_trigger_magnitude: Paired OPS243 magnitude threshold (SM).
     """
     global monitor, mock_mode, mock_swing_speed_mode, debug_mode, radar_config
 
@@ -3934,6 +3942,8 @@ def start_monitor(
             trigger_type=trigger_type,
             sample_rate_ksps=sample_rate_ksps,
             ops_baud=ops_baud,
+            trigger_speed_mph=ops_trigger_speed_mph,
+            trigger_magnitude=ops_trigger_magnitude,
             **(trigger_kwargs or {}),
         )
         print(
@@ -4469,6 +4479,29 @@ def main():
             f"(default {OPS243Radar.DEFAULT_UART_BAUD}). Only meaningful when "
             "--port is a UART device such as /dev/ttyAMA0; drop to 115200 if "
             "230400 proves unreliable on your board."
+        ),
+    )
+    parser.add_argument(
+        "--ops-trigger-speed-mph",
+        type=float,
+        default=None,
+        help=(
+            "Arm the OPS243's own onboard rolling-buffer trigger (ST) instead of "
+            "relying solely on the sound-gate edge or the IWR self-trigger's S!. "
+            "Default: off (a third, uncoordinated trigger source otherwise). "
+            "OmniPreSense's tested value against driver-backswing A/D saturation "
+            "is -40 (40 mph outbound; negative selects outbound per the OPS243 "
+            "API). Pair with --ops-trigger-magnitude."
+        ),
+    )
+    parser.add_argument(
+        "--ops-trigger-magnitude",
+        type=int,
+        default=None,
+        help=(
+            "OPS243 onboard rolling-buffer trigger magnitude threshold (SM), "
+            "paired with --ops-trigger-speed-mph. Default: off. OmniPreSense's "
+            "tested value for a 460cc driver head is 600."
         ),
     )
     parser.add_argument("--mock", "-m", action="store_true", help="Run in mock mode without radar")
@@ -5234,6 +5267,8 @@ def main():
             swing_speed_mode=args.swing_speed,
             swing_speed_kwargs=swing_speed_kwargs,
             ops_baud=args.ops_baud,
+            ops_trigger_speed_mph=args.ops_trigger_speed_mph,
+            ops_trigger_magnitude=args.ops_trigger_magnitude,
         )
     except Exception:
         monitor_recovery = (

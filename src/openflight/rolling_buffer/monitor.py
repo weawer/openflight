@@ -186,6 +186,8 @@ class RollingBufferMonitor:
         trigger_type: str = "sound",
         sample_rate_ksps: int = 30,
         ops_baud: Optional[int] = None,
+        trigger_speed_mph: Optional[float] = None,
+        trigger_magnitude: Optional[int] = None,
         **trigger_kwargs,
     ):
         """
@@ -201,6 +203,14 @@ class RollingBufferMonitor:
             trigger_type: Trigger strategy:
                 - "sound" (default): Persistent hardware-triggered buffer
                 - "speed": Fast speed trigger fallback per manufacturer
+            trigger_speed_mph: Arm the OPS243's own autonomous rolling-buffer
+                trigger (ST) instead of relying solely on the sound-gate edge
+                or the IWR self-trigger's S!. None (default) leaves it off --
+                see OPS243Radar.prepare_persisted_rolling_buffer for why this
+                is a real architectural choice, not a tuning knob. Ignored
+                for trigger_type="speed", which configures its own path.
+            trigger_magnitude: Paired OPS243 magnitude threshold (SM) for the
+                same onboard trigger. None (default) leaves it off.
             **trigger_kwargs: Arguments for trigger strategy
         """
         radar_kwargs = {} if ops_baud is None else {"uart_baud": ops_baud}
@@ -208,6 +218,8 @@ class RollingBufferMonitor:
         self.processor = RollingBufferProcessor(sample_rate=sample_rate_ksps * 1000)
         self.trigger_type = trigger_type
         self.sample_rate_ksps = sample_rate_ksps
+        self.trigger_speed_mph = trigger_speed_mph
+        self.trigger_magnitude = trigger_magnitude
         self.trigger = create_trigger(trigger_type, **trigger_kwargs)
 
         self._running = False
@@ -239,6 +251,8 @@ class RollingBufferMonitor:
             self.radar.prepare_persisted_rolling_buffer(
                 pre_trigger_segments=pre_trigger_segments,
                 sample_rate_ksps=self.sample_rate_ksps,
+                trigger_speed_mph=self.trigger_speed_mph,
+                trigger_magnitude=self.trigger_magnitude,
             )
             logger.info(
                 "[MONITOR] Rolling buffer mode configured with S#%d, S=%d",

@@ -3077,6 +3077,8 @@ class TestRollingBufferStartupMode:
         monitor.radar.prepare_persisted_rolling_buffer.assert_called_once_with(
             pre_trigger_segments=16,
             sample_rate_ksps=30,
+            trigger_speed_mph=None,
+            trigger_magnitude=None,
         )
         assert not monitor.radar.configure_for_rolling_buffer.called
 
@@ -3091,6 +3093,49 @@ class TestRollingBufferStartupMode:
         monitor.radar.connect.assert_called_once()
         assert not monitor.radar.configure_for_rolling_buffer.called
         assert not monitor.radar.prepare_persisted_rolling_buffer.called
+
+    def test_onboard_trigger_thresholds_default_off(self):
+        """Without opting in, the OPS243's own autonomous rolling-buffer
+        trigger must stay disabled -- it would fire independently of, and
+        possibly race, the IWR self-trigger's S! or the sound-gate edge."""
+        from openflight.rolling_buffer import RollingBufferMonitor
+
+        monitor = RollingBufferMonitor(port=None, trigger_type="sound", pre_trigger_segments=16)
+        monitor.radar = MagicMock()
+
+        assert monitor.connect() is True
+
+        monitor.radar.prepare_persisted_rolling_buffer.assert_called_once_with(
+            pre_trigger_segments=16,
+            sample_rate_ksps=30,
+            trigger_speed_mph=None,
+            trigger_magnitude=None,
+        )
+
+    def test_onboard_trigger_thresholds_are_opt_in(self):
+        """OmniPreSense's tested fix for driver-backswing A/D saturation:
+        ST-40 (outbound trigger speed) + SM600 (magnitude sized for a 460cc
+        driver head). Passed through only when the operator explicitly asks
+        for the OPS243's own onboard trigger."""
+        from openflight.rolling_buffer import RollingBufferMonitor
+
+        monitor = RollingBufferMonitor(
+            port=None,
+            trigger_type="sound",
+            pre_trigger_segments=16,
+            trigger_speed_mph=-40.0,
+            trigger_magnitude=600,
+        )
+        monitor.radar = MagicMock()
+
+        assert monitor.connect() is True
+
+        monitor.radar.prepare_persisted_rolling_buffer.assert_called_once_with(
+            pre_trigger_segments=16,
+            sample_rate_ksps=30,
+            trigger_speed_mph=-40.0,
+            trigger_magnitude=600,
+        )
 
 
 class TestSpinWindowTrimming:
