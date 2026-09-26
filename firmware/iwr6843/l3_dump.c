@@ -46,6 +46,7 @@
 #include <ti/control/mmwavelink/mmwavelink.h>
 #include <ti/control/mmwave/mmwave.h>
 #include <ti/utils/cli/cli.h>
+#include <ti/utils/cycleprofiler/cycle_profiler.h>
 
 #include "dump_format.h"
 #include "track_select.h"
@@ -380,6 +381,9 @@ static volatile uint32_t gHwaOutputDone;
 static volatile uint32_t gHwaRearms;
 static volatile uint32_t gHwaRearmErrors;
 static volatile uint32_t gHwaMissedFrameStarts;
+static volatile uint32_t gHwaRearmLastUs;
+static volatile uint32_t gHwaRearmMaxUs;
+static volatile uint32_t gHwaRearmQueuedCycles;
 static volatile uint8_t  gHwaArmedForFrame;
 static volatile uint8_t  gHwaDoneSeen;
 static volatile uint8_t  gHwaOutputSeen;
@@ -1197,6 +1201,9 @@ static void l3_hwaMaybeQueueRearm(void)
         }
 #endif
         }
+    }
+    if (queue) {
+        gHwaRearmQueuedCycles = Cycleprofiler_getTimeStamp();
     }
     Hwi_restore(key);
     if (freeze && gHwaFreezeSemaphore != NULL) {
@@ -2093,6 +2100,8 @@ static void l3_hwaRearmTask(UArg arg0, UArg arg1)
             uint32_t pendingSlot = 0U;
 #endif
             int32_t errCode;
+            uint32_t rearmStartCycles;
+            uint32_t rearmElapsedUs;
 
             key = Hwi_disable();
             if (gCaptureActive) {
@@ -2185,7 +2194,17 @@ static void l3_hwaRearmTask(UArg arg0, UArg arg1)
                 gIq8ActiveScratch = nextScratch;
             }
 #endif
+            rearmStartCycles = gHwaRearmQueuedCycles;
+            if (rearmStartCycles == 0U) {
+                rearmStartCycles = Cycleprofiler_getTimeStamp();
+            }
             errCode = l3_restartCompletedHwaFrame();
+            rearmElapsedUs = (Cycleprofiler_getTimeStamp() - rearmStartCycles) /
+                             (gCpuClock / 1000000U);
+            gHwaRearmLastUs = rearmElapsedUs;
+            if (rearmElapsedUs > gHwaRearmMaxUs) {
+                gHwaRearmMaxUs = rearmElapsedUs;
+            }
             if (errCode == 0) {
                 gHwaRearms++;
 #ifdef CONFIGURABLE_CAPTURE
@@ -3468,7 +3487,8 @@ static int32_t l3_cli_stats(int32_t argc, char *argv[])
     CLI_write("frames=%u wraps=%u active=%d calib=0x%x rf_faults=%u "
               "hwa_frames=%u hwa_out=%u hwa_rearms=%u hwa_rearm_err=%u "
               "hwa_missed=%u freeze_req=%u freeze_done=%u freeze_to=%u "
-              "format=%s plan=%upre/%upost loops=%u used=%u/%u\n",
+              "format=%s plan=%upre/%upost loops=%u used=%u/%u "
+              "rearm_last_us=%u rearm_max_us=%u\n",
               (unsigned)gNumFrame, (unsigned)gNumWrap, (int)gCaptureActive,
               (unsigned)gCalibStatus, (unsigned)gRfFaults,
               (unsigned)gHwaFrameDone, (unsigned)gHwaOutputDone,
@@ -3481,7 +3501,9 @@ static int32_t l3_cli_stats(int32_t argc, char *argv[])
               (unsigned)gCapturePlan.postFrames,
               (unsigned)gCapturePlan.loops,
               (unsigned)gCapturePlan.usedBytes,
-              (unsigned)l3_captureCapacityBytes());
+              (unsigned)l3_captureCapacityBytes(),
+              (unsigned)gHwaRearmLastUs,
+              (unsigned)gHwaRearmMaxUs);
     CLI_write("iq8_packed=%u iq8_overrun=%u iq8_clipped=%u pending=%u pre_seen=%u "
               "post_kept=%u post_seen=%u stride=%u"
 #ifdef L3_IQ8_EDMA_PACK
@@ -3511,7 +3533,8 @@ static int32_t l3_cli_stats(int32_t argc, char *argv[])
               "hwa_frames=%u hwa_out=%u hwa_rearms=%u hwa_rearm_err=%u "
               "hwa_missed=%u hwa_wait=0x%x freeze_req=%u freeze_done=%u freeze_to=%u "
               "freeze_restart=%u plan=%upre/%upost bins=%u/%u loops=%u "
-              "used=%u pre_seen=%u post_kept=%u post_seen=%u stride=%u\n",
+              "used=%u pre_seen=%u post_kept=%u post_seen=%u stride=%u "
+              "rearm_last_us=%u rearm_max_us=%u\n",
               (unsigned)gNumFrame, (unsigned)gNumWrap, (int)gCaptureActive,
               (unsigned)gCalibStatus, (unsigned)gRfFaults,
               (unsigned)gHwaFrameDone, (unsigned)gHwaOutputDone,
@@ -3530,13 +3553,15 @@ static int32_t l3_cli_stats(int32_t argc, char *argv[])
               (unsigned)gPreFramesCaptured,
               (unsigned)gPostFramesCaptured,
               (unsigned)gPostFramesObserved,
-              (unsigned)gCapturePlan.postStride);
+              (unsigned)gCapturePlan.postStride,
+              (unsigned)gHwaRearmLastUs,
+              (unsigned)gHwaRearmMaxUs);
 #endif
 #else
     CLI_write("frames=%u wraps=%u active=%d calib=0x%x rf_faults=%u "
               "hwa_frames=%u hwa_out=%u hwa_rearms=%u hwa_rearm_err=%u "
               "hwa_missed=%u hwa_wait=0x%x freeze_req=%u freeze_done=%u freeze_to=%u "
-              "freeze_restart=%u\n",
+              "freeze_restart=%u rearm_last_us=%u rearm_max_us=%u\n",
               (unsigned)gNumFrame, (unsigned)gNumWrap, (int)gCaptureActive,
               (unsigned)gCalibStatus, (unsigned)gRfFaults,
               (unsigned)gHwaFrameDone, (unsigned)gHwaOutputDone,
@@ -3545,7 +3570,8 @@ static int32_t l3_cli_stats(int32_t argc, char *argv[])
               (unsigned)((gHwaDoneSeen ? 1U : 0U) |
                          (gHwaOutputSeen ? 2U : 0U)),
               (unsigned)gHwaFreezeRequests, (unsigned)gHwaFreezeCompletions,
-              (unsigned)gHwaFreezeTimeouts, (unsigned)gHwaFreezeRestarts);
+              (unsigned)gHwaFreezeTimeouts, (unsigned)gHwaFreezeRestarts,
+              (unsigned)gHwaRearmLastUs, (unsigned)gHwaRearmMaxUs);
 #endif
 #else
     CLI_write("frames=%u wraps=%u active=%d calib=0x%x rf_faults=%u\n",
@@ -4034,6 +4060,9 @@ static int32_t l3_cli_sensorStart(int32_t argc, char *argv[])
     gHwaRearms         = 0U;
     gHwaRearmErrors    = 0U;
     gHwaMissedFrameStarts = 0U;
+    gHwaRearmLastUs    = 0U;
+    gHwaRearmMaxUs     = 0U;
+    gHwaRearmQueuedCycles = 0U;
     gHwaArmedForFrame  = 0U;
     gHwaDoneSeen       = 0U;
     gHwaOutputSeen     = 0U;
@@ -4135,6 +4164,7 @@ static void l3_initTask(UArg arg0, UArg arg1)
 
     (void)arg0; (void)arg1;
 
+    Cycleprofiler_init();
     UART_init();
     Pinmux_Set_FuncSel(SOC_XWR68XX_PINN5_PADBE, SOC_XWR68XX_PINN5_PADBE_MSS_UARTA_TX);
     Pinmux_Set_OverrideCtrl(SOC_XWR68XX_PINN5_PADBE,

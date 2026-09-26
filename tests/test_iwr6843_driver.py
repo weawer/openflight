@@ -5,8 +5,21 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from openflight.iwr6843.driver import IWR6843Radar
+from openflight.iwr6843.driver import IWR6843Radar, parse_capture_stats
 from openflight.iwr6843.dump import TEMP_REPORT_KEYS, pack_dump
+
+
+def test_parse_capture_stats_collects_numeric_health_fields():
+    stats = parse_capture_stats(
+        "frames=100000 active=1 hwa_rearm_err=0 hwa_missed=0 "
+        "rearm_last_us=91 rearm_max_us=137 format=iq16\nDone\n"
+    )
+
+    assert stats["frames"] == 100000
+    assert stats["hwa_rearm_err"] == 0
+    assert stats["hwa_missed"] == 0
+    assert stats["rearm_max_us"] == 137
+    assert stats["format"] == "iq16"
 
 
 def test_send_config_rejects_missing_cli_acknowledgement(tmp_path, monkeypatch):

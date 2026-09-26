@@ -386,6 +386,9 @@ class IWR6843Runtime:
         clamp; a zero-width gate disables the club cells. 17 significant
         digits let the firmware's strtod land on the host's exact doubles.
         """
+        from openflight.iwr6843.monitor import (  # pylint: disable=import-outside-toplevel
+            read_capture_config,
+        )
         from openflight.iwr6843.sparse import (  # pylint: disable=import-outside-toplevel
             RANGE_FFT_SIZE,
         )
@@ -396,7 +399,20 @@ class IWR6843Runtime:
 
         max_range = self._ball_max_range_m() or 0.0
         club_lo, club_hi = self._club_gate_m() or (0.0, 0.0)
-        fields = (LOOP_PRI_S, RANGE_SPAN_M / RANGE_FFT_SIZE, max_range, club_lo, club_hi)
+        monitor_config = getattr(self.capture_monitor, "config_path", None)
+        config_path = str(monitor_config) if monitor_config is not None else None
+        loop_period_s = LOOP_PRI_S
+        if config_path is not None:
+            configured_period = read_capture_config(config_path).loop_period_s
+            if configured_period is not None:
+                loop_period_s = configured_period
+        fields = (
+            loop_period_s,
+            RANGE_SPAN_M / RANGE_FFT_SIZE,
+            max_range,
+            club_lo,
+            club_hi,
+        )
         return "trackCfg " + " ".join(f"{value:.17g}" for value in fields)
 
     def process_shot(  # pylint: disable=too-many-arguments

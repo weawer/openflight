@@ -13,6 +13,7 @@ import inspect
 import shutil
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -515,11 +516,11 @@ from openflight.iwr6843.runtime import IWR6843Runtime  # noqa: E402
 from openflight.iwr6843.sparse import TRACK_MAGIC, OnboardTrack, vertical_loop_power  # noqa: E402
 
 
-def _runtime(*, tee_m=1.4, net_m=4.064, flight="net"):
+def _runtime(*, tee_m=1.4, net_m=4.064, flight="net", config_path=None):
     calibration = Calibration.identity()
     calibration.tee_range_m = tee_m
     return IWR6843Runtime(
-        capture_monitor=None,
+        capture_monitor=(SimpleNamespace(config_path=config_path) if config_path else None),
         calibration=calibration,
         net_range_m=net_m,
         flight_mode=flight,
@@ -546,6 +547,27 @@ def test_track_config_sends_the_host_planner_limits_exactly():
     assert max_range == runtime.tracking_net_m - 0.25
     assert club_lo == 1.4 - CLUB_APPROACH_DEPTH_M
     assert club_hi == 1.4 + CLUB_GATE_TEE_MARGIN_M
+
+
+def test_track_config_uses_three_tx_profile_loop_period(tmp_path):
+    config = tmp_path / "radar.cfg"
+    config.write_text(
+        "\n".join(
+            (
+                "profileCfg 0 60.0 7 3 38 0 0 100 1 128 4000 0 0 30",
+                "chirpCfg 0 0 0 0 0 0 0 1",
+                "chirpCfg 1 1 0 0 0 0 0 2",
+                "chirpCfg 2 2 0 0 0 0 0 4",
+                "frameCfg 0 2 12 0 2 1 0",
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    loop_s, *_rest = _track_cfg_fields(_runtime(config_path=config).track_config_command())
+
+    assert loop_s == pytest.approx(135e-6)
 
 
 def test_track_config_open_flight_has_no_net_clamp():

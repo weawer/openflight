@@ -9,6 +9,7 @@ FIRMWARE_MAKEFILE = Path(__file__).parents[1] / "firmware" / "Makefile"
 CONFIG_DIR = Path(__file__).parents[1] / "config"
 WIDE_CONFIG = CONFIG_DIR / "iwr6843_l3dump_wide_24f3ms_53bin_iq16.cfg"
 DENSE_CONFIG = CONFIG_DIR / "iwr6843_l3dump_dense_36f2ms_53bin_iq8.cfg"
+DENSE_IQ16_DIAGNOSTIC_CONFIG = CONFIG_DIR / "iwr6843_l3dump_diagnostic_24f2ms_53bin_iq16.cfg"
 DENSE_WIDE_LATE_CONFIG = CONFIG_DIR / "iwr6843_l3dump_dense_36f2ms_53bin_iq8_wide_late.cfg"
 
 
@@ -222,6 +223,18 @@ def test_dense_profile_uses_36_frames_at_2ms_with_53_bin_iq8_windows():
     assert "phaseCaptureCfg 20 53 14 32 53 10 47 53 64 12 1" in lines
 
 
+def test_diagnostic_profile_uses_memory_safe_2ms_iq16_capture():
+    lines = _config_lines(DENSE_IQ16_DIAGNOSTIC_CONFIG)
+
+    assert "frameCfg 0 2 12 0 2 1 0" in lines
+    assert "captureFormat iq16" in lines
+    assert "phaseCaptureCfg 20 53 9 32 53 7 47 53 47 8 1" in lines
+
+    payload_bytes = 3 * 12 * 4 * 24 * 53 * 4
+    assert payload_bytes == 732_672
+    assert payload_bytes < 786_432
+
+
 def test_dense_wide_late_profile_keeps_dense_timing_and_near_late_window():
     lines = _config_lines(DENSE_WIDE_LATE_CONFIG)
 
@@ -388,6 +401,22 @@ def test_stats_reports_trigger_state_and_debug_prints_on_phase_change_only():
     assert "if (phase == gTriggerDebugPhase)" in debug_write
     assert debug_write.index("gTriggerDebugPhase = phase") < debug_write.index("CLI_write(")
     assert "gTriggerDebugPhase = 0xFFU" in debug_cfg
+
+
+def test_stats_reports_rearm_latency_maximum_for_2ms_deadline_checks():
+    source = FIRMWARE.read_text(encoding="utf-8")
+    rearm = _function_source(
+        source,
+        "static void l3_hwaRearmTask",
+        "/* Fill the 20-byte fixed dump header",
+    )
+    stats = _function_source(
+        source, "static int32_t l3_cli_stats", "static int32_t l3_cli_hwaStats"
+    )
+
+    assert "Cycleprofiler_getTimeStamp()" in rearm
+    assert "gHwaRearmMaxUs" in rearm
+    assert "rearm_last_us=%u rearm_max_us=%u" in stats
 
 
 def test_sensor_start_discards_the_previous_self_trigger_latch():

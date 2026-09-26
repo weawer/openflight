@@ -34,24 +34,55 @@ class CaptureConfigSummary:
     chirp_tx_masks: tuple[str, ...]
     first_window_start: int | None
     first_window_bins: int | None
+    loops: int | None = None
+    frame_period_s: float | None = None
+    chirp_period_s: float | None = None
+    capture_format: str | None = None
+
+    @property
+    def n_tx(self) -> int:
+        """Number of distinct transmitters enabled by the chirp sequence."""
+        return len(set(self.chirp_tx_masks))
+
+    @property
+    def loop_period_s(self) -> float | None:
+        """Elapsed time between successive chirps from the same transmitter."""
+        if self.chirp_period_s is None or not self.n_tx:
+            return None
+        return self.chirp_period_s * self.n_tx
 
 
 def read_capture_config(config_path: str | Path) -> CaptureConfigSummary:
     """Parse chirp TX masks and the first saved range window from a cfg."""
     masks: list[str] = []
     window: tuple[int, int] | None = None
+    loops: int | None = None
+    frame_period_s: float | None = None
+    chirp_period_s: float | None = None
+    capture_format: str | None = None
     with Path(config_path).open(encoding="utf-8") as handle:
         for raw_line in handle:
             line = raw_line.strip()
+            fields = line.split()
             if line.startswith("chirpCfg"):
                 masks.append(line.rsplit(maxsplit=1)[-1])
             elif line.startswith("phaseCaptureCfg") and window is None:
-                fields = line.split()
                 window = (int(fields[1]), int(fields[2]))
+            elif line.startswith("profileCfg"):
+                chirp_period_s = (float(fields[3]) + float(fields[5])) * 1e-6
+            elif line.startswith("frameCfg"):
+                loops = int(fields[3])
+                frame_period_s = float(fields[5]) * 1e-3
+            elif line.startswith("captureFormat"):
+                capture_format = fields[1].lower()
     return CaptureConfigSummary(
         chirp_tx_masks=tuple(masks),
         first_window_start=window[0] if window else None,
         first_window_bins=window[1] if window else None,
+        loops=loops,
+        frame_period_s=frame_period_s,
+        chirp_period_s=chirp_period_s,
+        capture_format=capture_format,
     )
 
 
@@ -219,6 +250,9 @@ class IWR6843CaptureMonitor:
             return
         if not self.config_path.is_file():
             raise FileNotFoundError(f"IWR6843 config not found: {self.config_path}")
+        config = read_capture_config(self.config_path)
+        if self.self_trigger is not None and config.capture_format == "iq8":
+            raise ValueError("IQ8 capture does not support the IWR6843 self-trigger")
         if self.save_dumps:
             self.output_dir.mkdir(parents=True, exist_ok=True)
         configured = False

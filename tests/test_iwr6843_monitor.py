@@ -91,6 +91,54 @@ def _raw_dump(temperature_report: dict[str, int] | None = None) -> bytes:
     )
 
 
+def test_capture_config_reports_physical_timing_and_format(tmp_path):
+    config = tmp_path / "radar.cfg"
+    config.write_text(
+        "\n".join(
+            (
+                "profileCfg 0 60.0 7 3 38 0 0 100 1 128 4000 0 0 30",
+                "chirpCfg 0 0 0 0 0 0 0 1",
+                "chirpCfg 1 1 0 0 0 0 0 2",
+                "chirpCfg 2 2 0 0 0 0 0 4",
+                "frameCfg 0 2 12 0 2 1 0",
+                "captureFormat iq16",
+                "phaseCaptureCfg 20 53 9 32 53 7 47 53 47 8 1",
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    summary = read_capture_config(config)
+
+    assert summary.n_tx == 3
+    assert summary.loops == 12
+    assert summary.frame_period_s == pytest.approx(0.002)
+    assert summary.chirp_period_s == pytest.approx(45e-6)
+    assert summary.loop_period_s == pytest.approx(135e-6)
+    assert summary.capture_format == "iq16"
+
+
+def test_capture_monitor_rejects_iq8_self_trigger_before_configuring_hardware(tmp_path):
+    config = tmp_path / "radar.cfg"
+    config.write_text(
+        "captureFormat iq8\nphaseCaptureCfg 20 53 14 32 53 10 47 53 64 12 1\n",
+        encoding="utf-8",
+    )
+    radar = FakeRadar(_raw_dump())
+    monitor = IWR6843CaptureMonitor(
+        config_path=config,
+        output_dir=tmp_path / "dumps",
+        radar=radar,
+        self_trigger=SelfTriggerConfig(local_bin=1, level=2.0, hits=2),
+    )
+
+    with pytest.raises(ValueError, match="IQ8.*self-trigger"):
+        monitor.start()
+
+    assert radar.configs == []
+
+
 def test_capture_monitor_matches_gpio_edge_to_ops_impact(tmp_path):
     config = tmp_path / "radar.cfg"
     config.write_text("sensorStart\n", encoding="utf-8")

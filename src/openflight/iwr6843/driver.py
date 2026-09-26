@@ -52,6 +52,20 @@ _PORT_GLOBS = ("/dev/ttyUSB*", "/dev/tty.SLAB_USBtoUART*")
 logger = logging.getLogger(__name__)
 
 
+def parse_capture_stats(response: str) -> dict[str, int | str]:
+    """Parse firmware ``stats`` key/value fields without hiding unknown fields."""
+    parsed: dict[str, int | str] = {}
+    for token in response.split():
+        if "=" not in token:
+            continue
+        key, value = token.split("=", 1)
+        try:
+            parsed[key] = int(value, 0)
+        except ValueError:
+            parsed[key] = value
+    return parsed
+
+
 class UnsupportedCommand(RuntimeError):
     """The firmware CLI does not know the command, so it is an older image."""
 
