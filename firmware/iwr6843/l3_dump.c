@@ -450,7 +450,7 @@ static volatile uint8_t  gCaptureIncomplete;
 static uint32_t gShadowPower[N_SAMPLES];
 static uint32_t gShadowPreviousPower[N_SAMPLES];
 static uint8_t gShadowHavePrevious;
-static L3LiveSelectorParams gShadowParams = {12U, 4U, 2U, 768U};
+static L3LiveSelectorParams gShadowParams = {12U, 4U, 2U, 768U, 3U};
 static L3LiveSelectorState gShadowState;
 static L3LiveSelectorResult gShadowLast;
 static volatile uint32_t gShadowFrames;
@@ -468,6 +468,7 @@ static uint8_t gShadowSelected[L3_MAX_CAPTURE_FRAMES];
 static uint32_t gShadowNoise[L3_MAX_CAPTURE_FRAMES];
 static uint8_t gShadowAcceptedFrame[L3_MAX_CAPTURE_FRAMES];
 static uint8_t gShadowAmbiguousFrame[L3_MAX_CAPTURE_FRAMES];
+static uint8_t gShadowCoastingFrame[L3_MAX_CAPTURE_FRAMES];
 static volatile uint8_t gShadowDumpRequested;
 #ifdef L3_IQ8_EDMA_PACK
 static volatile uint8_t  gIq8EdmaBusy[2];
@@ -1824,7 +1825,6 @@ static void l3_storeCompletedScratchFrame(uint32_t slot, uint8_t scratch)
 {
     uint32_t startCycles;
     uint32_t elapsedUs;
-    uint8_t hadTrack = gShadowState.active;
 
     if (l3_captureUsesIq8()) {
 #ifdef L3_IQ8_EDMA_PACK
@@ -1908,6 +1908,7 @@ static void l3_storeCompletedScratchFrame(uint32_t slot, uint8_t scratch)
             gShadowNoise[slot] = gShadowLast.noise;
             gShadowAcceptedFrame[slot] = gShadowLast.accepted;
             gShadowAmbiguousFrame[slot] = gShadowLast.ambiguous;
+            gShadowCoastingFrame[slot] = gShadowLast.coasting;
         }
         elapsedUs = (Cycleprofiler_getTimeStamp() - selectorStart) /
                     (gCpuClock / 1000000U);
@@ -1918,9 +1919,9 @@ static void l3_storeCompletedScratchFrame(uint32_t slot, uint8_t scratch)
     }
     if (l3_captureUsesAdaptiveIq16() &&
         slot >= gCapturePlan.preFrames + gCapturePlan.impactFrames) {
-        gRetentionReason = hadTrack
-                               ? l3_retention_window(&gShadowLast, N_SAMPLES)
-                               : L3_RETENTION_TRACK_LOST;
+        /* Accepted frames belong to a confirmed track; coasting frames keep
+         * a confirmed track through a bounded number of misses. */
+        gRetentionReason = l3_retention_window(&gShadowLast, N_SAMPLES);
         if (gRetentionReason != 0U) return;
         gFrameBinStart[slot] = (uint8_t)gShadowLast.windowStart;
         gShadowWindowStart[slot] = (uint8_t)gShadowLast.windowStart;
@@ -2736,7 +2737,7 @@ int32_t l3_cli_dump(int32_t argc, char *argv[])
             uint32_t slot = i < actualPre
                                 ? (oldestPre + i) % gCapturePlan.preFrames
                                 : gCapturePlan.preFrames + i - actualPre;
-            CLI_write("SHD f=%u c=%u,%u s=%u w=%u,%u q=%u n=%u ok=%u a=%u\n",
+            CLI_write("SHD f=%u c=%u,%u s=%u w=%u,%u q=%u n=%u ok=%u a=%u co=%u\n",
                       (unsigned)i,
                       (unsigned)gShadowCandidate0[slot],
                       (unsigned)gShadowCandidate1[slot],
@@ -2746,7 +2747,8 @@ int32_t l3_cli_dump(int32_t argc, char *argv[])
                       (unsigned)gShadowConfidence[slot],
                       (unsigned)gShadowNoise[slot],
                       (unsigned)gShadowAcceptedFrame[slot],
-                      (unsigned)gShadowAmbiguousFrame[slot]);
+                      (unsigned)gShadowAmbiguousFrame[slot],
+                      (unsigned)gShadowCoastingFrame[slot]);
         }
     }
 #endif
@@ -4446,6 +4448,7 @@ static int32_t l3_cli_sensorStart(int32_t argc, char *argv[])
     memset(gShadowNoise, 0, sizeof(gShadowNoise));
     memset(gShadowAcceptedFrame, 0, sizeof(gShadowAcceptedFrame));
     memset(gShadowAmbiguousFrame, 0, sizeof(gShadowAmbiguousFrame));
+    memset(gShadowCoastingFrame, 0, sizeof(gShadowCoastingFrame));
     gShadowDumpRequested = 0U;
     gShadowFrames = 0U;
     gShadowAccepted = 0U;

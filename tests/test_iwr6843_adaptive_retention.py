@@ -140,6 +140,20 @@ def test_operator_check_verifies_actual_stored_windows(hardware_check):
         hardware_check._check_retention_layout(metadata, [], str(config))
 
 
+def test_operator_check_accepts_coasting_flight_frames_but_not_untracked_ones(hardware_check):
+    raw, _, starts, _ = _capture()
+    metadata, _ = parse_dump(raw)
+    config = ROOT / "config/iwr6843_l3dump_adaptive_36f2ms_iq16.cfg"
+    decisions = [
+        dict(accepted=1, coasting=0, proposed_start=start, proposed_bins=12) for start in starts
+    ]
+    decisions[25].update(accepted=0, coasting=1)
+    hardware_check._check_retention_layout(metadata, decisions, str(config))
+    decisions[25].update(coasting=0)
+    with pytest.raises(RuntimeError, match="differs from selector"):
+        hardware_check._check_retention_layout(metadata, decisions, str(config))
+
+
 def test_operator_check_rejects_processing_overrun_in_adaptive_capture(hardware_check):
     hardware_check._check_timing(dict(shadow_max_us=773, compact16_max_us=537), 2000, True)
     with pytest.raises(RuntimeError, match="selector plus compaction"):

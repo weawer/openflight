@@ -127,7 +127,8 @@ def _check_retention_layout(metadata, decisions, config_path):
             raise RuntimeError(f"frame {frame}: unexpected adaptive storage window")
         if frame >= pre + impact and decisions:
             decision = decisions[frame]
-            if not decision["accepted"] or (start, count) != (
+            tracked = decision["accepted"] or decision.get("coasting", 0)
+            if not tracked or (start, count) != (
                 decision["proposed_start"],
                 decision["proposed_bins"],
             ):
@@ -206,7 +207,7 @@ def run(args: argparse.Namespace) -> None:
                     f"{metadata['n_frames']} frames"
                 )
             if any(
-                decision["accepted"]
+                (decision["accepted"] or decision.get("coasting", 0))
                 and not (
                     decision["proposed_start"]
                     <= decision["selected"]

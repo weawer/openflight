@@ -258,6 +258,8 @@ class IWR6843Radar:
                     "noise": int(fields["n"], 0),
                     "accepted": int(fields["ok"], 0),
                     "ambiguous": int(fields["a"], 0),
+                    # Firmware before track coasting does not report it.
+                    "coasting": int(fields.get("co", "0"), 0),
                 }
             )
         return payload, decisions

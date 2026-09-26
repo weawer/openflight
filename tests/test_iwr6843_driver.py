@@ -176,6 +176,7 @@ def test_read_shadow_dump_returns_decisions_tied_to_binary_frames():
             self.payload = bytearray(
                 b"l3shadow\r\n"
                 b"SHD f=0 c=31,42 s=31 w=25,12 q=900 n=120 ok=1 a=0\r\n"
+                b"SHD f=1 c=50,60 s=34 w=28,12 q=0 n=130 ok=0 a=0 co=1\r\n"
                 + raw
                 + b"Done\r\nl3dump:/>"
             )
@@ -214,7 +215,21 @@ def test_read_shadow_dump_returns_decisions_tied_to_binary_frames():
             "noise": 120,
             "accepted": 1,
             "ambiguous": 0,
-        }
+            "coasting": 0,  # older firmware omits co=
+        },
+        {
+            "frame": 1,
+            "c0": 50,
+            "c1": 60,
+            "selected": 34,
+            "proposed_start": 28,
+            "proposed_bins": 12,
+            "confidence_q8": 0,
+            "noise": 130,
+            "accepted": 0,
+            "ambiguous": 0,
+            "coasting": 1,
+        },
     ]
     assert radar.ser.writes == [b"l3shadow\n"]
 
