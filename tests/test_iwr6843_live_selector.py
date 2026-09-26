@@ -159,3 +159,47 @@ def test_saturated_candidates_and_bin_edges_match(c_select):
     assert actual.window_start == expected.window_start == 0
     assert actual.confidence_q8 == expected.confidence_q8
     assert c_state.selected_bin == state.selected_bin
+
+
+def test_miss_holds_range_and_clears_stale_velocity(c_select):
+    params = SelectorParams()
+    state = SelectorState(selected_bin=13, velocity_q8=8 * 256, active=1)
+    powers = _powers((28, 5000), (22, 4000), (13, 3000))
+    before = state.copy()
+
+    expected = select_window(powers, params, state)
+    c_state, actual = _c_run(c_select, powers, params, before)
+
+    assert not expected.accepted
+    assert expected.selected_bin == 13
+    assert expected.window_start == 7
+    assert state.velocity_q8 == 0
+    assert actual.selected_bin == expected.selected_bin
+    assert actual.window_start == expected.window_start
+    assert c_state.velocity_q8 == 0
+
+
+def test_home_motion_reference_stays_inside_proposed_windows(c_select):
+    params = SelectorParams()
+    python_state = SelectorState(selected_bin=13, velocity_q8=8 * 256, active=1)
+    candidate_frames = [
+        ((24, 4829), (22, 4012)),
+        ((28, 5606), (36, 4720)),
+        ((13, 7305), (71, 3816)),
+        ((13, 11996), (31, 4273)),
+        ((31, 3474), (33, 3373)),
+        ((95, 3828), (15, 3661)),
+    ]
+    reference_bins = (13, 13, 13, 13, 14, 15)
+
+    for peaks, reference_bin in zip(candidate_frames, reference_bins, strict=True):
+        powers = _powers(*peaks)
+        before = python_state.copy()
+        expected = select_window(powers, params, python_state)
+        c_state, actual = _c_run(c_select, powers, params, before)
+
+        assert expected.window_start <= reference_bin < (
+            expected.window_start + expected.window_bins
+        )
+        assert actual.window_start == expected.window_start
+        assert c_state.selected_bin == python_state.selected_bin

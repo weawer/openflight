@@ -8,7 +8,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class SelectorParams:
     window_bins: int = 12
-    max_jump_bins: int = 8
+    max_jump_bins: int = 4
     max_misses: int = 2
     snr_q8: int = 768
 
@@ -69,6 +69,7 @@ def select_window(
             index
             for index in candidates
             if index >= state.selected_bin - 1
+            and abs(index - state.selected_bin) <= params.max_jump_bins
             and abs(index * 256 - predicted_q8) <= params.max_jump_bins * 256
         ]
         if eligible:
@@ -80,8 +81,8 @@ def select_window(
             )
     if chosen is None:
         state.misses += 1
-        predicted = state.selected_bin + int(state.velocity_q8 / 256)
-        selected = max(0, min(predicted, len(powers) - 1))
+        selected = state.selected_bin
+        state.velocity_q8 = 0
         if state.misses > params.max_misses:
             state.active = 0
             state.velocity_q8 = 0

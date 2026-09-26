@@ -71,6 +71,8 @@ int32_t l3_live_select(const uint32_t *powers, uint16_t nBins,
             int32_t candidateQ8 = (int32_t)candidates[bin] * 256;
             uint32_t distance = l3_abs_diff(candidateQ8, predictedQ8);
             if ((int32_t)candidates[bin] < (int32_t)state->selectedBin - 1 ||
+                l3_abs_diff(candidates[bin], state->selectedBin) >
+                    params->maxJumpBins ||
                 distance > (uint32_t)params->maxJumpBins * 256U) {
                 continue;
             }
@@ -86,12 +88,8 @@ int32_t l3_live_select(const uint32_t *powers, uint16_t nBins,
     }
     if (chosen < 0) {
         state->misses++;
-        selected = state->selectedBin + state->velocityQ8 / 256;
-        if (selected < 0) {
-            selected = 0;
-        } else if (selected >= nBins) {
-            selected = nBins - 1;
-        }
+        selected = state->selectedBin;
+        state->velocityQ8 = 0;
         if (state->misses > params->maxMisses) {
             state->active = 0U;
             state->velocityQ8 = 0;

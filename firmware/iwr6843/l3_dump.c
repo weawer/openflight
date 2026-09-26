@@ -447,7 +447,7 @@ static volatile uint8_t  gCaptureIncomplete;
 static uint32_t gShadowPower[N_SAMPLES];
 static uint32_t gShadowPreviousPower[N_SAMPLES];
 static uint8_t gShadowHavePrevious;
-static L3LiveSelectorParams gShadowParams = {12U, 8U, 2U, 768U};
+static L3LiveSelectorParams gShadowParams = {12U, 4U, 2U, 768U};
 static L3LiveSelectorState gShadowState;
 static L3LiveSelectorResult gShadowLast;
 static volatile uint32_t gShadowFrames;
