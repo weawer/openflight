@@ -233,6 +233,8 @@ this step so corruption and scheduling failures cannot be confused with tracker 
 
 **User stories:** U2, U4.
 
+Hardware checkpoint: [Phase 3 shadow-selector evidence](iwr-iq16-2ms-phase3-checkpoint.md).
+
 ### What to build
 
 Run the bounded selector on completed frames, recording its candidate ranges,
