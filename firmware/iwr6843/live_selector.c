@@ -43,6 +43,30 @@ uint16_t l3_retention_window(L3LiveSelectorResult *result, uint16_t nBins)
     return L3_RETENTION_COMPLETE;
 }
 
+void l3_coherent_gate(const uint32_t *rise, const uint32_t *coherent,
+                     uint16_t nBins, uint16_t gateQ8, uint32_t *gated)
+{
+    uint64_t sum = 0U;
+    uint32_t meanCoherent;
+    uint32_t threshold;
+    uint16_t bin;
+
+    if (rise == NULL || coherent == NULL || gated == NULL || nBins == 0U) {
+        return;
+    }
+    for (bin = 0U; bin < nBins; bin++) {
+        sum += coherent[bin];
+    }
+    meanCoherent = (uint32_t)(sum / nBins);
+    if (meanCoherent == 0U) {
+        meanCoherent = 1U;
+    }
+    threshold = (uint32_t)(((uint64_t)meanCoherent * gateQ8) / 256U);
+    for (bin = 0U; bin < nBins; bin++) {
+        gated[bin] = (coherent[bin] >= threshold) ? rise[bin] : 0U;
+    }
+}
+
 static uint32_t l3_abs_diff(int32_t left, int32_t right)
 {
     return (uint32_t)(left >= right ? left - right : right - left);

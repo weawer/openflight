@@ -234,6 +234,9 @@
 #define L3_MAX_POST_STRIDE     16U
 #define L3_SHADOW_LOOP_STRIDE 3U
 #define L3_SHADOW_RX_STRIDE 2U
+/* Coherent gate factor: keep a bin only if its coherent difference is at
+ * least 2x the in-window mean (plans/iwr-coherent-gate.md). */
+#define L3_COHERENT_GATE_Q8 512U
 
 typedef struct {
     uint8_t preStart;
@@ -450,6 +453,18 @@ static volatile uint8_t  gCaptureIncomplete;
 static uint32_t gShadowPower[N_SAMPLES];
 static uint32_t gShadowPreviousPower[N_SAMPLES];
 static uint8_t gShadowHavePrevious;
+/*
+ * Coherent gate (plans/iwr-coherent-gate.md): the raw sampled rows (every
+ * L3_SHADOW_LOOP_STRIDE-th loop, all TX, every L3_SHADOW_RX_STRIDE-th RX) of
+ * the previous frame, kept so the current frame's complex (not rectified)
+ * difference can be computed per bin. gShadowHavePrevious also gates this.
+ */
+#define L3_SHADOW_MAX_ROWS \
+    (((L3_MAX_LOOPS + L3_SHADOW_LOOP_STRIDE - 1U) / L3_SHADOW_LOOP_STRIDE) * \
+     N_TX * ((N_RX + L3_SHADOW_RX_STRIDE - 1U) / L3_SHADOW_RX_STRIDE))
+static int16_t gShadowPrevRows[L3_SHADOW_MAX_ROWS][N_SAMPLES][2];
+static uint32_t gShadowCoherent[N_SAMPLES];
+static uint32_t gShadowGated[N_SAMPLES];
 static L3LiveSelectorParams gShadowParams = {12U, 4U, 2U, 768U, 3U};
 static L3LiveSelectorState gShadowState;
 static L3LiveSelectorResult gShadowLast;
@@ -1855,22 +1870,46 @@ static void l3_storeCompletedScratchFrame(uint32_t slot, uint8_t scratch)
         uint32_t rx;
         uint32_t bin;
         uint32_t selectorStart = startCycles;
+        uint8_t hadPreviousRows = gShadowHavePrevious;
 
         memset(gShadowPower, 0, sizeof(gShadowPower));
-        for (loop = 0U; loop < gCapturePlan.loops;
-             loop += L3_SHADOW_LOOP_STRIDE) {
-            for (tx = 0U; tx < N_TX; tx++) {
-                uint32_t chirp = loop * N_TX + tx;
-                for (rx = 0U; rx < N_RX; rx += L3_SHADOW_RX_STRIDE) {
-                    uint32_t row = (chirp * N_RX + rx) * N_SAMPLES * 2U;
-                    for (bin = 0U; bin < N_SAMPLES; bin++) {
-                        int32_t imag =
-                            g_iq16FrameScratch[scratch][row + bin * 2U];
-                        int32_t real =
-                            g_iq16FrameScratch[scratch][row + bin * 2U + 1U];
-                        gShadowPower[bin] +=
-                            (uint32_t)(imag < 0 ? -imag : imag) +
-                            (uint32_t)(real < 0 ? -real : real);
+        memset(gShadowCoherent, 0, sizeof(gShadowCoherent));
+        {
+            uint32_t sampledRow = 0U;
+            for (loop = 0U; loop < gCapturePlan.loops;
+                 loop += L3_SHADOW_LOOP_STRIDE) {
+                for (tx = 0U; tx < N_TX; tx++) {
+                    uint32_t chirp = loop * N_TX + tx;
+                    for (rx = 0U; rx < N_RX; rx += L3_SHADOW_RX_STRIDE) {
+                        uint32_t row = (chirp * N_RX + rx) * N_SAMPLES * 2U;
+                        for (bin = 0U; bin < N_SAMPLES; bin++) {
+                            int32_t imag =
+                                g_iq16FrameScratch[scratch][row + bin * 2U];
+                            int32_t real =
+                                g_iq16FrameScratch[scratch][row + bin * 2U + 1U];
+                            gShadowPower[bin] +=
+                                (uint32_t)(imag < 0 ? -imag : imag) +
+                                (uint32_t)(real < 0 ? -real : real);
+                            if (hadPreviousRows &&
+                                sampledRow < L3_SHADOW_MAX_ROWS) {
+                                int32_t prevImag =
+                                    gShadowPrevRows[sampledRow][bin][0];
+                                int32_t prevReal =
+                                    gShadowPrevRows[sampledRow][bin][1];
+                                int32_t dImag = imag - prevImag;
+                                int32_t dReal = real - prevReal;
+                                gShadowCoherent[bin] +=
+                                    (uint32_t)(dImag < 0 ? -dImag : dImag) +
+                                    (uint32_t)(dReal < 0 ? -dReal : dReal);
+                            }
+                            if (sampledRow < L3_SHADOW_MAX_ROWS) {
+                                gShadowPrevRows[sampledRow][bin][0] =
+                                    (int16_t)imag;
+                                gShadowPrevRows[sampledRow][bin][1] =
+                                    (int16_t)real;
+                            }
+                        }
+                        sampledRow++;
                     }
                 }
             }
@@ -1889,10 +1928,22 @@ static void l3_storeCompletedScratchFrame(uint32_t slot, uint8_t scratch)
                 if (bin < gCapturePlan.impactStart ||
                     bin >= gCapturePlan.impactStart + gCapturePlan.impactBins) {
                     gShadowPower[bin] = 0U;
+                    gShadowCoherent[bin] = 0U;
                 }
             }
         }
-        if (l3_live_select(gShadowPower, N_SAMPLES, &gShadowParams,
+        /* Coherent gate (plans/iwr-coherent-gate.md): a rise bin is kept only
+         * if it is backed by a well-above-average coherent difference, which
+         * static/quasi-static clutter does not produce. Skipped on the first
+         * usable frame (no previous rows yet); gShadowGated is then all-zero,
+         * matching l3_live_select's existing "no candidates" behavior. */
+        if (hadPreviousRows) {
+            l3_coherent_gate(gShadowPower, gShadowCoherent, N_SAMPLES,
+                             L3_COHERENT_GATE_Q8, gShadowGated);
+        } else {
+            memset(gShadowGated, 0, sizeof(gShadowGated));
+        }
+        if (l3_live_select(gShadowGated, N_SAMPLES, &gShadowParams,
                            &gShadowState, &gShadowLast) != 0) {
             gShadowErrors++;
         } else {

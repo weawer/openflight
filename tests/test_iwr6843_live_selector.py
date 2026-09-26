@@ -4,14 +4,17 @@ from __future__ import annotations
 
 import ctypes
 import subprocess
+import sys
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from openflight.iwr6843.live_selector import (
     SelectorParams,
     SelectorResult,
     SelectorState,
+    coherent_gate,
     retention_window,
     select_window,
 )
@@ -63,14 +66,27 @@ class CResult(ctypes.Structure):
 def c_select(tmp_path_factory: pytest.TempPathFactory):
     library = tmp_path_factory.mktemp("live-selector") / "live_selector.so"
     subprocess.run(
-        ["cc", "-shared", "-fPIC", "-std=c99", "-Wall", "-Wextra", "-Werror",
-         "-o", str(library), str(SOURCE)],
+        [
+            "cc",
+            "-shared",
+            "-fPIC",
+            "-std=c99",
+            "-Wall",
+            "-Wextra",
+            "-Werror",
+            "-o",
+            str(library),
+            str(SOURCE),
+        ],
         check=True,
     )
     function = ctypes.CDLL(str(library)).l3_live_select
     function.argtypes = [
-        ctypes.POINTER(ctypes.c_uint32), ctypes.c_uint16,
-        ctypes.POINTER(CParams), ctypes.POINTER(CState), ctypes.POINTER(CResult),
+        ctypes.POINTER(ctypes.c_uint32),
+        ctypes.c_uint16,
+        ctypes.POINTER(CParams),
+        ctypes.POINTER(CState),
+        ctypes.POINTER(CResult),
     ]
     function.restype = ctypes.c_int32
     function.library_path = str(library)
@@ -86,7 +102,10 @@ def _powers(*peaks: tuple[int, int]) -> list[int]:
 
 def _c_params(params: SelectorParams) -> CParams:
     return CParams(
-        params.window_bins, params.max_jump_bins, params.max_misses, params.snr_q8,
+        params.window_bins,
+        params.max_jump_bins,
+        params.max_misses,
+        params.snr_q8,
         params.confirm_frames,
     )
 
@@ -104,7 +123,16 @@ def _c_run(c_select, powers, params, state):
     c_params = _c_params(params)
     c_state = _c_state(state)
     result = CResult()
-    assert c_select(c_power, len(powers), ctypes.byref(c_params), ctypes.byref(c_state), ctypes.byref(result)) == 0
+    assert (
+        c_select(
+            c_power,
+            len(powers),
+            ctypes.byref(c_params),
+            ctypes.byref(c_state),
+            ctypes.byref(result),
+        )
+        == 0
+    )
     return c_state, result
 
 
@@ -168,7 +196,10 @@ def test_rejects_invalid_layout_without_mutating_state(c_select):
     c_state = _c_state(state)
     result = CResult()
 
-    assert c_select(powers, 128, ctypes.byref(c_params), ctypes.byref(c_state), ctypes.byref(result)) == -1
+    assert (
+        c_select(powers, 128, ctypes.byref(c_params), ctypes.byref(c_state), ctypes.byref(result))
+        == -1
+    )
     assert (c_state.selected_bin, c_state.active) == (before.selected_bin, before.active)
 
 
@@ -224,8 +255,8 @@ def test_home_motion_reference_stays_inside_proposed_windows(c_select):
         expected = select_window(powers, params, python_state)
         c_state, actual = _c_run(c_select, powers, params, before)
 
-        assert expected.window_start <= reference_bin < (
-            expected.window_start + expected.window_bins
+        assert (
+            expected.window_start <= reference_bin < (expected.window_start + expected.window_bins)
         )
         assert actual.window_start == expected.window_start
         assert c_state.selected_bin == python_state.selected_bin
@@ -258,8 +289,16 @@ def c_retention(c_select):
     ],
 )
 def test_retention_requires_candidate_and_uncertainty_margin(
-    c_retention, accepted, ambiguous, candidates, selected, start, reason, expected_start,
-    held, coasting,
+    c_retention,
+    accepted,
+    ambiguous,
+    candidates,
+    selected,
+    start,
+    reason,
+    expected_start,
+    held,
+    coasting,
 ):
     held = selected if held is None else held
     result = CResult()
@@ -274,9 +313,16 @@ def test_retention_requires_candidate_and_uncertainty_margin(
     for index, value in enumerate(candidates):
         result.candidate_bins[index] = value
     python_result = SelectorResult(
-        candidate_bins=candidates, candidate_power=(0,) * len(candidates), noise=1,
-        selected_bin=selected, window_start=start, window_bins=12, confidence_q8=0,
-        accepted=bool(accepted), ambiguous=bool(ambiguous), held_bin=held,
+        candidate_bins=candidates,
+        candidate_power=(0,) * len(candidates),
+        noise=1,
+        selected_bin=selected,
+        window_start=start,
+        window_bins=12,
+        confidence_q8=0,
+        accepted=bool(accepted),
+        ambiguous=bool(ambiguous),
+        held_bin=held,
         coasting=bool(coasting),
     )
     assert c_retention(ctypes.byref(result), 128) == reason
@@ -355,11 +401,19 @@ def _step(c_select, powers, params, state):
     expected = select_window(powers, params, state)
     c_state, actual = _c_run(c_select, powers, params, before)
     assert (
-        actual.selected_bin, actual.window_start, bool(actual.accepted),
-        actual.held_bin, bool(actual.coasting), actual.confidence_q8,
+        actual.selected_bin,
+        actual.window_start,
+        bool(actual.accepted),
+        actual.held_bin,
+        bool(actual.coasting),
+        actual.confidence_q8,
     ) == (
-        expected.selected_bin, expected.window_start, expected.accepted,
-        expected.held_bin, expected.coasting, expected.confidence_q8,
+        expected.selected_bin,
+        expected.window_start,
+        expected.accepted,
+        expected.held_bin,
+        expected.coasting,
+        expected.confidence_q8,
     )
     assert _state_tuple(c_state) == _state_tuple(state)
     return expected, actual
@@ -443,7 +497,9 @@ def test_fast_ball_is_retained_through_missed_frames(c_select, c_retention, miss
             continue
         assert _retain(c_retention, expected, actual) == 0, f"frame {frame} ended retention"
         assert actual.window_start <= truth - 2, f"frame {frame} lost the near margin"
-        assert truth + 2 < actual.window_start + actual.window_bins, f"frame {frame} lost the far margin"
+        assert truth + 2 < actual.window_start + actual.window_bins, (
+            f"frame {frame} lost the far margin"
+        )
         if visible:
             assert expected.accepted and expected.selected_bin == truth
     assert confirmed
@@ -468,3 +524,190 @@ def test_isolated_jumping_peaks_never_become_a_retained_track(c_select, c_retent
         expected, actual = _step(c_select, _powers((peak, 5000)), params, state)
         assert not expected.accepted
         assert _retain(c_retention, expected, actual) != 0
+
+
+# --- Coherent gate (plans/iwr-coherent-gate.md) -----------------------------
+#
+# The magnitude-rise detector above flickers on static clutter often enough to
+# false-confirm a track: the 2026-09-26 100-cycle static soak kept flight
+# frames in 7/100 cycles with nothing moving. A candidate bin is trustworthy
+# only if it also shows up in the *coherent* (complex, not rectified)
+# frame-to-frame difference well above the in-window mean; static returns
+# cancel almost exactly under coherent differencing, but a bin a target is
+# departing does not (that departure is what the magnitude rise already sees).
+
+sys.path.insert(0, str(ROOT / "scripts" / "analysis"))
+from iwr_selector_replay import (  # noqa: E402
+    coherent_difference,
+    hybrid_gated_rise,
+    load_dump,
+    magnitude_rise,
+    masked_powers,
+    run_selector,
+    would_retain_flight_frames,
+)
+
+ALL_STATIC_CAPTURES = (
+    sorted((SESSIONS / "iwr-adaptive-smoke").glob("*.l3dump"))
+    + sorted((SESSIONS / "iwr-adaptive-confirm-smoke").glob("*.l3dump"))
+    + sorted((SESSIONS / "iwr-adaptive-confirm-soak-no-fail").glob("*.l3dump"))
+)
+
+
+def test_recorded_static_soak_reproduces_the_2026_09_26_false_confirmations():
+    """Sanity check on the replay tool itself, not the fix: the magnitude
+    detector must still show real false confirmations on this hardware
+    evidence, or the tests below would be exercising nothing."""
+    if not ALL_STATIC_CAPTURES:
+        pytest.skip("recorded static captures not present")
+    false_confirms = sum(
+        would_retain_flight_frames(magnitude_rise, *load_dump(path)) for path in ALL_STATIC_CAPTURES
+    )
+    assert false_confirms > 0, "replay tool no longer reproduces the known false confirmations"
+
+
+def test_coherent_gate_removes_every_recorded_static_false_confirmation():
+    if not ALL_STATIC_CAPTURES:
+        pytest.skip("recorded static captures not present")
+    false_confirms = [
+        path
+        for path in ALL_STATIC_CAPTURES
+        if would_retain_flight_frames(hybrid_gated_rise, *load_dump(path))
+    ]
+    assert not false_confirms, f"gate still confirms a track on: {false_confirms}"
+
+
+def test_coherent_gate_still_tracks_recorded_indoor_motion():
+    if not MOTION_REFERENCE.exists():
+        pytest.skip("recorded Phase 3 reference capture not present")
+    meta, cube, starts, counts = load_dump(MOTION_REFERENCE)
+    powers, _ = masked_powers(hybrid_gated_rise, meta, cube, starts, counts)
+    results = run_selector(powers)
+    accepted = [(frame, result.selected_bin) for frame, result in results if result.accepted]
+    assert accepted, "the gate must still confirm the recorded moving object"
+    # Bin 13 (~0.6 m) is the persistent mover both recorded motion captures show.
+    assert all(abs(bin_index - 13) <= 1 for _frame, bin_index in accepted)
+
+
+@pytest.mark.parametrize(
+    "step_bins_per_frame",
+    [3.2, 1.5],  # ~75 m/s and ~35 m/s ball speed at the 2 ms/frame, 128-bin profile
+)
+def test_coherent_gate_detects_an_injected_ball_at_least_as_often_as_current(
+    step_bins_per_frame,
+):
+    """A synthetic point target with random per-chirp phase (Doppler), added to
+    real recorded static IQ. Absolute detection rates are pessimistic (no real
+    ball data exists yet); the comparison between detectors is the point."""
+    if not ALL_STATIC_CAPTURES:
+        pytest.skip("recorded static captures not present")
+    rng_seed_captures = ALL_STATIC_CAPTURES[:20]
+    detected = {"magnitude": 0, "hybrid": 0}
+    for seed, path in enumerate(rng_seed_captures):
+        meta, cube, starts, counts = load_dump(path)
+        pre_frames = meta.get("retention", {}).get("pre_frames")
+        if pre_frames is None:
+            continue
+        injected, truth = inject_synthetic_ball(
+            cube,
+            range(pre_frames, pre_frames + 6),
+            starts[pre_frames],
+            first_bin=starts[pre_frames] + 4,
+            step=step_bins_per_frame,
+            seed=seed,
+        )
+        for name, detector in (("magnitude", magnitude_rise), ("hybrid", hybrid_gated_rise)):
+            if would_retain_flight_frames(detector, meta, injected, starts, counts):
+                detected[name] += 1
+    assert detected["hybrid"] >= detected["magnitude"]
+
+
+def inject_synthetic_ball(cube, frames, window_start, first_bin, step, seed):
+    """Add a point target moving `step` bins/frame with random per-chirp phase."""
+    rng = np.random.default_rng(seed)
+    amplitude = float(np.median(np.abs(cube[frames.start])))
+    injected = cube.copy()
+    truth = {}
+    for offset, frame in enumerate(frames):
+        target_bin = first_bin + round(offset * step)
+        truth[frame] = target_bin
+        phase = np.exp(1j * rng.uniform(0, 2 * np.pi, size=cube.shape[1:3]))
+        injected[frame][:, :, target_bin - window_start] += amplitude * phase
+    return injected, truth
+
+
+@pytest.fixture(scope="module")
+def c_coherent_gate(c_select):
+    function = ctypes.CDLL(c_select.library_path).l3_coherent_gate
+    function.argtypes = [
+        ctypes.POINTER(ctypes.c_uint32),
+        ctypes.POINTER(ctypes.c_uint32),
+        ctypes.c_uint16,
+        ctypes.c_uint16,
+        ctypes.POINTER(ctypes.c_uint32),
+    ]
+    function.restype = None
+    return function
+
+
+def _run_gate(c_coherent_gate, rise, coherent, gate_q8=512):
+    c_rise = (ctypes.c_uint32 * len(rise))(*rise)
+    c_coherent = (ctypes.c_uint32 * len(coherent))(*coherent)
+    c_gated = (ctypes.c_uint32 * len(rise))()
+    c_coherent_gate(c_rise, c_coherent, len(rise), gate_q8, c_gated)
+    expected = coherent_gate(list(rise), list(coherent), gate_q8)
+    assert list(c_gated) == expected
+    return expected
+
+
+def test_coherent_gate_keeps_only_bins_well_above_the_mean(c_coherent_gate):
+    rise = [10, 20, 30, 40]
+    coherent = [100, 100, 250, 100]  # mean 137; only bin 2 clears 2x (274 needed... )
+    gated = _run_gate(c_coherent_gate, rise, coherent)
+    assert gated == [0, 0, 0, 0]  # none clear 2x the mean of 137 (274)
+    gated = _run_gate(c_coherent_gate, [10, 20, 30, 40], [50, 50, 400, 50])
+    assert gated == [0, 0, 30, 0]
+
+
+def test_coherent_gate_matches_recorded_static_clutter_ratio(c_coherent_gate):
+    # Static clutter measured at up to 1.51x its in-window mean; must be gated out.
+    coherent = [140] * 127 + [211]  # 1.51x mean
+    rise = [5] * 128
+    gated = _run_gate(c_coherent_gate, rise, coherent)
+    assert gated == [0] * 128
+
+
+def test_coherent_gate_passes_a_target_at_the_recommended_factor(c_coherent_gate):
+    coherent = [140] * 63 + [400] + [140] * 64  # ~2.8x mean, above the 2x gate
+    rise = [5] * 63 + [90] + [5] * 64
+    gated = _run_gate(c_coherent_gate, rise, coherent)
+    assert gated[63] == 90
+    assert sum(gated) == 90
+
+
+def test_coherent_gate_rejects_mismatched_lengths():
+    with pytest.raises(ValueError, match="same bins"):
+        coherent_gate([1, 2], [1, 2, 3])
+
+
+def test_coherent_gate_handles_all_zero_input(c_coherent_gate):
+    gated = _run_gate(c_coherent_gate, [0] * 16, [0] * 16)
+    assert gated == [0] * 16
+
+
+def test_coherent_gate_c_matches_python_on_recorded_captures(c_coherent_gate):
+    """Parity across real recorded static and motion captures, not just synthetic vectors."""
+    if not ALL_STATIC_CAPTURES and not MOTION_REFERENCE.exists():
+        pytest.skip("no recorded captures present")
+    paths = ALL_STATIC_CAPTURES[:10] + ([MOTION_REFERENCE] if MOTION_REFERENCE.exists() else [])
+    checked = 0
+    for path in paths:
+        meta, cube, starts, counts = load_dump(path)
+        for frame in range(1, meta["n_frames"]):
+            if (starts[frame], counts[frame]) != (starts[frame - 1], counts[frame - 1]):
+                continue
+            rise = [int(v) for v in magnitude_rise(cube, frame, starts, counts)]
+            coherent = [int(v) for v in coherent_difference(cube, frame, starts, counts)]
+            _run_gate(c_coherent_gate, rise, coherent)
+            checked += 1
+    assert checked > 0

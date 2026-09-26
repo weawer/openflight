@@ -187,3 +187,26 @@ def retention_window(result: SelectorResult, n_bins: int) -> tuple[int, int]:
     if start + result.window_bins <= high + margin:
         start = high + margin + 1 - result.window_bins
     return RETENTION_COMPLETE, start
+
+
+def coherent_gate(rise: list[int], coherent: list[int], gate_q8: int = 512) -> list[int]:
+    """Suppress rise bins whose coherent difference is not well above average.
+
+    ``rise`` is the existing magnitude-rise selector input; ``coherent`` is the
+    magnitude of the complex (not rectified) frame-to-frame difference at each
+    bin, over the same window. Static and quasi-static clutter cancels almost
+    exactly under coherent differencing (recorded static captures never
+    exceeded 1.51x their in-window mean); a real departing target does not,
+    because the magnitude-rise detector that finds it is already looking at a
+    fall in rectified amplitude, not a bin a target merely moved through.
+
+    ``gate_q8 = 512`` requires at least 2x the mean coherent difference over
+    ``coherent`` (plans/iwr-coherent-gate.md); every recorded static capture
+    stayed under that, and it kept slightly more injected synthetic targets
+    than the ungated detector in an offline A/B.
+    """
+    if len(rise) != len(coherent):
+        raise ValueError("rise and coherent must cover the same bins")
+    mean_coherent = max(1, sum(coherent) // len(coherent))
+    threshold = mean_coherent * gate_q8 // 256
+    return [value if coherent[index] >= threshold else 0 for index, value in enumerate(rise)]

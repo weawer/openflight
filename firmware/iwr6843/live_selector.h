@@ -50,4 +50,12 @@ int32_t l3_live_select(const uint32_t *powers, uint16_t nBins,
 
 uint16_t l3_retention_window(L3LiveSelectorResult *result, uint16_t nBins);
 
+/*
+ * Suppress rise[] bins whose coherent[] difference is not well above the
+ * in-window mean. See coherent_gate() in live_selector.py and
+ * plans/iwr-coherent-gate.md. gateQ8 = 512 requires 2x the mean.
+ */
+void l3_coherent_gate(const uint32_t *rise, const uint32_t *coherent,
+                     uint16_t nBins, uint16_t gateQ8, uint32_t *gated);
+
 #endif
