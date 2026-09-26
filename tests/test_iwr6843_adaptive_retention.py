@@ -20,8 +20,11 @@ ROOT = Path(__file__).parents[1]
 
 
 def _capture(reason="complete", frames=36):
+    # Matches config/iwr6843_l3dump_adaptive_36f2ms_iq16.cfg's calibrated
+    # phaseCaptureCfg (preStart=22, impactStart=34); see that file's comment
+    # for the range-bias calibration this is derived from.
     counts = ([32] * 14 + [53] * 6 + [12] * 16)[:frames]
-    starts = ([20] * 14 + [32] * 6 + list(range(47, 95, 3)))[:frames]
+    starts = ([22] * 14 + [34] * 6 + list(range(47, 95, 3)))[:frames]
     values = np.arange(frames * 36 * 4 * 53).reshape(frames, 36, 4, 53)
     cube = ((values % 65536) - 32768) + 1j * ((values % 32768) - 16384)
     raw = pack_dump(
