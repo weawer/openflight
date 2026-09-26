@@ -175,8 +175,7 @@ def test_read_shadow_dump_returns_decisions_tied_to_binary_frames():
         def __init__(self):
             self.payload = bytearray(
                 b"l3shadow\r\n"
-                b"shadow frame=0 c0=31 c1=42 selected=31 proposed=25+12 "
-                b"confidence_q8=900 noise=120 accepted=1 ambiguous=0\r\n"
+                b"SHD f=0 c=31,42 s=31 w=25,12 q=900 n=120 ok=1 a=0\r\n"
                 + raw
                 + b"Done\r\nl3dump:/>"
             )

@@ -1,7 +1,7 @@
 # IWR6843 2 ms IQ16 shadow-selector diagnostic
 
-- Binary: `l3_dump_2ms_iq16_shadow_selector_20260926.bin`
-- SHA-256: `d3c844e61f3a2891ff5bf75b80547ab70e40245a76cb4106c0b8d20a18302f5f`
+- Binary: `l3_dump_2ms_iq16_shadow_reference_20260926.bin`
+- SHA-256: `bd7646fed3a1b882ab026ae042a51a6a16dd5e4d7afc80a1e65d9c0e3e910df7`
 - Config: `config/iwr6843_l3dump_compact_16f2ms_32bin_iq16.cfg`
 
 This phase-3 diagnostic retains the same fixed 32-bin IQ16 reference window as

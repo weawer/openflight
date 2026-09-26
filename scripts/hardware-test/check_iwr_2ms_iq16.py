@@ -140,6 +140,17 @@ def run(args: argparse.Namespace) -> None:
             else:
                 raw = radar.read_dump()
                 decisions = []
+            capture_path = None
+            if capture_dir is not None:
+                capture_path = capture_dir / f"shadow-reference-{cycle:03d}.l3dump"
+                capture_path.write_bytes(raw)
+            _write_event(
+                output,
+                "capture_received",
+                cycle=cycle,
+                shadow_decisions=decisions,
+                capture_path=str(capture_path) if capture_path else None,
+            )
             metadata = parse_header(raw)
             if (
                 metadata["n_frames"] != expected_frames
@@ -172,10 +183,6 @@ def run(args: argparse.Namespace) -> None:
             current = _health(radar)
             _check_errors(current, baseline)
             baseline = current
-            capture_path = None
-            if capture_dir is not None:
-                capture_path = capture_dir / f"shadow-reference-{cycle:03d}.l3dump"
-                capture_path.write_bytes(raw)
             print(f"capture cycle {cycle}/{args.cycles} passed")
             _write_event(
                 output,

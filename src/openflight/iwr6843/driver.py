@@ -241,15 +241,23 @@ class IWR6843Radar:
         )
         decisions: list[dict[str, int]] = []
         for line in prefix.decode(errors="replace").splitlines():
-            if not line.startswith("shadow frame="):
+            if not line.startswith("SHD f="):
                 continue
             fields = dict(token.split("=", 1) for token in line.split()[1:])
-            proposed_start, proposed_bins = fields.pop("proposed").split("+", 1)
+            candidate0, candidate1 = fields["c"].split(",", 1)
+            proposed_start, proposed_bins = fields["w"].split(",", 1)
             decisions.append(
                 {
-                    **{key: int(value, 0) for key, value in fields.items()},
+                    "frame": int(fields["f"], 0),
+                    "c0": int(candidate0, 0),
+                    "c1": int(candidate1, 0),
+                    "selected": int(fields["s"], 0),
                     "proposed_start": int(proposed_start, 0),
                     "proposed_bins": int(proposed_bins, 0),
+                    "confidence_q8": int(fields["q"], 0),
+                    "noise": int(fields["n"], 0),
+                    "accepted": int(fields["ok"], 0),
+                    "ambiguous": int(fields["a"], 0),
                 }
             )
         return payload, decisions

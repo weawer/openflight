@@ -2676,9 +2676,7 @@ int32_t l3_cli_dump(int32_t argc, char *argv[])
             uint32_t slot = i < actualPre
                                 ? (oldestPre + i) % gCapturePlan.preFrames
                                 : gCapturePlan.preFrames + i - actualPre;
-            CLI_write("shadow frame=%u c0=%u c1=%u selected=%u "
-                      "proposed=%u+%u confidence_q8=%u noise=%u "
-                      "accepted=%u ambiguous=%u\n",
+            CLI_write("SHD f=%u c=%u,%u s=%u w=%u,%u q=%u n=%u ok=%u a=%u\n",
                       (unsigned)i,
                       (unsigned)gShadowCandidate0[slot],
                       (unsigned)gShadowCandidate1[slot],
