@@ -370,6 +370,21 @@ def test_live_selector_runs_on_full_scratch_before_reference_compaction():
     assert "shadow_max_us=%u" in source
 
 
+def test_live_selector_scan_is_bounded_below_full_cube_work():
+    source = FIRMWARE.read_text(encoding="utf-8")
+    store = _function_source(
+        source,
+        "static void l3_storeCompletedScratchFrame",
+        "static uint32_t l3_snapshotBinStart",
+    )
+
+    assert "L3_SHADOW_LOOP_STRIDE 3U" in source
+    assert "L3_SHADOW_RX_STRIDE 2U" in source
+    assert "loop += L3_SHADOW_LOOP_STRIDE" in store
+    assert "rx += L3_SHADOW_RX_STRIDE" in store
+    assert "chirp < gCapturePlan.chirpsPerFrame" not in store
+
+
 def test_track_limits_match_the_capture_limits():
     """The tracker's fixed buffers must hold any capture the ring can freeze."""
     firmware = FIRMWARE.read_text(encoding="utf-8")

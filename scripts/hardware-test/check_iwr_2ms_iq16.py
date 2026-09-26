@@ -90,8 +90,10 @@ def _expected_geometry(config_path: str) -> tuple[int, int]:
 def run(args: argparse.Namespace) -> None:
     output = Path(args.output).open("w", encoding="utf-8") if args.output else None
     radar = IWR6843Radar(args.port)
+    configured = False
     try:
         radar.send_config(args.config)
+        configured = True
         baseline = _health(radar)
         expected_frames, expected_period_us = _expected_geometry(args.config)
         compact_mode = baseline.get("format") == "compact16"
@@ -160,7 +162,8 @@ def run(args: argparse.Namespace) -> None:
         )
     finally:
         try:
-            radar.stop_sensor()
+            if configured:
+                radar.stop_sensor()
         finally:
             radar.close()
             if output is not None:

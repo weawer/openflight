@@ -231,6 +231,8 @@
 #define L3_DEFAULT_POST_STRIDE 1U
 #endif
 #define L3_MAX_POST_STRIDE     16U
+#define L3_SHADOW_LOOP_STRIDE 3U
+#define L3_SHADOW_RX_STRIDE 2U
 
 typedef struct {
     uint8_t preStart;
@@ -1809,20 +1811,28 @@ static void l3_storeCompletedScratchFrame(uint32_t slot, uint8_t scratch)
 
     startCycles = Cycleprofiler_getTimeStamp();
     {
-        uint32_t chirp;
+        uint32_t loop;
+        uint32_t tx;
         uint32_t rx;
         uint32_t bin;
         uint32_t selectorStart = startCycles;
 
         memset(gShadowPower, 0, sizeof(gShadowPower));
-        for (chirp = 0U; chirp < gCapturePlan.chirpsPerFrame; chirp++) {
-            for (rx = 0U; rx < N_RX; rx++) {
-                uint32_t row = (chirp * N_RX + rx) * N_SAMPLES * 2U;
-                for (bin = 0U; bin < N_SAMPLES; bin++) {
-                    int32_t imag = g_iq16FrameScratch[scratch][row + bin * 2U];
-                    int32_t real = g_iq16FrameScratch[scratch][row + bin * 2U + 1U];
-                    gShadowPower[bin] += (uint32_t)(imag < 0 ? -imag : imag) +
-                                         (uint32_t)(real < 0 ? -real : real);
+        for (loop = 0U; loop < gCapturePlan.loops;
+             loop += L3_SHADOW_LOOP_STRIDE) {
+            for (tx = 0U; tx < N_TX; tx++) {
+                uint32_t chirp = loop * N_TX + tx;
+                for (rx = 0U; rx < N_RX; rx += L3_SHADOW_RX_STRIDE) {
+                    uint32_t row = (chirp * N_RX + rx) * N_SAMPLES * 2U;
+                    for (bin = 0U; bin < N_SAMPLES; bin++) {
+                        int32_t imag =
+                            g_iq16FrameScratch[scratch][row + bin * 2U];
+                        int32_t real =
+                            g_iq16FrameScratch[scratch][row + bin * 2U + 1U];
+                        gShadowPower[bin] +=
+                            (uint32_t)(imag < 0 ? -imag : imag) +
+                            (uint32_t)(real < 0 ? -real : real);
+                    }
                 }
             }
         }
