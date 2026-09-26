@@ -98,8 +98,21 @@ def tx_order_from_config(config_path: str | Path) -> str:
     raise ValueError(f"IWR6843 config must contain chirp TX masks 1/4, 4/1, or 1/2/4, got {masks}")
 
 
-def tee_local_bin(tee_range_m: float, config_path: str | Path, fft_size: int = 128) -> int:
+def tee_local_bin(
+    tee_range_m: float,
+    config_path: str | Path,
+    fft_size: int = 128,
+    range_bias_m: float = 0.0,
+) -> int:
     """Tee bin inside the cfg's first saved window.
+
+    ``range_bias_m`` corrects for the radar's own range bias (RF group delay,
+    cabling): a 2026-09-26 hardware calibration found a stationary reflector
+    at 1.20 m and 1.845 m both centroided ~1.6-1.8 bins (~7-8 cm) beyond this
+    function's nominal range-FFT mapping, consistently across both distances.
+    Without it, a self-trigger armed from this bin watches a few bins short of
+    the true tee. Pass the calibration's ``Calibration.range_bias_m`` (0.0 is
+    the old, uncorrected behavior).
 
     Raises when the tee falls outside that window: the firmware would watch a
     bin that never sees the ball.
@@ -107,7 +120,7 @@ def tee_local_bin(tee_range_m: float, config_path: str | Path, fft_size: int = 1
     summary = read_capture_config(config_path)
     if summary.first_window_start is None or summary.first_window_bins is None:
         raise ValueError(f"{config_path} has no phaseCaptureCfg")
-    absolute = int(round(tee_range_m / (RANGE_SPAN_M / fft_size)))
+    absolute = int(round((tee_range_m + range_bias_m) / (RANGE_SPAN_M / fft_size)))
     local = absolute - summary.first_window_start
     if not 0 <= local < summary.first_window_bins:
         raise ValueError(

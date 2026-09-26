@@ -1101,6 +1101,7 @@ def _self_trigger_config(args) -> "SelfTriggerConfig | None":
     Raises ValueError for tuning flags without the switch, so a partial
     command line cannot silently change which trigger drives the shot.
     """
+    from .iwr6843.calibration import Calibration
     from .iwr6843.monitor import SelfTriggerConfig, tee_local_bin
 
     tuning = [
@@ -1118,7 +1119,15 @@ def _self_trigger_config(args) -> "SelfTriggerConfig | None":
         return None
     bin_index = args.iwr6843_self_trigger_bin
     if bin_index is None:
-        bin_index = tee_local_bin(args.iwr6843_tee_m, args.iwr6843_config)
+        # An explicit --iwr6843-self-trigger-bin bypasses this: the caller
+        # already knows the true bin. Otherwise correct --iwr6843-tee-m for
+        # this radar's measured range bias before mapping it to a bin, or a
+        # self-trigger armed from the uncorrected mapping watches a few bins
+        # short of the true tee (see tee_local_bin's range_bias_m docstring).
+        range_bias_m = Calibration.load(args.iwr6843_cal).range_bias_m
+        bin_index = tee_local_bin(
+            args.iwr6843_tee_m, args.iwr6843_config, range_bias_m=range_bias_m
+        )
     level = args.iwr6843_self_trigger_level
     hits = args.iwr6843_self_trigger_hits
     return SelfTriggerConfig(
@@ -4685,7 +4694,13 @@ def main():
     )
     parser.add_argument(
         "--iwr6843-config",
-        default="config/iwr6843_l3dump_wide_24f3ms_53bin_iq16.cfg",
+        # Feature-branch default: the experimental adaptive16 profile under
+        # active Phase 4/5 validation (plans/iwr-iq16-2ms-onboard-retention.md),
+        # not yet qualified for range use. Kiosk captures land in their own
+        # --iwr6843-output-dir subfolder regardless, so this is low-risk to
+        # default on this branch; do not carry this default into main before
+        # Phase 5 passes -- revert to the wide_24f3ms_53bin profile there.
+        default="config/iwr6843_l3dump_adaptive_36f2ms_iq16.cfg",
         help="TI RF config matching the flashed L3 firmware",
     )
     parser.add_argument(

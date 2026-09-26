@@ -733,6 +733,27 @@ def test_tee_bin_needs_a_capture_window(tmp_path):
         tee_local_bin(1.5, _cfg(tmp_path, "sensorStart"))
 
 
+def test_tee_local_bin_defaults_to_the_uncorrected_nominal_mapping(tmp_path):
+    """2026-09-26 hardware calibration: a stationary reflector at 1.20 m and
+    1.845 m both centroided ~1.6-1.8 bins beyond this nominal mapping (RF
+    group delay/cabling, not a measurement error). Without a range_bias_m,
+    tee_local_bin has no way to know that, and a self-trigger armed from its
+    unmodified output would watch a bin ~7-8 cm short of the true tee."""
+    path = _cfg(tmp_path, "phaseCaptureCfg 20 53 9 32 53 7 47 53 47 8 1")
+    assert tee_local_bin(1.845, path) == 39 - 20
+
+
+def test_tee_local_bin_applies_a_measured_range_bias(tmp_path):
+    path = _cfg(tmp_path, "phaseCaptureCfg 20 53 9 32 53 7 47 53 47 8 1")
+    # Same two calibration points as the config comment in
+    # config/iwr6843_l3dump_adaptive_36f2ms_iq16.cfg: true bin - nominal bin.
+    assert tee_local_bin(1.20, path, range_bias_m=0.0) == tee_local_bin(
+        1.20, path
+    )  # zero bias is a no-op
+    assert tee_local_bin(1.20, path, range_bias_m=0.075) == 27 - 20
+    assert tee_local_bin(1.845, path, range_bias_m=0.075) == 41 - 20
+
+
 def test_listener_serial_error_does_not_kill_the_worker(tmp_path):
     radar = SelfTriggerRadar(_raw_dump())
     failures = {"left": 1}

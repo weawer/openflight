@@ -4764,6 +4764,7 @@ def _self_trigger_args(**overrides):
         "iwr6843_self_trigger_hits": None,
         "iwr6843_tee_m": 1.575,
         "iwr6843_config": "config/iwr6843_l3dump_wide_24f3ms_53bin_iq16.cfg",
+        "iwr6843_cal": "config/iwr6843_calibration_reference.json",
         "sound_pre_trigger": None,
     }
     values.update(overrides)
@@ -4789,10 +4790,13 @@ class TestSelfTriggerCli:
             server_module._self_trigger_config(_self_trigger_args(**{flag: value}))
 
     def test_switch_alone_takes_the_bin_from_the_tee_and_the_defaults(self):
+        # Corrected for the reference calibration's range_bias_const_m
+        # (0.066 m): (1.575 + 0.066) / (6/128) = bin 35.0 -> 35 - 20 = 15.
+        # Uncorrected (pre-calibration-fix) this was 14.
         config = server_module._self_trigger_config(_self_trigger_args(iwr6843_self_trigger=True))
 
-        assert (config.local_bin, config.level, config.hits) == (14, 1000.0, 2)
-        assert config.command == "triggerCfg 14 1000.0 2"
+        assert (config.local_bin, config.level, config.hits) == (15, 1000.0, 2)
+        assert config.command == "triggerCfg 15 1000.0 2"
 
     def test_explicit_tuning_wins(self):
         config = server_module._self_trigger_config(
