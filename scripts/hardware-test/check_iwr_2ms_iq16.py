@@ -89,6 +89,9 @@ def _expected_geometry(config_path: str) -> tuple[int, int]:
 
 def run(args: argparse.Namespace) -> None:
     output = Path(args.output).open("w", encoding="utf-8") if args.output else None
+    capture_dir = Path(args.capture_dir) if args.capture_dir else None
+    if capture_dir is not None:
+        capture_dir.mkdir(parents=True, exist_ok=True)
     radar = IWR6843Radar(args.port)
     configured = False
     try:
@@ -132,7 +135,11 @@ def run(args: argparse.Namespace) -> None:
             _write_event(output, "stats", stats=current)
 
         for cycle in range(1, args.cycles + 1):
-            raw = radar.read_dump()
+            if args.shadow:
+                raw, decisions = radar.read_shadow_dump()
+            else:
+                raw = radar.read_dump()
+                decisions = []
             metadata = parse_header(raw)
             if (
                 metadata["n_frames"] != expected_frames
@@ -141,6 +148,21 @@ def run(args: argparse.Namespace) -> None:
                 raise RuntimeError(f"cycle {cycle}: unexpected geometry {metadata}")
             if metadata["sample_fmt"] != SAMPLE_RANGE_FFT_IQ16_VARIABLE_TIMED:
                 raise RuntimeError(f"cycle {cycle}: capture is not timed IQ16")
+            if args.shadow and len(decisions) != metadata["n_frames"]:
+                raise RuntimeError(
+                    f"cycle {cycle}: got {len(decisions)} shadow decisions for "
+                    f"{metadata['n_frames']} frames"
+                )
+            if any(
+                decision["accepted"]
+                and not (
+                    decision["proposed_start"]
+                    <= decision["selected"]
+                    < decision["proposed_start"] + decision["proposed_bins"]
+                )
+                for decision in decisions
+            ):
+                raise RuntimeError(f"cycle {cycle}: proposed window excludes its candidate")
             offsets = metadata.get("frame_time_offsets_us")
             if offsets is not None and any(
                 later - earlier != expected_period_us
@@ -150,8 +172,20 @@ def run(args: argparse.Namespace) -> None:
             current = _health(radar)
             _check_errors(current, baseline)
             baseline = current
+            capture_path = None
+            if capture_dir is not None:
+                capture_path = capture_dir / f"shadow-reference-{cycle:03d}.l3dump"
+                capture_path.write_bytes(raw)
             print(f"capture cycle {cycle}/{args.cycles} passed")
-            _write_event(output, "capture", cycle=cycle, metadata=metadata, stats=current)
+            _write_event(
+                output,
+                "capture",
+                cycle=cycle,
+                metadata=metadata,
+                shadow_decisions=decisions,
+                capture_path=str(capture_path) if capture_path else None,
+                stats=current,
+            )
 
         print(
             f"PASS: {args.soak_frames} frames, {args.cycles} capture cycles, "
@@ -178,6 +212,12 @@ def main() -> int:
     parser.add_argument("--cycles", type=int, default=0)
     parser.add_argument("--poll-s", type=float, default=10.0)
     parser.add_argument("--output")
+    parser.add_argument("--capture-dir", help="directory for raw .l3dump captures")
+    parser.add_argument(
+        "--shadow",
+        action="store_true",
+        help="use l3shadow and save decisions paired with each capture",
+    )
     args = parser.parse_args()
     if args.soak_frames < 0 or args.cycles < 0 or args.poll_s <= 0:
         parser.error("soak frames and cycles must be non-negative; poll interval must be positive")

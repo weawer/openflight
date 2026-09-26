@@ -461,6 +461,11 @@ static uint8_t gShadowWindowStart[L3_MAX_CAPTURE_FRAMES];
 static uint8_t gShadowCandidate0[L3_MAX_CAPTURE_FRAMES];
 static uint8_t gShadowCandidate1[L3_MAX_CAPTURE_FRAMES];
 static uint16_t gShadowConfidence[L3_MAX_CAPTURE_FRAMES];
+static uint8_t gShadowSelected[L3_MAX_CAPTURE_FRAMES];
+static uint32_t gShadowNoise[L3_MAX_CAPTURE_FRAMES];
+static uint8_t gShadowAcceptedFrame[L3_MAX_CAPTURE_FRAMES];
+static uint8_t gShadowAmbiguousFrame[L3_MAX_CAPTURE_FRAMES];
+static volatile uint8_t gShadowDumpRequested;
 #ifdef L3_IQ8_EDMA_PACK
 static volatile uint8_t  gIq8EdmaBusy[2];
 static volatile uint32_t gIq8EdmaDone;
@@ -479,6 +484,9 @@ static MMWave_CtrlCfg gCtrlCfg;
 
 /* Forward declarations. */
 int32_t l3_cli_dump(int32_t argc, char *argv[]);
+#if defined(CONFIGURABLE_CAPTURE) && defined(L3_RING_IQ8)
+static int32_t l3_cli_shadowDump(int32_t argc, char *argv[]);
+#endif
 int32_t l3_cli_sparse(int32_t argc, char *argv[]);
 int32_t l3_cli_track(int32_t argc, char *argv[]);
 static int32_t l3_cli_sensorStart(int32_t argc, char *argv[]);
@@ -1856,6 +1864,10 @@ static void l3_storeCompletedScratchFrame(uint32_t slot, uint8_t scratch)
             gShadowCandidate0[slot] = (uint8_t)gShadowLast.candidateBins[0];
             gShadowCandidate1[slot] = (uint8_t)gShadowLast.candidateBins[1];
             gShadowConfidence[slot] = gShadowLast.confidenceQ8;
+            gShadowSelected[slot] = (uint8_t)gShadowLast.selectedBin;
+            gShadowNoise[slot] = gShadowLast.noise;
+            gShadowAcceptedFrame[slot] = gShadowLast.accepted;
+            gShadowAmbiguousFrame[slot] = gShadowLast.ambiguous;
         }
         elapsedUs = (Cycleprofiler_getTimeStamp() - selectorStart) /
                     (gCpuClock / 1000000U);
@@ -2621,12 +2633,22 @@ int32_t l3_cli_dump(int32_t argc, char *argv[])
     l3_dump_header_t h;
     uint32_t         i;
     uint8_t          dumpCancelled = 0U;
+#if defined(CONFIGURABLE_CAPTURE) && defined(L3_RING_IQ8)
+    uint8_t          emitShadow = gShadowDumpRequested;
+#endif
 #ifdef CONFIGURABLE_CAPTURE
     uint32_t actualPre;
     uint32_t actualPost;
     uint32_t oldestPre;
 #endif
     (void)argc; (void)argv;
+#if defined(CONFIGURABLE_CAPTURE) && defined(L3_RING_IQ8)
+    gShadowDumpRequested = 0U;
+    if (emitShadow && !l3_captureUsesCompactIq16()) {
+        CLI_write("Error: l3shadow requires compact16 storage\n");
+        return -1;
+    }
+#endif
 
 #ifdef CONFIGURABLE_CAPTURE
     if (l3_freezeCapture() != 0) {
@@ -2648,6 +2670,28 @@ int32_t l3_cli_dump(int32_t argc, char *argv[])
                      ? gPostFramesCaptured : gCapturePlan.postFrames;
     oldestPre = (gPreFramesCaptured >= gCapturePlan.preFrames)
                     ? (gPreFramesCaptured % gCapturePlan.preFrames) : 0U;
+#ifdef L3_RING_IQ8
+    if (emitShadow) {
+        for (i = 0U; i < actualPre + actualPost; i++) {
+            uint32_t slot = i < actualPre
+                                ? (oldestPre + i) % gCapturePlan.preFrames
+                                : gCapturePlan.preFrames + i - actualPre;
+            CLI_write("shadow frame=%u c0=%u c1=%u selected=%u "
+                      "proposed=%u+%u confidence_q8=%u noise=%u "
+                      "accepted=%u ambiguous=%u\n",
+                      (unsigned)i,
+                      (unsigned)gShadowCandidate0[slot],
+                      (unsigned)gShadowCandidate1[slot],
+                      (unsigned)gShadowSelected[slot],
+                      (unsigned)gShadowWindowStart[slot],
+                      (unsigned)gShadowParams.windowBins,
+                      (unsigned)gShadowConfidence[slot],
+                      (unsigned)gShadowNoise[slot],
+                      (unsigned)gShadowAcceptedFrame[slot],
+                      (unsigned)gShadowAmbiguousFrame[slot]);
+        }
+    }
+#endif
     l3_fill_header(&h, (uint16_t)(actualPre + actualPost), 0U);
 #else
     l3_fill_header(&h, RING_FRAMES,
@@ -2830,6 +2874,14 @@ int32_t l3_cli_dump(int32_t argc, char *argv[])
     }
     return 0;
 }
+
+#if defined(CONFIGURABLE_CAPTURE) && defined(L3_RING_IQ8)
+static int32_t l3_cli_shadowDump(int32_t argc, char *argv[])
+{
+    gShadowDumpRequested = 1U;
+    return l3_cli_dump(argc, argv);
+}
+#endif
 
 /* CLI "l3sparse": freeze, stream vertical residual power, then the complex
  * cells the host names. The host falls back to l3dump when this command
@@ -4289,6 +4341,11 @@ static int32_t l3_cli_sensorStart(int32_t argc, char *argv[])
     memset(gShadowCandidate0, 0, sizeof(gShadowCandidate0));
     memset(gShadowCandidate1, 0, sizeof(gShadowCandidate1));
     memset(gShadowConfidence, 0, sizeof(gShadowConfidence));
+    memset(gShadowSelected, 0, sizeof(gShadowSelected));
+    memset(gShadowNoise, 0, sizeof(gShadowNoise));
+    memset(gShadowAcceptedFrame, 0, sizeof(gShadowAcceptedFrame));
+    memset(gShadowAmbiguousFrame, 0, sizeof(gShadowAmbiguousFrame));
+    gShadowDumpRequested = 0U;
     gShadowFrames = 0U;
     gShadowAccepted = 0U;
     gShadowAmbiguous = 0U;
@@ -4575,6 +4632,11 @@ static void l3_initTask(UArg arg0, UArg arg1)
     cliCfg.tableEntry[15].cmd           = "debugCfg";
     cliCfg.tableEntry[15].helpString    = "debugCfg <0|1> stream trigger decisions";
     cliCfg.tableEntry[15].cmdHandlerFxn = l3_cli_debugCfg;
+#if defined(CONFIGURABLE_CAPTURE) && defined(L3_RING_IQ8)
+    cliCfg.tableEntry[16].cmd           = "l3shadow";
+    cliCfg.tableEntry[16].helpString    = "Freeze and stream shadow decisions plus reference";
+    cliCfg.tableEntry[16].cmdHandlerFxn = l3_cli_shadowDump;
+#endif
     CLI_open(&cliCfg);
 }
 

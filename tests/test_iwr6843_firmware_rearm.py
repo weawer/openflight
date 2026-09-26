@@ -12,6 +12,9 @@ DENSE_CONFIG = CONFIG_DIR / "iwr6843_l3dump_dense_36f2ms_53bin_iq8.cfg"
 DENSE_IQ16_DIAGNOSTIC_CONFIG = CONFIG_DIR / "iwr6843_l3dump_diagnostic_24f2ms_53bin_iq16.cfg"
 DENSE_WIDE_LATE_CONFIG = CONFIG_DIR / "iwr6843_l3dump_dense_36f2ms_53bin_iq8_wide_late.cfg"
 COMPACT_IQ16_CONFIG = CONFIG_DIR / "iwr6843_l3dump_compact_16f2ms_32bin_iq16.cfg"
+SHADOW_REFERENCE_CONFIG = (
+    CONFIG_DIR / "iwr6843_l3dump_shadow_reference_7f2ms_128bin_iq16.cfg"
+)
 
 
 def _function_source(source: str, name: str, next_name: str) -> str:
@@ -249,6 +252,19 @@ def test_compact_iq16_profile_keeps_2ms_cadence_with_fixed_window():
     retained_bytes = 3 * 12 * 4 * 16 * 32 * 4
     scratch_bytes = 2 * 3 * 16 * 4 * 128 * 4
     assert retained_bytes + scratch_bytes == 491_520
+    assert retained_bytes + scratch_bytes < 786_432
+
+
+def test_shadow_reference_profile_retains_seven_complete_frames():
+    lines = _config_lines(SHADOW_REFERENCE_CONFIG)
+
+    assert "frameCfg 0 2 12 0 2 1 0" in lines
+    assert "captureFormat compact16" in lines
+    assert "phaseCaptureCfg 0 128 3 0 128 2 0 128 0 2 1" in lines
+
+    retained_bytes = 3 * 12 * 4 * 7 * 128 * 4
+    scratch_bytes = 2 * 3 * 16 * 4 * 128 * 4
+    assert retained_bytes + scratch_bytes == 712_704
     assert retained_bytes + scratch_bytes < 786_432
 
 

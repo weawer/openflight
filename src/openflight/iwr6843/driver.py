@@ -227,9 +227,40 @@ class IWR6843Radar:
         Syncs on the ILD1 magic past the CLI echo and sizes the read from the
         dump's own header, so any firmware geometry works.
         """
+        payload, _prefix = self._read_dump_command(
+            b"l3dump\n", timeout_s, stall_tolerance_s
+        )
+        return payload
+
+    def read_shadow_dump(
+        self, timeout_s: float = 40.0, stall_tolerance_s: float = 4.0
+    ) -> tuple[bytes, list[dict[str, int]]]:
+        """Return a dump and shadow decisions frozen with those same frames."""
+        payload, prefix = self._read_dump_command(
+            b"l3shadow\n", timeout_s, stall_tolerance_s
+        )
+        decisions: list[dict[str, int]] = []
+        for line in prefix.decode(errors="replace").splitlines():
+            if not line.startswith("shadow frame="):
+                continue
+            fields = dict(token.split("=", 1) for token in line.split()[1:])
+            proposed_start, proposed_bins = fields.pop("proposed").split("+", 1)
+            decisions.append(
+                {
+                    **{key: int(value, 0) for key, value in fields.items()},
+                    "proposed_start": int(proposed_start, 0),
+                    "proposed_bins": int(proposed_bins, 0),
+                }
+            )
+        return payload, decisions
+
+    def _read_dump_command(
+        self, command: bytes, timeout_s: float, stall_tolerance_s: float
+    ) -> tuple[bytes, bytes]:
         self.ser.reset_input_buffer()
-        self.ser.write(b"l3dump\n")
+        self.ser.write(command)
         buf = bytearray()
+        prefix = b""
         expected: int | None = None
         start = time.time()
         last = start
@@ -244,6 +275,7 @@ class IWR6843Radar:
             if expected is None:
                 idx = buf.find(MAGIC)
                 if idx >= 0 and len(buf) - idx >= HEADER.size:
+                    prefix = bytes(buf[:idx])
                     del buf[:idx]
                     try:
                         metadata = parse_header(buf)
@@ -253,7 +285,7 @@ class IWR6843Radar:
             elif len(buf) >= expected:
                 break
         if expected is None:
-            return bytes(buf)
+            return bytes(buf), prefix
 
         payload = bytes(buf[:expected])
         if len(payload) == expected:
@@ -269,7 +301,7 @@ class IWR6843Radar:
                     f"IWR6843 dump completed but firmware restart failed: "
                     f"{trailer.decode(errors='replace').strip()}"
                 )
-        return payload
+        return payload, prefix
 
     def read_sparse(self, planner: SlicePlanner, timeout_s: float = 8.0) -> SparseCapture | None:
         """Freeze, read residual power, then the complex cells ``planner`` names.

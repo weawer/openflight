@@ -168,6 +168,58 @@ def test_read_dump_waits_for_cli_ready_after_binary_payload():
     assert radar.ser.writes == [b"l3dump\n"]
 
 
+def test_read_shadow_dump_returns_decisions_tied_to_binary_frames():
+    raw = pack_dump(np.ones((1, 6, 4, 7), dtype=complex), n_tx=3, version=3)
+
+    class FakeSerial:
+        def __init__(self):
+            self.payload = bytearray(
+                b"l3shadow\r\n"
+                b"shadow frame=0 c0=31 c1=42 selected=31 proposed=25+12 "
+                b"confidence_q8=900 noise=120 accepted=1 ambiguous=0\r\n"
+                + raw
+                + b"Done\r\nl3dump:/>"
+            )
+            self.writes = []
+
+        def reset_input_buffer(self):
+            pass
+
+        def write(self, data):
+            self.writes.append(data)
+
+        @property
+        def in_waiting(self):
+            return len(self.payload)
+
+        def read(self, count):
+            data = bytes(self.payload[:count])
+            del self.payload[:count]
+            return data
+
+    radar = IWR6843Radar.__new__(IWR6843Radar)
+    radar.ser = FakeSerial()
+
+    capture, decisions = radar.read_shadow_dump(timeout_s=0.1)
+
+    assert capture == raw
+    assert decisions == [
+        {
+            "frame": 0,
+            "c0": 31,
+            "c1": 42,
+            "selected": 31,
+            "proposed_start": 25,
+            "proposed_bins": 12,
+            "confidence_q8": 900,
+            "noise": 120,
+            "accepted": 1,
+            "ambiguous": 0,
+        }
+    ]
+    assert radar.ser.writes == [b"l3shadow\n"]
+
+
 def test_read_dump_reports_firmware_restart_error_after_binary_payload():
     raw = pack_dump(np.ones((1, 3, 4, 4), dtype=complex), n_tx=3, version=3)
     radar = IWR6843Radar.__new__(IWR6843Radar)
