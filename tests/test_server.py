@@ -4835,6 +4835,25 @@ class TestSelfTriggerCli:
         assert server_module._ops_pre_trigger_segments(_self_trigger_args(**overrides)) == expected
 
     @pytest.mark.parametrize(
+        ("speed_mph", "magnitude", "expected"),
+        [
+            (None, None, True),  # nothing else armed: relay S! as before
+            (-40.0, None, False),
+            (None, 600, False),
+            (-40.0, 600, False),
+        ],
+    )
+    def test_relay_iwr_self_trigger_to_ops_follows_the_onboard_trigger(
+        self, speed_mph, magnitude, expected
+    ):
+        """The IWR self-trigger must stop sending S! to the OPS -- but only
+        that -- once the OPS's own onboard trigger is armed instead. The IWR
+        still freezes its own capture and still drives the camera through a
+        separate, unconditional observer (see start_monitor); this helper
+        only decides the S!-relay observer."""
+        assert server_module._relay_iwr_self_trigger_to_ops(speed_mph, magnitude) is expected
+
+    @pytest.mark.parametrize(
         ("argv", "message"),
         [
             (["--iwr6843", "--iwr6843-self-trigger-bin", "3"], "requires --iwr6843-self-trigger"),
@@ -4842,24 +4861,6 @@ class TestSelfTriggerCli:
             (
                 ["--iwr6843", "--iwr6843-self-trigger", "--trigger", "speed"],
                 "use --trigger sound",
-            ),
-            (
-                [
-                    "--iwr6843",
-                    "--iwr6843-self-trigger",
-                    "--ops-trigger-speed-mph",
-                    "-40",
-                ],
-                "would double-trigger",
-            ),
-            (
-                [
-                    "--iwr6843",
-                    "--iwr6843-self-trigger",
-                    "--ops-trigger-magnitude",
-                    "600",
-                ],
-                "would double-trigger",
             ),
             (
                 ["--trigger", "speed", "--ops-trigger-speed-mph", "-40"],

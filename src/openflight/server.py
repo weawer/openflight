@@ -1146,6 +1146,20 @@ def _ops_pre_trigger_segments(args) -> int:
     return _DEFAULT_OPS_PRE_TRIGGER_SEGMENTS
 
 
+def _relay_iwr_self_trigger_to_ops(
+    ops_trigger_speed_mph: float | None, ops_trigger_magnitude: int | None
+) -> bool:
+    """Whether the IWR self-trigger should also send S! to the OPS.
+
+    False when the OPS243's own onboard rolling-buffer trigger (ST/SM) is
+    armed instead: sending S! too would double-trigger the same swing. The
+    IWR still freezes its own capture and still notifies the camera either
+    way (that wiring does not go through this observer at all -- see
+    start_monitor).
+    """
+    return ops_trigger_speed_mph is None and ops_trigger_magnitude is None
+
+
 def init_iwr6843(
     *,
     port: str | None,
@@ -4042,7 +4056,9 @@ def start_monitor(
         )
         if iwr6843_runtime is not None:
             capture_monitor = iwr6843_runtime.capture_monitor
-            if capture_monitor.watch_self_trigger:
+            if capture_monitor.watch_self_trigger and _relay_iwr_self_trigger_to_ops(
+                ops_trigger_speed_mph, ops_trigger_magnitude
+            ):
                 ops_radar = getattr(monitor, "radar", None)
                 if ops_radar is None or not hasattr(ops_radar, "request_capture"):
                     raise RuntimeError("IWR6843 self-trigger needs an OPS radar that accepts S!")
@@ -4991,12 +5007,11 @@ def main():
     ops_onboard_trigger = (
         args.ops_trigger_speed_mph is not None or args.ops_trigger_magnitude is not None
     )
-    if ops_onboard_trigger and self_trigger_config is not None:
-        parser.error(
-            "--ops-trigger-speed-mph/--ops-trigger-magnitude arm the OPS243's own "
-            "autonomous trigger; combined with --iwr6843-self-trigger's S!, it would "
-            "double-trigger. Use exactly one trigger source."
-        )
+    # Combined with --iwr6843-self-trigger this is intentional and safe: the
+    # IWR still freezes its own capture and drives the camera as usual, but
+    # start_monitor skips relaying S! to the OPS (see
+    # _relay_iwr_self_trigger_to_ops), since the OPS is already
+    # self-triggering via ST/SM and sending S! too would double-trigger it.
     if ops_onboard_trigger and args.trigger == "speed":
         parser.error(
             "--ops-trigger-speed-mph/--ops-trigger-magnitude only apply to the "
