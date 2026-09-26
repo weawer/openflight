@@ -105,14 +105,33 @@ def _expected_geometry(config_path: str) -> tuple[int, int]:
     return int(phase[3]) + int(phase[6]) + int(phase[10]), frame_period_us
 
 
-def _check_retention_layout(metadata, decisions, config_path):
-    if "retention" not in metadata:
-        return
-    phase = next(
+def _phase_capture_cfg(config_path: str) -> list[int]:
+    return next(
         list(map(int, line.split()[1:]))
         for line in Path(config_path).read_text(encoding="utf-8").splitlines()
         if line.startswith("phaseCaptureCfg ")
     )
+
+
+def flight_frames_kept(metadata: dict, config_path: str) -> int:
+    """Number of retained frames beyond the fixed pre-trigger/impact windows.
+
+    These are the frames the selector chose to keep, as opposed to the fixed
+    windows every capture retains regardless of tracking. Any positive count
+    here means a track was accepted (or coasted) long enough to keep at least
+    one selector-controlled window; a static scene must report zero.
+    """
+    if "retention" not in metadata:
+        return 0
+    phase = _phase_capture_cfg(config_path)
+    pre, impact = phase[2], phase[5]
+    return max(0, metadata["n_frames"] - pre - impact)
+
+
+def _check_retention_layout(metadata, decisions, config_path):
+    if "retention" not in metadata:
+        return
+    phase = _phase_capture_cfg(config_path)
     pre, impact, flight = phase[2], phase[5], phase[9]
     counts = [phase[1]] * pre + [phase[4]] * impact + [phase[7]] * flight
     fixed_starts = [phase[0]] * pre + [phase[3]] * impact
@@ -217,6 +236,13 @@ def run(args: argparse.Namespace) -> None:
             ):
                 raise RuntimeError(f"cycle {cycle}: proposed window excludes its candidate")
             _check_retention_layout(metadata, decisions, args.config)
+            kept_flight_frames = flight_frames_kept(metadata, args.config)
+            if args.expect_no_flight_frames and kept_flight_frames > 0:
+                raise RuntimeError(
+                    f"cycle {cycle}: expected a static scene but retained "
+                    f"{kept_flight_frames} flight frame(s); a track was accepted "
+                    "or coasted from something other than trigger noise"
+                )
             offsets = metadata.get("frame_time_offsets_us")
             if offsets is not None and any(
                 later - earlier != expected_period_us
@@ -228,12 +254,16 @@ def run(args: argparse.Namespace) -> None:
             _check_timing(current, expected_period_us, compact_mode)
             baseline = current
             outcome = f"early stop: {retention['reason']}" if stopped else "complete"
-            print(f"capture cycle {cycle}/{args.cycles} passed ({outcome})")
+            print(
+                f"capture cycle {cycle}/{args.cycles} passed ({outcome}, "
+                f"{kept_flight_frames} flight frame(s) kept)"
+            )
             _write_event(
                 output,
                 "capture",
                 cycle=cycle,
                 metadata=metadata,
+                flight_frames_kept=kept_flight_frames,
                 payload_bytes=len(raw),
                 capture_roundtrip_s=capture_roundtrip_s,
                 shadow_decisions=decisions,
@@ -272,6 +302,12 @@ def main() -> int:
         help="accept explicitly labelled adaptive track loss for indoor lifecycle tests",
     )
     parser.add_argument("--capture-dir", help="directory for raw .l3dump captures")
+    parser.add_argument(
+        "--expect-no-flight-frames",
+        action="store_true",
+        help="fail if any capture retains a selector-controlled flight frame "
+        "(use for a static-scene run, where none should ever be confirmed)",
+    )
     parser.add_argument(
         "--shadow",
         action="store_true",

@@ -1,5 +1,6 @@
 """Adaptive IQ16 retains channel identity and reports discarded flight evidence."""
 
+import argparse
 import struct
 from pathlib import Path
 
@@ -123,6 +124,79 @@ def hardware_check():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def test_flight_frames_kept_counts_only_selector_controlled_frames(hardware_check):
+    config = str(ROOT / "config/iwr6843_l3dump_adaptive_36f2ms_iq16.cfg")
+    static_raw, *_ = _capture(reason="track_lost", frames=20)
+    static_metadata, _ = parse_dump(static_raw)
+    assert hardware_check.flight_frames_kept(static_metadata, config) == 0
+
+    complete_raw, *_ = _capture(reason="complete", frames=36)
+    complete_metadata, _ = parse_dump(complete_raw)
+    assert hardware_check.flight_frames_kept(complete_metadata, config) == 16
+
+    partial_raw, *_ = _capture(reason="range_edge", frames=24)
+    partial_metadata, _ = parse_dump(partial_raw)
+    assert hardware_check.flight_frames_kept(partial_metadata, config) == 4
+
+
+def test_expect_no_flight_frames_fails_a_static_scene_that_kept_any(hardware_check, monkeypatch):
+    """The 2026-09-26 confirmation fix must be caught by this flag if it regresses:
+    a static scene that ends up retaining even one selector-controlled frame means a
+    track was accepted or coasted from something other than trigger noise."""
+    config = str(ROOT / "config/iwr6843_l3dump_adaptive_36f2ms_iq16.cfg")
+    raw, _, starts, counts = _capture(
+        reason="range_edge", frames=22
+    )  # 14 pre + 6 impact + 2 flight
+    metadata, _ = parse_dump(raw)
+    decisions = [
+        dict(accepted=1, coasting=0, selected=start, proposed_start=start, proposed_bins=count)
+        for start, count in zip(starts, counts, strict=False)
+    ]
+
+    class FakeRadar:
+        def __init__(self, _port):
+            pass
+
+        def send_config(self, _config):
+            pass
+
+        def stats(self):
+            return "Done"
+
+        def read_shadow_dump(self):
+            return raw, decisions
+
+        def stop_sensor(self):
+            pass
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(hardware_check, "IWR6843Radar", FakeRadar)
+    monkeypatch.setattr(
+        hardware_check,
+        "parse_capture_stats",
+        lambda _response: {"frames": 0, "format": "adaptive16"},
+    )
+    args = argparse.Namespace(
+        port=None,
+        config=config,
+        soak_frames=0,
+        cycles=1,
+        poll_s=1.0,
+        output=None,
+        allow_early_stop=True,
+        capture_dir=None,
+        shadow=True,
+        expect_no_flight_frames=True,
+    )
+    with pytest.raises(RuntimeError, match="expected a static scene"):
+        hardware_check.run(args)
+
+    args.expect_no_flight_frames = False
+    hardware_check.run(args)  # same capture passes once the flag is off
 
 
 def test_operator_check_verifies_actual_stored_windows(hardware_check):
