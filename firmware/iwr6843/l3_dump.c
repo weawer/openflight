@@ -49,6 +49,7 @@
 #include <ti/utils/cycleprofiler/cycle_profiler.h>
 
 #include "dump_format.h"
+#include "compact_iq16.h"
 #include "track_select.h"
 
 #if defined(L3_DUMP_IQ8) || defined(L3_RING_IQ8)
@@ -58,7 +59,7 @@
 /* --- task priorities (mirror the mmw demo): ctrl > CLI. -------------------- */
 #define L3_INIT_TASK_PRIORITY  2
 #define L3_CLI_TASK_PRIORITY   3
-#define L3_HWA_REARM_TASK_PRIORITY (L3_CLI_TASK_PRIORITY - 1U)
+#define L3_HWA_REARM_TASK_PRIORITY (L3_CLI_TASK_PRIORITY + 1U)
 /* Keep the live snapshot worker below CLI. SYS/BIOS Task_yield does not allow
  * lower-priority tasks to run, and a priority-4 snapshot loop starved l3dump
  * so the host only saw the echoed 7-byte "l3dump\n" command. */
@@ -207,13 +208,15 @@
 #define L3_RING_MAX_BINS       64U
 #define L3_CAPTURE_FORMAT_IQ16 0U
 #define L3_CAPTURE_FORMAT_IQ8  1U
+#define L3_CAPTURE_FORMAT_COMPACT_IQ16 2U
 #define L3_IQ16_SCRATCH_FRAME_BYTES  \
-    (N_TX * L3_MAX_LOOPS * N_RX * L3_RING_MAX_BINS * 2U * \
+    (N_TX * L3_MAX_LOOPS * N_RX * N_SAMPLES * 2U * \
      (uint32_t)sizeof(int16_t))
 #define L3_IQ16_SCRATCH_BYTES  (2U * L3_IQ16_SCRATCH_FRAME_BYTES)
 #define L3_IQ16_SCRATCH_WORDS  \
     (L3_IQ16_SCRATCH_FRAME_BYTES / (uint32_t)sizeof(int16_t))
-#define L3_IQ8_CAPTURE_BYTES   (L3_TOTAL_BYTES - L3_IQ16_SCRATCH_BYTES)
+#define L3_SCRATCH_CAPTURE_BYTES (L3_TOTAL_BYTES - L3_IQ16_SCRATCH_BYTES)
+#define L3_IQ8_CAPTURE_BYTES   L3_SCRATCH_CAPTURE_BYTES
 #endif
 #define L3_DEFAULT_PRE_START   20U
 #define L3_DEFAULT_PRE_BINS    32U
@@ -432,6 +435,12 @@ static volatile uint8_t  gIq8ActiveScratch;
 static volatile uint32_t gIq8PackFrames;
 static volatile uint32_t gIq8PackOverruns;
 static volatile uint32_t gIq8ClippedComponents;
+static volatile uint32_t gCompactIq16Frames;
+static volatile uint32_t gCompactIq16Errors;
+static volatile uint32_t gCompactIq16LastUs;
+static volatile uint32_t gCompactIq16MaxUs;
+static volatile uint32_t gCompactIq16Generation[2];
+static volatile uint8_t  gCaptureIncomplete;
 #ifdef L3_IQ8_EDMA_PACK
 static volatile uint8_t  gIq8EdmaBusy[2];
 static volatile uint32_t gIq8EdmaDone;
@@ -502,11 +511,25 @@ static uint8_t l3_captureUsesIq8(void)
 #endif
 }
 
+static uint8_t l3_captureUsesCompactIq16(void)
+{
+#ifdef L3_RING_IQ8
+    return gCaptureFormat == L3_CAPTURE_FORMAT_COMPACT_IQ16;
+#else
+    return 0U;
+#endif
+}
+
+static uint8_t l3_captureUsesScratch(void)
+{
+    return l3_captureUsesIq8() || l3_captureUsesCompactIq16();
+}
+
 static uint32_t l3_captureCapacityBytes(void)
 {
 #ifdef L3_RING_IQ8
-    if (l3_captureUsesIq8()) {
-        return L3_IQ8_CAPTURE_BYTES;
+    if (l3_captureUsesScratch()) {
+        return L3_SCRATCH_CAPTURE_BYTES;
     }
 #endif
     return L3_TOTAL_BYTES;
@@ -526,21 +549,25 @@ static int32_t l3_cli_captureFormat(int32_t argc, char *argv[])
         return -1;
     }
     if (argc != 2) {
-        CLI_write("Error: captureFormat needs iq16 or iq8\n");
+        CLI_write("Error: captureFormat needs iq16, iq8, or compact16\n");
         return -1;
     }
     if (strcmp(argv[1], "iq16") == 0) {
         gCaptureFormat = L3_CAPTURE_FORMAT_IQ16;
     } else if (strcmp(argv[1], "iq8") == 0) {
         gCaptureFormat = L3_CAPTURE_FORMAT_IQ8;
+    } else if (strcmp(argv[1], "compact16") == 0) {
+        gCaptureFormat = L3_CAPTURE_FORMAT_COMPACT_IQ16;
     } else {
-        CLI_write("Error: captureFormat needs iq16 or iq8\n");
+        CLI_write("Error: captureFormat needs iq16, iq8, or compact16\n");
         return -1;
     }
     gCapturePlan.preFrames = 0U;
     gCapturePlan.totalFrames = 0U;
     gCapturePlan.usedBytes = 0U;
-    CLI_write("Capture format: %s\n", l3_captureUsesIq8() ? "iq8" : "iq16");
+    CLI_write("Capture format: %s\n",
+              l3_captureUsesIq8() ? "iq8" :
+              (l3_captureUsesCompactIq16() ? "compact16" : "iq16"));
     return 0;
 }
 
@@ -1136,7 +1163,7 @@ static void l3_hwaMaybeQueueRearm(void)
     if (gCaptureActive && gHwaDoneSeen && gHwaOutputSeen && !gHwaRearmPending) {
         if (gHwaShutdownRequested) {
 #if defined(CONFIGURABLE_CAPTURE) && defined(L3_RING_IQ8)
-            if (l3_captureUsesIq8()) {
+            if (l3_captureUsesScratch()) {
                 /* Let the task pack the completed scratch frame before
                  * acknowledging the shutdown boundary. */
                 gHwaRearmPending = 1U;
@@ -1151,7 +1178,7 @@ static void l3_hwaMaybeQueueRearm(void)
         } else {
 #ifdef CONFIGURABLE_CAPTURE
 #ifdef L3_RING_IQ8
-        if (l3_captureUsesIq8()) {
+        if (l3_captureUsesScratch()) {
             /* The completed IQ16 scratch frame must be packed before scratch
              * can be reused, including the final retained post frame. */
             if (gHwaFreezeRequested && !gActiveFrameIsPost) {
@@ -1229,16 +1256,19 @@ static void l3_hwaOutputDoneCB(uintptr_t arg, uint8_t tcCode)
     gRingFrame++;
 #ifdef CONFIGURABLE_CAPTURE
 #ifdef L3_RING_IQ8
-    if (l3_captureUsesIq8() && gActiveFrameShouldKeep) {
+    if (l3_captureUsesScratch() && gActiveFrameShouldKeep) {
         uint32_t completedSlot = gActiveFrameIsPost
                                      ? gCapturePlan.preFrames + gPostFramesCaptured
                                      : gPreFramesCaptured % gCapturePlan.preFrames;
         if (gIq8Pending) {
             gIq8PackOverruns++;
+            gCaptureIncomplete = 1U;
+        } else {
+            gIq8PendingSlot = completedSlot;
+            gIq8PendingScratch = gIq8ActiveScratch;
+            gIq8Pending = 1U;
+            gCompactIq16Generation[gIq8ActiveScratch]++;
         }
-        gIq8PendingSlot = completedSlot;
-        gIq8PendingScratch = gIq8ActiveScratch;
-        gIq8Pending = 1U;
     }
 #endif
     if (gActiveFrameIsPost) {
@@ -1738,6 +1768,44 @@ static void l3_waitForAllIq8Edma(void)
     l3_waitForIq8EdmaScratch(1U);
 }
 #endif
+
+static void l3_storeCompletedScratchFrame(uint32_t slot, uint8_t scratch)
+{
+    uint32_t startCycles;
+    uint32_t elapsedUs;
+
+    if (l3_captureUsesIq8()) {
+#ifdef L3_IQ8_EDMA_PACK
+        (void)l3_startIq8EdmaPack(slot, scratch);
+#else
+        l3_packIq8CompletedFrame(slot, scratch);
+#endif
+        return;
+    }
+    if (!l3_captureUsesCompactIq16() || slot >= gCapturePlan.totalFrames ||
+        scratch >= 2U) {
+        gCompactIq16Errors++;
+        gCaptureIncomplete = 1U;
+        return;
+    }
+
+    startCycles = Cycleprofiler_getTimeStamp();
+    if (l3_compact_iq16(&g_iq16FrameScratch[scratch][0],
+                        (int16_t *)&g_ring[gFrameOffset[slot]],
+                        gCapturePlan.chirpsPerFrame, N_RX, N_SAMPLES,
+                        gFrameBinStart[slot], gFrameBinCount[slot]) != 0) {
+        gCompactIq16Errors++;
+        gCaptureIncomplete = 1U;
+        return;
+    }
+    elapsedUs = (Cycleprofiler_getTimeStamp() - startCycles) /
+                (gCpuClock / 1000000U);
+    gCompactIq16LastUs = elapsedUs;
+    if (elapsedUs > gCompactIq16MaxUs) {
+        gCompactIq16MaxUs = elapsedUs;
+    }
+    gCompactIq16Frames++;
+}
 #endif
 
 static uint32_t l3_snapshotBinStartForNextFrame(void)
@@ -1781,10 +1849,8 @@ static int32_t l3_configHwaFrameOutput(uint32_t ringSlot)
     uint32_t binStart = l3_snapshotBinStartForNextFrame();
     uint16_t binCount;
     uint32_t destination;
-    uint32_t pingSource = SOC_XWR68XX_MSS_HWA_MEM2_BASE_ADDRESS +
-                          binStart * HWA_COMPLEX16_BYTES;
-    uint32_t pongSource = SOC_XWR68XX_MSS_HWA_MEM2_BASE_ADDRESS + HWA_MEM_STRIDE +
-                          binStart * HWA_COMPLEX16_BYTES;
+    uint32_t pingSource;
+    uint32_t pongSource;
 
 #ifdef CONFIGURABLE_CAPTURE
     if (gPostCaptureStarted) {
@@ -1813,7 +1879,11 @@ static int32_t l3_configHwaFrameOutput(uint32_t ringSlot)
         return -1;
     }
 #ifdef L3_RING_IQ8
-    destination = l3_captureUsesIq8()
+    if (l3_captureUsesCompactIq16()) {
+        binStart = 0U;
+        binCount = N_SAMPLES;
+    }
+    destination = l3_captureUsesScratch()
                       ? (uint32_t)&g_iq16FrameScratch[gIq8ActiveScratch][0]
                       : (uint32_t)&g_ring[gFrameOffset[ringSlot]];
 #else
@@ -1826,6 +1896,11 @@ static int32_t l3_configHwaFrameOutput(uint32_t ringSlot)
     gFrameBinStart[ringSlot % RING_FRAMES] = (uint8_t)binStart;
 #endif
 #endif
+
+    pingSource = SOC_XWR68XX_MSS_HWA_MEM2_BASE_ADDRESS +
+                 binStart * HWA_COMPLEX16_BYTES;
+    pongSource = SOC_XWR68XX_MSS_HWA_MEM2_BASE_ADDRESS + HWA_MEM_STRIDE +
+                 binStart * HWA_COMPLEX16_BYTES;
 
     (void)EDMA_disableChannel(gEdmaHandle, L3_HWA_OUT_PING_CHANNEL,
                               EDMA3_CHANNEL_TYPE_DMA);
@@ -2123,7 +2198,7 @@ static void l3_hwaRearmTask(UArg arg0, UArg arg1)
             }
             Hwi_restore(key);
 #else
-            if (!l3_captureUsesIq8()) {
+            if (!l3_captureUsesScratch()) {
                 key = Hwi_disable();
                 if (gHwaShutdownRequested) {
                     gCaptureActive = 0U;
@@ -2135,7 +2210,7 @@ static void l3_hwaRearmTask(UArg arg0, UArg arg1)
             }
 #endif
 #ifdef L3_RING_IQ8
-            if (l3_captureUsesIq8()) {
+            if (l3_captureUsesScratch()) {
                 key = Hwi_disable();
                 if (gIq8Pending) {
                     hadPending = 1U;
@@ -2168,11 +2243,7 @@ static void l3_hwaRearmTask(UArg arg0, UArg arg1)
             if (freezeAfterPack) {
 #ifdef L3_RING_IQ8
                 if (hadPending) {
-#ifdef L3_IQ8_EDMA_PACK
-                    (void)l3_startIq8EdmaPack(pendingSlot, pendingScratch);
-#else
-                    l3_packIq8CompletedFrame(pendingSlot, pendingScratch);
-#endif
+                    l3_storeCompletedScratchFrame(pendingSlot, pendingScratch);
                 }
 #ifdef L3_IQ8_EDMA_PACK
                 if (l3_captureUsesIq8()) {
@@ -2192,6 +2263,8 @@ static void l3_hwaRearmTask(UArg arg0, UArg arg1)
             if (l3_captureUsesIq8()) {
                 l3_waitForIq8EdmaScratch(nextScratch);
                 gIq8ActiveScratch = nextScratch;
+            } else if (l3_captureUsesCompactIq16()) {
+                gIq8ActiveScratch = nextScratch;
             }
 #endif
             rearmStartCycles = gHwaRearmQueuedCycles;
@@ -2208,18 +2281,19 @@ static void l3_hwaRearmTask(UArg arg0, UArg arg1)
             if (errCode == 0) {
                 gHwaRearms++;
 #ifdef CONFIGURABLE_CAPTURE
-                l3_considerSelfTrigger();
+                if (!l3_captureUsesScratch()) {
+                    l3_considerSelfTrigger();
+                }
 #endif
             } else {
                 gHwaRearmErrors++;
             }
 #ifdef L3_RING_IQ8
-            if (l3_captureUsesIq8() && hadPending) {
-#ifdef L3_IQ8_EDMA_PACK
-                (void)l3_startIq8EdmaPack(pendingSlot, pendingScratch);
-#else
-                l3_packIq8CompletedFrame(pendingSlot, pendingScratch);
-#endif
+            if (l3_captureUsesScratch() && hadPending) {
+                l3_storeCompletedScratchFrame(pendingSlot, pendingScratch);
+                if (!gCaptureIncomplete) {
+                    l3_considerSelfTrigger();
+                }
             }
 #endif
             key = Hwi_disable();
@@ -3054,6 +3128,10 @@ static int32_t l3_freezeCapture(void)
     } else if (l3_stopCaptureAtBoundary() != 0) {
         return -1;
     }
+    if (gCaptureIncomplete) {
+        CLI_write("Error: capture incomplete after scratch overrun or compaction failure\n");
+        return -1;
+    }
     return 0;
 }
 
@@ -3487,8 +3565,7 @@ static int32_t l3_cli_stats(int32_t argc, char *argv[])
     CLI_write("frames=%u wraps=%u active=%d calib=0x%x rf_faults=%u "
               "hwa_frames=%u hwa_out=%u hwa_rearms=%u hwa_rearm_err=%u "
               "hwa_missed=%u freeze_req=%u freeze_done=%u freeze_to=%u "
-              "format=%s plan=%upre/%upost loops=%u used=%u/%u "
-              "rearm_last_us=%u rearm_max_us=%u\n",
+              "format=%s plan=%upre/%upost loops=%u used=%u/%u\n",
               (unsigned)gNumFrame, (unsigned)gNumWrap, (int)gCaptureActive,
               (unsigned)gCalibStatus, (unsigned)gRfFaults,
               (unsigned)gHwaFrameDone, (unsigned)gHwaOutputDone,
@@ -3496,14 +3573,13 @@ static int32_t l3_cli_stats(int32_t argc, char *argv[])
               (unsigned)gHwaMissedFrameStarts,
               (unsigned)gHwaFreezeRequests, (unsigned)gHwaFreezeCompletions,
               (unsigned)gHwaFreezeTimeouts,
-              l3_captureUsesIq8() ? "iq8" : "iq16",
+              l3_captureUsesIq8() ? "iq8" :
+              (l3_captureUsesCompactIq16() ? "compact16" : "iq16"),
               (unsigned)gCapturePlan.preFrames,
               (unsigned)gCapturePlan.postFrames,
               (unsigned)gCapturePlan.loops,
               (unsigned)gCapturePlan.usedBytes,
-              (unsigned)l3_captureCapacityBytes(),
-              (unsigned)gHwaRearmLastUs,
-              (unsigned)gHwaRearmMaxUs);
+              (unsigned)l3_captureCapacityBytes());
     CLI_write("iq8_packed=%u iq8_overrun=%u iq8_clipped=%u pending=%u pre_seen=%u "
               "post_kept=%u post_seen=%u stride=%u"
 #ifdef L3_IQ8_EDMA_PACK
@@ -3528,13 +3604,21 @@ static int32_t l3_cli_stats(int32_t argc, char *argv[])
               (unsigned)gIq8FixedScale
 #endif
               );
+    CLI_write("compact16_frames=%u compact16_err=%u compact16_last_us=%u "
+              "compact16_max_us=%u generations=%u/%u incomplete=%u\n",
+              (unsigned)gCompactIq16Frames,
+              (unsigned)gCompactIq16Errors,
+              (unsigned)gCompactIq16LastUs,
+              (unsigned)gCompactIq16MaxUs,
+              (unsigned)gCompactIq16Generation[0],
+              (unsigned)gCompactIq16Generation[1],
+              (unsigned)gCaptureIncomplete);
 #else
     CLI_write("frames=%u wraps=%u active=%d calib=0x%x rf_faults=%u "
               "hwa_frames=%u hwa_out=%u hwa_rearms=%u hwa_rearm_err=%u "
               "hwa_missed=%u hwa_wait=0x%x freeze_req=%u freeze_done=%u freeze_to=%u "
               "freeze_restart=%u plan=%upre/%upost bins=%u/%u loops=%u "
-              "used=%u pre_seen=%u post_kept=%u post_seen=%u stride=%u "
-              "rearm_last_us=%u rearm_max_us=%u\n",
+              "used=%u pre_seen=%u post_kept=%u post_seen=%u stride=%u\n",
               (unsigned)gNumFrame, (unsigned)gNumWrap, (int)gCaptureActive,
               (unsigned)gCalibStatus, (unsigned)gRfFaults,
               (unsigned)gHwaFrameDone, (unsigned)gHwaOutputDone,
@@ -3553,15 +3637,13 @@ static int32_t l3_cli_stats(int32_t argc, char *argv[])
               (unsigned)gPreFramesCaptured,
               (unsigned)gPostFramesCaptured,
               (unsigned)gPostFramesObserved,
-              (unsigned)gCapturePlan.postStride,
-              (unsigned)gHwaRearmLastUs,
-              (unsigned)gHwaRearmMaxUs);
+              (unsigned)gCapturePlan.postStride);
 #endif
 #else
     CLI_write("frames=%u wraps=%u active=%d calib=0x%x rf_faults=%u "
               "hwa_frames=%u hwa_out=%u hwa_rearms=%u hwa_rearm_err=%u "
               "hwa_missed=%u hwa_wait=0x%x freeze_req=%u freeze_done=%u freeze_to=%u "
-              "freeze_restart=%u rearm_last_us=%u rearm_max_us=%u\n",
+              "freeze_restart=%u\n",
               (unsigned)gNumFrame, (unsigned)gNumWrap, (int)gCaptureActive,
               (unsigned)gCalibStatus, (unsigned)gRfFaults,
               (unsigned)gHwaFrameDone, (unsigned)gHwaOutputDone,
@@ -3570,14 +3652,17 @@ static int32_t l3_cli_stats(int32_t argc, char *argv[])
               (unsigned)((gHwaDoneSeen ? 1U : 0U) |
                          (gHwaOutputSeen ? 2U : 0U)),
               (unsigned)gHwaFreezeRequests, (unsigned)gHwaFreezeCompletions,
-              (unsigned)gHwaFreezeTimeouts, (unsigned)gHwaFreezeRestarts,
-              (unsigned)gHwaRearmLastUs, (unsigned)gHwaRearmMaxUs);
+              (unsigned)gHwaFreezeTimeouts, (unsigned)gHwaFreezeRestarts);
 #endif
 #else
     CLI_write("frames=%u wraps=%u active=%d calib=0x%x rf_faults=%u\n",
               (unsigned)gNumFrame, (unsigned)gNumWrap, (int)gCaptureActive,
               (unsigned)gCalibStatus, (unsigned)gRfFaults);
 #endif
+#endif
+#ifdef HWA_CHAINED_SNAPSHOT_RING
+    CLI_write("rearm_last_us=%u rearm_max_us=%u\n",
+              (unsigned)gHwaRearmLastUs, (unsigned)gHwaRearmMaxUs);
 #endif
 #ifdef CONFIGURABLE_CAPTURE
     CLI_write("trig phase=%s tee=%u latched=%u enabled=%u\n",
@@ -4094,6 +4179,13 @@ static int32_t l3_cli_sensorStart(int32_t argc, char *argv[])
     gIq8PackFrames = 0U;
     gIq8PackOverruns = 0U;
     gIq8ClippedComponents = 0U;
+    gCompactIq16Frames = 0U;
+    gCompactIq16Errors = 0U;
+    gCompactIq16LastUs = 0U;
+    gCompactIq16MaxUs = 0U;
+    gCompactIq16Generation[0] = 0U;
+    gCompactIq16Generation[1] = 0U;
+    gCaptureIncomplete = 0U;
 #ifdef L3_IQ8_EDMA_PACK
     gIq8EdmaBusy[0] = 0U;
     gIq8EdmaBusy[1] = 0U;
@@ -4349,7 +4441,7 @@ static void l3_initTask(UArg arg0, UArg arg1)
     cliCfg.tableEntry[8].cmdHandlerFxn = l3_cli_phaseCaptureCfg;
 #ifdef L3_RING_IQ8
     cliCfg.tableEntry[9].cmd           = "captureFormat";
-    cliCfg.tableEntry[9].helpString    = "captureFormat iq16|iq8";
+    cliCfg.tableEntry[9].helpString    = "captureFormat iq16|iq8|compact16";
     cliCfg.tableEntry[9].cmdHandlerFxn = l3_cli_captureFormat;
 #ifdef L3_IQ8_EDMA_PACK
     cliCfg.tableEntry[10].cmd           = "iq8Scale";

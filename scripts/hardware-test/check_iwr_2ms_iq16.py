@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the phase-1 2 ms IQ16 profile on a connected IWR6843."""
+"""Validate a 2 ms IQ16 profile on a connected IWR6843."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, "src")
 
-from openflight.iwr6843.driver import IWR6843Radar, parse_capture_stats  # noqa: E402
+from openflight.iwr6843.driver import IWR6843Radar  # noqa: E402
 from openflight.iwr6843.dump import (  # noqa: E402
     SAMPLE_RANGE_FFT_IQ16_VARIABLE_TIMED,
     parse_header,
@@ -25,7 +25,23 @@ ERROR_FIELDS = (
     "freeze_to",
     "iq8_overrun",
     "iq8_edma_err",
+    "compact16_err",
+    "incomplete",
 )
+
+
+def parse_capture_stats(response: str) -> dict[str, int | str]:
+    """Parse firmware ``stats`` key/value fields."""
+    parsed: dict[str, int | str] = {}
+    for token in response.split():
+        if "=" not in token:
+            continue
+        key, value = token.split("=", 1)
+        try:
+            parsed[key] = int(value, 0)
+        except ValueError:
+            parsed[key] = value
+    return parsed
 
 
 def _numeric(stats: dict[str, int | str], name: str) -> int:
@@ -59,12 +75,25 @@ def _write_event(output, event: str, **fields) -> None:
     output.flush()
 
 
+def _expected_geometry(config_path: str) -> tuple[int, int]:
+    commands = {
+        fields[0]: fields
+        for line in Path(config_path).read_text(encoding="utf-8").splitlines()
+        if (fields := line.split()) and not fields[0].startswith("%")
+    }
+    frame_period_us = int(float(commands["frameCfg"][5]) * 1000)
+    phase = commands["phaseCaptureCfg"]
+    return int(phase[3]) + int(phase[6]) + int(phase[10]), frame_period_us
+
+
 def run(args: argparse.Namespace) -> None:
     output = Path(args.output).open("w", encoding="utf-8") if args.output else None
     radar = IWR6843Radar(args.port)
     try:
         radar.send_config(args.config)
         baseline = _health(radar)
+        expected_frames, expected_period_us = _expected_geometry(args.config)
+        compact_mode = baseline.get("format") == "compact16"
         start_frames = _numeric(baseline, "frames")
         target = start_frames + args.soak_frames
         _write_event(output, "start", config=args.config, stats=baseline)
@@ -73,24 +102,34 @@ def run(args: argparse.Namespace) -> None:
             time.sleep(min(args.poll_s, 60.0))
             current = _health(radar)
             _check_errors(current, baseline)
+            if compact_mode and _numeric(current, "compact16_max_us") >= expected_period_us:
+                raise RuntimeError(
+                    "compaction exceeded the frame period: "
+                    f"{_numeric(current, 'compact16_max_us')} >= {expected_period_us} us"
+                )
             baseline = current
             done = _numeric(current, "frames") - start_frames
             print(
                 f"frames {done}/{args.soak_frames}, "
-                f"rearm max {_numeric(current, 'rearm_max_us')} us"
+                f"rearm max {_numeric(current, 'rearm_max_us')} us, "
+                f"compact max {_numeric(current, 'compact16_max_us')} us"
             )
             _write_event(output, "stats", stats=current)
 
         for cycle in range(1, args.cycles + 1):
             raw = radar.read_dump()
             metadata = parse_header(raw)
-            if metadata["n_frames"] != 24 or metadata["frame_period_us"] != 2000:
+            if (
+                metadata["n_frames"] != expected_frames
+                or metadata["frame_period_us"] != expected_period_us
+            ):
                 raise RuntimeError(f"cycle {cycle}: unexpected geometry {metadata}")
             if metadata["sample_fmt"] != SAMPLE_RANGE_FFT_IQ16_VARIABLE_TIMED:
                 raise RuntimeError(f"cycle {cycle}: capture is not timed IQ16")
             offsets = metadata.get("frame_time_offsets_us")
             if offsets is not None and any(
-                later - earlier != 2000 for earlier, later in zip(offsets, offsets[1:])
+                later - earlier != expected_period_us
+                for earlier, later in zip(offsets, offsets[1:])
             ):
                 raise RuntimeError(f"cycle {cycle}: explicit frame gap in {offsets}")
             current = _health(radar)
@@ -101,7 +140,9 @@ def run(args: argparse.Namespace) -> None:
 
         print(
             f"PASS: {args.soak_frames} frames, {args.cycles} capture cycles, "
-            f"maximum rearm latency {_numeric(baseline, 'rearm_max_us')} us"
+            f"maximum rearm latency {_numeric(baseline, 'rearm_max_us')} us, "
+            f"maximum compaction latency "
+            f"{_numeric(baseline, 'compact16_max_us')} us"
         )
     finally:
         try:

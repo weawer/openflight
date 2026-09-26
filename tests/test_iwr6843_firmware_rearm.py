@@ -11,6 +11,7 @@ WIDE_CONFIG = CONFIG_DIR / "iwr6843_l3dump_wide_24f3ms_53bin_iq16.cfg"
 DENSE_CONFIG = CONFIG_DIR / "iwr6843_l3dump_dense_36f2ms_53bin_iq8.cfg"
 DENSE_IQ16_DIAGNOSTIC_CONFIG = CONFIG_DIR / "iwr6843_l3dump_diagnostic_24f2ms_53bin_iq16.cfg"
 DENSE_WIDE_LATE_CONFIG = CONFIG_DIR / "iwr6843_l3dump_dense_36f2ms_53bin_iq8_wide_late.cfg"
+COMPACT_IQ16_CONFIG = CONFIG_DIR / "iwr6843_l3dump_compact_16f2ms_32bin_iq16.cfg"
 
 
 def _function_source(source: str, name: str, next_name: str) -> str:
@@ -40,6 +41,12 @@ def test_hwa_chain_processes_and_rearms_one_frame_at_a_time():
 
     assert "gCapturePlan.chirpsPerFrame / 2U" in common
     assert "gCapturePlan.chirpsPerFrame / 2U" in output
+
+
+def test_hwa_rearm_task_preempts_cli_diagnostics():
+    source = FIRMWARE.read_text(encoding="utf-8")
+
+    assert "#define L3_HWA_REARM_TASK_PRIORITY (L3_CLI_TASK_PRIORITY + 1U)" in source
 
 
 def test_completed_frame_advances_circular_ring_slot():
@@ -157,10 +164,7 @@ def test_iq8_edma_pack_compacts_int16_scratch_without_cpu_loop():
     assert "param->destinationBindex = 1" in pack
     assert "EDMA_startDmaTransfer" in pack
     assert "l3_restartCompletedHwaFrame" in rearm
-    assert "l3_startIq8EdmaPack" in rearm
-    assert rearm.count("l3_packIq8CompletedFrame") == 2
-    assert rearm.count("#else\n                    l3_packIq8CompletedFrame") == 1
-    assert rearm.count("#else\n                l3_packIq8CompletedFrame") == 1
+    assert rearm.count("l3_storeCompletedScratchFrame") == 2
 
 
 def test_iq8_edma_pack_waits_before_reusing_ping_pong_scratch():
@@ -233,6 +237,43 @@ def test_diagnostic_profile_uses_memory_safe_2ms_iq16_capture():
     payload_bytes = 3 * 12 * 4 * 24 * 53 * 4
     assert payload_bytes == 732_672
     assert payload_bytes < 786_432
+
+
+def test_compact_iq16_profile_keeps_2ms_cadence_with_fixed_window():
+    lines = _config_lines(COMPACT_IQ16_CONFIG)
+
+    assert "frameCfg 0 2 12 0 2 1 0" in lines
+    assert "captureFormat compact16" in lines
+    assert "phaseCaptureCfg 20 32 8 20 32 4 20 32 20 4 1" in lines
+
+    retained_bytes = 3 * 12 * 4 * 16 * 32 * 4
+    scratch_bytes = 2 * 3 * 16 * 4 * 128 * 4
+    assert retained_bytes + scratch_bytes == 491_520
+    assert retained_bytes + scratch_bytes < 786_432
+
+
+def test_compact_iq16_rearms_alternate_full_frame_before_copying():
+    source = FIRMWARE.read_text(encoding="utf-8")
+    output = _function_source(
+        source, "static int32_t l3_configHwaFrameOutput", "static void l3_drain"
+    )
+    rearm = _function_source(
+        source, "static void l3_hwaRearmTask", "/* Fill the 20-byte fixed dump header"
+    )
+
+    assert "binCount = N_SAMPLES" in output
+    assert "l3_captureUsesScratch()" in output
+    assert rearm.index("l3_restartCompletedHwaFrame()") < rearm.rindex(
+        "l3_storeCompletedScratchFrame"
+    )
+    assert "gCaptureIncomplete = 1U" in source
+    assert "compact16_max_us=%u" in source
+
+    freeze = _function_source(
+        source, "static int32_t l3_freezeCapture", "static void l3_sparseWindow"
+    )
+    assert "if (gCaptureIncomplete)" in freeze
+    assert "capture incomplete" in freeze
 
 
 def test_dense_wide_late_profile_keeps_dense_timing_and_near_late_window():
@@ -416,7 +457,7 @@ def test_stats_reports_rearm_latency_maximum_for_2ms_deadline_checks():
 
     assert "Cycleprofiler_getTimeStamp()" in rearm
     assert "gHwaRearmMaxUs" in rearm
-    assert "rearm_last_us=%u rearm_max_us=%u" in stats
+    assert 'CLI_write("rearm_last_us=%u rearm_max_us=%u\\n"' in stats
 
 
 def test_sensor_start_discards_the_previous_self_trigger_latch():

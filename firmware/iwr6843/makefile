@@ -70,7 +70,7 @@ MAP        = $(APPNAME)_mss.map
 OUT        = $(APPNAME)_mss.$(R4F_EXE_EXT)
 BIN        = $(APPNAME).bin
 APP_CMD    = mss_linker.cmd
-SOURCES    = l3_dump.c track_select.c
+SOURCES    = l3_dump.c track_select.c compact_iq16.c
 DEPENDS    = $(addprefix $(PLATFORM_OBJDIR)/, $(SOURCES:.c=.$(R4F_DEP_EXT)))
 OBJECTS    = $(addprefix $(PLATFORM_OBJDIR)/, $(SOURCES:.c=.$(R4F_OBJ_EXT)))
 
