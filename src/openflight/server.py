@@ -4988,6 +4988,21 @@ def main():
         parser.error("--iwr6843-self-trigger requires --iwr6843")
     if self_trigger_config is not None and args.trigger != "sound":
         parser.error("--iwr6843-self-trigger drives the OPS with S!; use --trigger sound")
+    ops_onboard_trigger = (
+        args.ops_trigger_speed_mph is not None or args.ops_trigger_magnitude is not None
+    )
+    if ops_onboard_trigger and self_trigger_config is not None:
+        parser.error(
+            "--ops-trigger-speed-mph/--ops-trigger-magnitude arm the OPS243's own "
+            "autonomous trigger; combined with --iwr6843-self-trigger's S!, it would "
+            "double-trigger. Use exactly one trigger source."
+        )
+    if ops_onboard_trigger and args.trigger == "speed":
+        parser.error(
+            "--ops-trigger-speed-mph/--ops-trigger-magnitude only apply to the "
+            "persisted rolling-buffer setup; --trigger speed already has its own "
+            "trigger and would silently ignore them"
+        )
     if args.camera_capture and (
         args.camera_capture_width <= 0
         or args.camera_capture_height <= 0

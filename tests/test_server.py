@@ -4843,6 +4843,28 @@ class TestSelfTriggerCli:
                 ["--iwr6843", "--iwr6843-self-trigger", "--trigger", "speed"],
                 "use --trigger sound",
             ),
+            (
+                [
+                    "--iwr6843",
+                    "--iwr6843-self-trigger",
+                    "--ops-trigger-speed-mph",
+                    "-40",
+                ],
+                "would double-trigger",
+            ),
+            (
+                [
+                    "--iwr6843",
+                    "--iwr6843-self-trigger",
+                    "--ops-trigger-magnitude",
+                    "600",
+                ],
+                "would double-trigger",
+            ),
+            (
+                ["--trigger", "speed", "--ops-trigger-speed-mph", "-40"],
+                "speed already has its own trigger",
+            ),
         ],
     )
     def test_cli_refuses_ambiguous_trigger_setups(self, monkeypatch, capsys, argv, message):
