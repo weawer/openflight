@@ -196,3 +196,32 @@ def test_restore_rolling_buffer_uses_gc_and_no_flash_write(radar):
     for deprecated in DEPRECATED_MODE_COMMANDS:
         assert deprecated not in sent
     assert b"A!" not in sent, "mode switching must not write flash"
+
+
+# --- speed trigger avoids driver-backswing saturation (vendor guidance) -----
+
+
+def test_speed_trigger_sets_magnitude_and_trigger_speed_thresholds(radar):
+    """OmniPreSense field report (v1.3.2 rolling buffer, sensor at 1.5 m):
+
+    with a driver, the club saturates the A/D during the backswing; despite
+    R- (outbound only), the saturated backswing is misread as a fast outbound
+    speed and fires the trigger, leaving nothing but saturated backswing data
+    and no ball capture. Their tested fix: ST-40 (trigger speed threshold,
+    outbound) and SM600 (signal magnitude threshold, sized for a 460cc driver
+    head) reject the saturated-backswing false trigger while still firing on
+    the real forward swing. Their other fix is purely mechanical (mount at
+    1.8 m instead of 1.5 m) and is not something this driver can enforce.
+    """
+    radar.configure_for_speed_trigger()
+
+    sent = _sent(radar)
+    assert b"ST-40" in sent, (
+        f"expected ST-40 trigger-speed threshold, sent: {radar.serial.writes!r}"
+    )
+    assert b"SM600" in sent, f"expected SM600 magnitude threshold, sent: {radar.serial.writes!r}"
+    # Order matters here only in that both must land before the radar goes
+    # active (PA); a threshold set after PA would not take effect until the
+    # next arm.
+    assert sent.index(b"PA") > sent.index(b"ST-40")
+    assert sent.index(b"PA") > sent.index(b"SM600")

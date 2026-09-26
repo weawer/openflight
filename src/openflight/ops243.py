@@ -1828,6 +1828,13 @@ class OPS243Radar:
         - 256 FFT size (X=2) for ~150-200Hz report rate (5-6ms between reports)
         - R>20 = minimum 20mph filter (eliminates leg movement, backswing noise)
         - R- = outbound only (ball/club going away from radar)
+        - ST-40 = trigger speed threshold, 40mph outbound; SM600 = magnitude
+          threshold sized for a 460cc driver head. Per OmniPreSense field
+          testing, R- alone is not enough with a driver at 1.5m: the club
+          head saturates the A/D during the backswing, and the saturated
+          signal is misread as a fast outbound speed, firing the trigger on
+          backswing noise instead of the ball. These two thresholds were
+          their tested fix (the other is moving the sensor to 1.8m).
 
         This mode is used to detect the initial club swing, then we switch
         to rolling buffer mode (GC) to capture high-resolution ball data.
@@ -1879,6 +1886,26 @@ class OPS243Radar:
         self._send_command("R>20")
         time.sleep(0.05)
         logger.info("[OPS] Min speed filter: 20 mph (R>20)")
+
+        # OmniPreSense field report (v1.3.2 rolling buffer, sensor at 1.5 m):
+        # a driver's club head saturates the A/D during the backswing, and
+        # despite R- (outbound only) the saturated signal is misread as a
+        # fast outbound speed and fires the trigger -- captured data is then
+        # just the saturated backswing, with the club already out of the
+        # sensor's field of view by the time the real ball-bearing swing
+        # happens. Their tested fix: a trigger-speed threshold (outbound,
+        # 40 mph) and a magnitude threshold sized for a 460cc driver head
+        # (600) reject the saturated-backswing false trigger while still
+        # firing on the real forward swing. Their other fix -- mount 1.8 m
+        # back instead of 1.5 m -- is physical, not something this driver
+        # can enforce.
+        self._send_command("ST-40")
+        time.sleep(0.05)
+        logger.info("[OPS] Trigger speed threshold: 40 mph outbound (ST-40)")
+
+        self._send_command("SM600")
+        time.sleep(0.05)
+        logger.info("[OPS] Signal magnitude threshold: 600 (SM600)")
 
         # Enable JSON output for parsing
         self.enable_json_output(True)
