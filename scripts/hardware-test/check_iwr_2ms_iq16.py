@@ -14,7 +14,7 @@ sys.path.insert(0, "src")
 from openflight.iwr6843.driver import IWR6843Radar  # noqa: E402
 from openflight.iwr6843.dump import (  # noqa: E402
     SAMPLE_RANGE_FFT_IQ16_VARIABLE_TIMED,
-    parse_header,
+    parse_dump,
 )
 
 DEFAULT_CONFIG = "config/iwr6843_l3dump_diagnostic_24f2ms_53bin_iq16.cfg"
@@ -69,6 +69,24 @@ def _check_errors(stats: dict[str, int | str], baseline: dict[str, int | str]) -
         raise RuntimeError(f"capture error counters changed: {changed}")
 
 
+def _check_timing(current, expected_period_us, compact_mode):
+    if compact_mode and _numeric(current, "compact16_max_us") >= expected_period_us:
+        raise RuntimeError(
+            "compaction exceeded the frame period: "
+            f"{_numeric(current, 'compact16_max_us')} >= {expected_period_us} us"
+        )
+    if compact_mode and (
+        _numeric(current, "shadow_max_us") + _numeric(current, "compact16_max_us")
+        >= expected_period_us
+    ):
+        raise RuntimeError(
+            "selector plus compaction exceeded the frame period: "
+            f"{_numeric(current, 'shadow_max_us')} + "
+            f"{_numeric(current, 'compact16_max_us')} >= "
+            f"{expected_period_us} us"
+        )
+
+
 def _write_event(output, event: str, **fields) -> None:
     if output is None:
         return
@@ -87,7 +105,38 @@ def _expected_geometry(config_path: str) -> tuple[int, int]:
     return int(phase[3]) + int(phase[6]) + int(phase[10]), frame_period_us
 
 
+def _check_retention_layout(metadata, decisions, config_path):
+    if "retention" not in metadata:
+        return
+    phase = next(
+        list(map(int, line.split()[1:]))
+        for line in Path(config_path).read_text(encoding="utf-8").splitlines()
+        if line.startswith("phaseCaptureCfg ")
+    )
+    pre, impact, flight = phase[2], phase[5], phase[9]
+    counts = [phase[1]] * pre + [phase[4]] * impact + [phase[7]] * flight
+    fixed_starts = [phase[0]] * pre + [phase[3]] * impact
+    if metadata["retention"]["pre_frames"] != pre:
+        raise RuntimeError("adaptive capture did not retain its complete pre-trigger history")
+    if (metadata["chirps_per_frame"], metadata["n_tx"], metadata["n_rx"]) != (36, 3, 4):
+        raise RuntimeError("adaptive capture lost loops or antenna channels")
+    for frame, (start, count) in enumerate(
+        zip(metadata["range_bin_starts"], metadata["range_bin_counts"], strict=True)
+    ):
+        if count != counts[frame] or (frame < pre + impact and start != fixed_starts[frame]):
+            raise RuntimeError(f"frame {frame}: unexpected adaptive storage window")
+        if frame >= pre + impact and decisions:
+            decision = decisions[frame]
+            if not decision["accepted"] or (start, count) != (
+                decision["proposed_start"],
+                decision["proposed_bins"],
+            ):
+                raise RuntimeError(f"frame {frame}: stored window differs from selector decision")
+
+
 def run(args: argparse.Namespace) -> None:
+    if args.output:
+        Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     output = Path(args.output).open("w", encoding="utf-8") if args.output else None
     capture_dir = Path(args.capture_dir) if args.capture_dir else None
     if capture_dir is not None:
@@ -99,7 +148,7 @@ def run(args: argparse.Namespace) -> None:
         configured = True
         baseline = _health(radar)
         expected_frames, expected_period_us = _expected_geometry(args.config)
-        compact_mode = baseline.get("format") == "compact16"
+        compact_mode = baseline.get("format") in ("compact16", "adaptive16")
         start_frames = _numeric(baseline, "frames")
         target = start_frames + args.soak_frames
         _write_event(output, "start", config=args.config, stats=baseline)
@@ -108,22 +157,7 @@ def run(args: argparse.Namespace) -> None:
             time.sleep(min(args.poll_s, 60.0))
             current = _health(radar)
             _check_errors(current, baseline)
-            if compact_mode and _numeric(current, "compact16_max_us") >= expected_period_us:
-                raise RuntimeError(
-                    "compaction exceeded the frame period: "
-                    f"{_numeric(current, 'compact16_max_us')} >= {expected_period_us} us"
-                )
-            if compact_mode and (
-                _numeric(current, "shadow_max_us")
-                + _numeric(current, "compact16_max_us")
-                >= expected_period_us
-            ):
-                raise RuntimeError(
-                    "selector plus compaction exceeded the frame period: "
-                    f"{_numeric(current, 'shadow_max_us')} + "
-                    f"{_numeric(current, 'compact16_max_us')} >= "
-                    f"{expected_period_us} us"
-                )
+            _check_timing(current, expected_period_us, compact_mode)
             baseline = current
             done = _numeric(current, "frames") - start_frames
             print(
@@ -135,11 +169,13 @@ def run(args: argparse.Namespace) -> None:
             _write_event(output, "stats", stats=current)
 
         for cycle in range(1, args.cycles + 1):
+            capture_start = time.monotonic()
             if args.shadow:
                 raw, decisions = radar.read_shadow_dump()
             else:
                 raw = radar.read_dump()
                 decisions = []
+            capture_roundtrip_s = time.monotonic() - capture_start
             capture_path = None
             if capture_dir is not None:
                 capture_path = capture_dir / f"shadow-reference-{cycle:03d}.l3dump"
@@ -151,11 +187,16 @@ def run(args: argparse.Namespace) -> None:
                 shadow_decisions=decisions,
                 capture_path=str(capture_path) if capture_path else None,
             )
-            metadata = parse_header(raw)
-            if (
-                metadata["n_frames"] != expected_frames
-                or metadata["frame_period_us"] != expected_period_us
-            ):
+            metadata, _cube = parse_dump(raw)
+            retention = metadata.get("retention")
+            stopped = retention is not None and retention["reason"] != "complete"
+            if stopped and not args.allow_early_stop:
+                raise RuntimeError(f"cycle {cycle}: retention stopped: {retention['reason']}")
+            if retention and retention["planned_frames"] != expected_frames:
+                raise RuntimeError(f"cycle {cycle}: unexpected retention plan {retention}")
+            if (metadata["n_frames"] != expected_frames and not stopped) or metadata[
+                "frame_period_us"
+            ] != expected_period_us:
                 raise RuntimeError(f"cycle {cycle}: unexpected geometry {metadata}")
             if metadata["sample_fmt"] != SAMPLE_RANGE_FFT_IQ16_VARIABLE_TIMED:
                 raise RuntimeError(f"cycle {cycle}: capture is not timed IQ16")
@@ -174,6 +215,7 @@ def run(args: argparse.Namespace) -> None:
                 for decision in decisions
             ):
                 raise RuntimeError(f"cycle {cycle}: proposed window excludes its candidate")
+            _check_retention_layout(metadata, decisions, args.config)
             offsets = metadata.get("frame_time_offsets_us")
             if offsets is not None and any(
                 later - earlier != expected_period_us
@@ -182,13 +224,17 @@ def run(args: argparse.Namespace) -> None:
                 raise RuntimeError(f"cycle {cycle}: explicit frame gap in {offsets}")
             current = _health(radar)
             _check_errors(current, baseline)
+            _check_timing(current, expected_period_us, compact_mode)
             baseline = current
-            print(f"capture cycle {cycle}/{args.cycles} passed")
+            outcome = f"early stop: {retention['reason']}" if stopped else "complete"
+            print(f"capture cycle {cycle}/{args.cycles} passed ({outcome})")
             _write_event(
                 output,
                 "capture",
                 cycle=cycle,
                 metadata=metadata,
+                payload_bytes=len(raw),
+                capture_roundtrip_s=capture_roundtrip_s,
                 shadow_decisions=decisions,
                 capture_path=str(capture_path) if capture_path else None,
                 stats=current,
@@ -219,6 +265,11 @@ def main() -> int:
     parser.add_argument("--cycles", type=int, default=0)
     parser.add_argument("--poll-s", type=float, default=10.0)
     parser.add_argument("--output")
+    parser.add_argument(
+        "--allow-early-stop",
+        action="store_true",
+        help="accept explicitly labelled adaptive track loss for indoor lifecycle tests",
+    )
     parser.add_argument("--capture-dir", help="directory for raw .l3dump captures")
     parser.add_argument(
         "--shadow",

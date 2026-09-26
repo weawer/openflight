@@ -45,7 +45,7 @@ static uint32_t gPreFramesCaptured = 1, gFramePeriodUs = 3000;
 static uint32_t gFrameBinCount[1];
 static struct { uint32_t preFrames, loops, preBins; } gCapturePlan = {1, 12, 53};
 static const float *powers;
-static uint8_t gCaptureActive;
+static uint8_t gCaptureActive, gCaptureIncomplete;
 static void *gHwaFreezeSemaphore = (void *)1;
 static int permit, stopCalls;
 static int Semaphore_pend(void *semaphore, unsigned timeout) { return permit; }

@@ -36,7 +36,9 @@ from openflight.iwr6843.music import est_music_fbss, steer
 MAGIC = b"ILD1"
 HEADER = struct.Struct("<4sHHHBBHBBHH")
 TEMP_REPORT = struct.Struct("<Ihhhhhhhhhh")
-MAX_SUPPORTED_DUMP_VERSION = 7
+MAX_SUPPORTED_DUMP_VERSION = 9
+RETENTION_REPORT = struct.Struct("<HHHH")
+RETENTION_REASONS = ("complete", "track_lost", "ambiguous", "range_edge", "short_history")
 # TI mmWaveLink rlRfTempData_t temperature fields are signed, 1 LSB = 1 deg C.
 TEMP_REPORT_KEYS = (
     "device_time_ms",
@@ -72,7 +74,7 @@ _TIMED_SAMPLE_FORMATS = (
 
 def _has_temperature_extension(version: int, sample_fmt: int) -> bool:
     """Identify schemas that append the temperature report after the header."""
-    return version == 7 or (version == 5 and sample_fmt not in _VARIABLE_SAMPLE_FORMATS)
+    return version in (7, 9) or (version == 5 and sample_fmt not in _VARIABLE_SAMPLE_FORMATS)
 
 
 def pack_dump(
@@ -88,6 +90,7 @@ def pack_dump(
     range_bin_counts: tuple[int, ...] | list[int] | None = None,
     frame_time_offsets_us: tuple[int, ...] | list[int] | None = None,
     temperature_report: dict[str, int] | None = None,
+    retention: dict | None = None,
 ) -> bytes:
     """Complex cube [n_frames, chirps_per_frame, n_rx, n_samples] -> dump bytes.
 
@@ -118,6 +121,17 @@ def pack_dump(
         temp_prefix = TEMP_REPORT.pack(*temp_values)
     elif _has_temperature_extension(version, sample_fmt):
         raise ValueError("dump version 5+ requires a temperature report")
+    if version in (8, 9):
+        if retention is None or sample_fmt != SAMPLE_RANGE_FFT_IQ16_VARIABLE_TIMED:
+            raise ValueError("adaptive dump needs retention metadata and timed IQ16")
+        temp_prefix += RETENTION_REPORT.pack(
+            RETENTION_REASONS.index(retention["reason"]),
+            retention["pre_frames"],
+            retention["planned_frames"],
+            0,
+        )
+    elif retention is not None:
+        raise ValueError("retention metadata requires version 8 or 9")
     frame_prefix = b""
     if sample_fmt in (
         SAMPLE_RANGE_FFT_IQ16_WINDOWED,
@@ -243,6 +257,19 @@ def parse_header(raw: bytes) -> dict:
         temp = TEMP_REPORT.unpack_from(raw, HEADER.size)
         temperature_report = dict(zip(TEMP_REPORT_KEYS, temp, strict=True))
         header_nbytes += TEMP_REPORT.size
+    retention = None
+    if ver in (8, 9):
+        if fmt != SAMPLE_RANGE_FFT_IQ16_VARIABLE_TIMED:
+            raise ValueError("adaptive dump requires timed IQ16")
+        if len(raw) < header_nbytes + RETENTION_REPORT.size:
+            raise ValueError("short retention report extension")
+        reason, pre, planned, reserved = RETENTION_REPORT.unpack_from(raw, header_nbytes)
+        if reason >= len(RETENTION_REASONS) or reserved or not 0 < pre <= nf <= planned:
+            raise ValueError("invalid retention report")
+        if reason == 0 and nf != planned:
+            raise ValueError("complete adaptive capture has missing frames")
+        retention = dict(reason=RETENTION_REASONS[reason], pre_frames=pre, planned_frames=planned)
+        header_nbytes += RETENTION_REPORT.size
     range_metadata_nbytes = (
         TIMED_FRAME_DESCRIPTOR.size * nf + (2 * nf)
         if fmt == SAMPLE_RANGE_FFT_IQ8_VARIABLE_TIMED
@@ -269,6 +296,7 @@ def parse_header(raw: bytes) -> dict:
         frame_metadata_nbytes=range_metadata_nbytes,
         header_nbytes=header_nbytes,
         temperature_report=temperature_report,
+        **({"retention": retention} if retention is not None else {}),
     )
 
 
@@ -417,6 +445,7 @@ def select_tdm_loops(raw: bytes, *, start: int, count: int) -> bytes:
         range_bin_counts=meta.get("range_bin_counts"),
         frame_time_offsets_us=meta.get("frame_time_offsets_us"),
         temperature_report=meta.get("temperature_report"),
+        retention=meta.get("retention"),
     )
 
 
@@ -470,6 +499,7 @@ def project_tx_pair(raw: bytes, tx_indices: tuple[int, int] = (0, 1)) -> bytes:
         range_bin_counts=meta.get("range_bin_counts"),
         frame_time_offsets_us=meta.get("frame_time_offsets_us"),
         temperature_report=meta.get("temperature_report"),
+        retention=meta.get("retention"),
     )
 
 

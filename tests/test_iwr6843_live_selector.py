@@ -61,6 +61,7 @@ def c_select(tmp_path_factory: pytest.TempPathFactory):
         ctypes.POINTER(CParams), ctypes.POINTER(CState), ctypes.POINTER(CResult),
     ]
     function.restype = ctypes.c_int32
+    function.library_path = str(library)
     return function
 
 
@@ -203,3 +204,57 @@ def test_home_motion_reference_stays_inside_proposed_windows(c_select):
         )
         assert actual.window_start == expected.window_start
         assert c_state.selected_bin == python_state.selected_bin
+
+
+@pytest.fixture(scope="module")
+def c_retention(c_select):
+    function = ctypes.CDLL(c_select.library_path).l3_retention_window
+    function.argtypes = [ctypes.POINTER(CResult), ctypes.c_uint16]
+    function.restype = ctypes.c_uint16
+    return function
+
+
+@pytest.mark.parametrize(
+    "accepted,ambiguous,candidates,selected,start,reason,expected_start",
+    [
+        (1, 0, (30,), 30, 24, 0, 24),
+        (0, 0, (30,), 30, 24, 1, 24),
+        (1, 1, (30, 50), 30, 24, 2, 24),
+        (1, 1, (30, 37), 30, 24, 0, 28),
+        (1, 1, (30, 23), 30, 24, 0, 21),
+        (1, 0, (126,), 126, 116, 3, 116),
+        (1, 0, (1,), 1, 0, 3, 0),
+    ],
+)
+def test_retention_requires_candidate_and_uncertainty_margin(
+    c_retention, accepted, ambiguous, candidates, selected, start, reason, expected_start
+):
+    result = CResult()
+    result.accepted = accepted
+    result.ambiguous = ambiguous
+    result.candidate_count = len(candidates)
+    result.selected_bin = selected
+    result.window_start = start
+    result.window_bins = 12
+    for index, value in enumerate(candidates):
+        result.candidate_bins[index] = value
+    assert c_retention(ctypes.byref(result), 128) == reason
+    assert result.window_start == expected_start
+    if reason == 0:
+        for candidate in candidates:
+            assert result.window_start <= candidate - 2
+            assert candidate + 2 < result.window_start + result.window_bins
+
+
+def test_sixteen_flight_windows_keep_fast_target_with_stronger_distractor(c_select, c_retention):
+    params = SelectorParams()
+    state = SelectorState(selected_bin=35, velocity_q8=3 * 256, active=1)
+    for target in range(38, 86, 3):
+        powers = _powers((target, 3000), (110, 6000))
+        before = state.copy()
+        expected = select_window(powers, params, state)
+        _, result = _c_run(c_select, powers, params, before)
+        assert expected.selected_bin == result.selected_bin == target
+        assert c_retention(ctypes.byref(result), 128) == 0
+        assert result.window_start <= target - 2
+        assert target + 2 < result.window_start + result.window_bins

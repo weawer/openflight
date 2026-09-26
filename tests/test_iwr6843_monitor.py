@@ -930,3 +930,42 @@ def test_failed_release_is_retried_without_another_notice(tmp_path):
         pass
     monitor._listen_for_self_trigger()
     assert radar.releases == 2
+
+
+def test_adaptive_capture_bypasses_vertical_only_transfer(tmp_path):
+    radar = FakeRadar(_raw_dump())
+    monitor = IWR6843CaptureMonitor(
+        config_path=tmp_path / "unused.cfg", radar=radar,
+        output_dir=tmp_path, onboard_tracking=True,
+        slice_planner=lambda *_: pytest.fail("adaptive capture must preserve all TX"),
+    )
+    monitor._adaptive_retention = True
+    raw, noise, track = monitor._read_capture()
+    assert raw == radar.raw
+    assert noise is None and track is None
+
+
+def test_adaptive_early_stop_is_saved_but_reported_as_capture_error(tmp_path):
+    raw = pack_dump(
+        np.ones((20, 36, 4, 53), dtype=complex), n_tx=3, version=8,
+        frame_period_us=2000, sample_fmt=4,
+        range_bin_starts=[20] * 14 + [32] * 6,
+        range_bin_counts=[32] * 14 + [53] * 6,
+        frame_time_offsets_us=list(range(0, 40_000, 2000)),
+        retention=dict(reason="track_lost", pre_frames=14, planned_frames=36),
+    )
+    monitor = IWR6843CaptureMonitor(
+        config_path=tmp_path / "unused.cfg", radar=FakeRadar(raw),
+        output_dir=tmp_path, save_dumps=True,
+    )
+    monitor._adaptive_retention = True
+    monitor._capture(time.time())
+    capture = monitor._captures[0]
+    assert capture.raw is None
+    assert capture.error == "adaptive retention stopped: track_lost"
+    assert capture.path.read_bytes() == raw
+    assert not monitor._capture_active
+    assert not monitor._edge_pending
+    monitor.radar.raw = _raw_dump()
+    monitor._capture(time.time())
+    assert monitor._captures[-1].error is None

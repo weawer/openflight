@@ -210,6 +210,7 @@
 #define L3_CAPTURE_FORMAT_IQ16 0U
 #define L3_CAPTURE_FORMAT_IQ8  1U
 #define L3_CAPTURE_FORMAT_COMPACT_IQ16 2U
+#define L3_CAPTURE_FORMAT_ADAPTIVE_IQ16 3U
 #define L3_IQ16_SCRATCH_FRAME_BYTES  \
     (N_TX * L3_MAX_LOOPS * N_RX * N_SAMPLES * 2U * \
      (uint32_t)sizeof(int16_t))
@@ -264,6 +265,8 @@ typedef struct {
 static uint8_t g_ring[L3_TOTAL_BYTES];
 #ifdef L3_RING_IQ8
 static uint8_t gCaptureFormat = L3_CAPTURE_FORMAT_IQ16;
+static uint16_t gRetentionReason;
+static uint32_t gRetentionPostFrames;
 #define g_iq16FrameScratch \
     (*((int16_t (*)[2][L3_IQ16_SCRATCH_WORDS]) \
        (void *)&g_ring[L3_IQ8_CAPTURE_BYTES]))
@@ -542,7 +545,17 @@ static uint8_t l3_captureUsesIq8(void)
 static uint8_t l3_captureUsesCompactIq16(void)
 {
 #ifdef L3_RING_IQ8
-    return gCaptureFormat == L3_CAPTURE_FORMAT_COMPACT_IQ16;
+    return gCaptureFormat == L3_CAPTURE_FORMAT_COMPACT_IQ16 ||
+           gCaptureFormat == L3_CAPTURE_FORMAT_ADAPTIVE_IQ16;
+#else
+    return 0U;
+#endif
+}
+
+static uint8_t l3_captureUsesAdaptiveIq16(void)
+{
+#ifdef L3_RING_IQ8
+    return gCaptureFormat == L3_CAPTURE_FORMAT_ADAPTIVE_IQ16;
 #else
     return 0U;
 #endif
@@ -577,17 +590,19 @@ static int32_t l3_cli_captureFormat(int32_t argc, char *argv[])
         return -1;
     }
     if (argc != 2) {
-        CLI_write("Error: captureFormat needs iq16, iq8, or compact16\n");
+        CLI_write("Error: captureFormat needs iq16, iq8, compact16, or adaptive16\n");
         return -1;
     }
     if (strcmp(argv[1], "iq16") == 0) {
         gCaptureFormat = L3_CAPTURE_FORMAT_IQ16;
     } else if (strcmp(argv[1], "iq8") == 0) {
         gCaptureFormat = L3_CAPTURE_FORMAT_IQ8;
+    } else if (strcmp(argv[1], "adaptive16") == 0) {
+        gCaptureFormat = L3_CAPTURE_FORMAT_ADAPTIVE_IQ16;
     } else if (strcmp(argv[1], "compact16") == 0) {
         gCaptureFormat = L3_CAPTURE_FORMAT_COMPACT_IQ16;
     } else {
-        CLI_write("Error: captureFormat needs iq16, iq8, or compact16\n");
+        CLI_write("Error: captureFormat needs iq16, iq8, compact16, or adaptive16\n");
         return -1;
     }
     gCapturePlan.preFrames = 0U;
@@ -595,7 +610,8 @@ static int32_t l3_cli_captureFormat(int32_t argc, char *argv[])
     gCapturePlan.usedBytes = 0U;
     CLI_write("Capture format: %s\n",
               l3_captureUsesIq8() ? "iq8" :
-              (l3_captureUsesCompactIq16() ? "compact16" : "iq16"));
+              (l3_captureUsesAdaptiveIq16() ? "adaptive16" :
+               (l3_captureUsesCompactIq16() ? "compact16" : "iq16")));
     return 0;
 }
 
@@ -682,6 +698,13 @@ static int32_t l3_finalizeCapturePlan(uint16_t loops)
            gCapturePlan.postFrames) > L3_MAX_CAPTURE_FRAMES))) {
         CLI_write("Error: captureCfg needs valid windows and 1-%u post frames\n",
                   (unsigned)(L3_MAX_CAPTURE_FRAMES - 1U));
+        return -1;
+    }
+
+    if (l3_captureUsesAdaptiveIq16() &&
+        (!gCapturePlan.phased || loops != 12U || gFramePeriodUs != 2000U ||
+         gCapturePlan.postStride != 1U || gCapturePlan.postBins != 12U)) {
+        CLI_write("Error: adaptive16 needs phased 12-loop 2ms capture, stride 1, 12 flight bins\n");
         return -1;
     }
 
@@ -1801,6 +1824,7 @@ static void l3_storeCompletedScratchFrame(uint32_t slot, uint8_t scratch)
 {
     uint32_t startCycles;
     uint32_t elapsedUs;
+    uint8_t hadTrack = gShadowState.active;
 
     if (l3_captureUsesIq8()) {
 #ifdef L3_IQ8_EDMA_PACK
@@ -1817,6 +1841,13 @@ static void l3_storeCompletedScratchFrame(uint32_t slot, uint8_t scratch)
         return;
     }
 
+    if (l3_captureUsesAdaptiveIq16() && slot >= gCapturePlan.preFrames &&
+        gRetentionReason != 0U) {
+        return;
+    }
+    if (l3_captureUsesAdaptiveIq16() && slot == gCapturePlan.preFrames) {
+        memset(&gShadowState, 0, sizeof(gShadowState));
+    }
     startCycles = Cycleprofiler_getTimeStamp();
     {
         uint32_t loop;
@@ -1852,6 +1883,15 @@ static void l3_storeCompletedScratchFrame(uint32_t slot, uint8_t scratch)
             gShadowPreviousPower[bin] = current;
         }
         gShadowHavePrevious = 1U;
+        if (l3_captureUsesAdaptiveIq16() &&
+            slot < gCapturePlan.preFrames + gCapturePlan.impactFrames) {
+            for (bin = 0U; bin < N_SAMPLES; bin++) {
+                if (bin < gCapturePlan.impactStart ||
+                    bin >= gCapturePlan.impactStart + gCapturePlan.impactBins) {
+                    gShadowPower[bin] = 0U;
+                }
+            }
+        }
         if (l3_live_select(gShadowPower, N_SAMPLES, &gShadowParams,
                            &gShadowState, &gShadowLast) != 0) {
             gShadowErrors++;
@@ -1876,6 +1916,15 @@ static void l3_storeCompletedScratchFrame(uint32_t slot, uint8_t scratch)
             gShadowMaxUs = elapsedUs;
         }
     }
+    if (l3_captureUsesAdaptiveIq16() &&
+        slot >= gCapturePlan.preFrames + gCapturePlan.impactFrames) {
+        gRetentionReason = hadTrack
+                               ? l3_retention_window(&gShadowLast, N_SAMPLES)
+                               : L3_RETENTION_TRACK_LOST;
+        if (gRetentionReason != 0U) return;
+        gFrameBinStart[slot] = (uint8_t)gShadowLast.windowStart;
+        gShadowWindowStart[slot] = (uint8_t)gShadowLast.windowStart;
+    }
     startCycles = Cycleprofiler_getTimeStamp();
     if (l3_compact_iq16(&g_iq16FrameScratch[scratch][0],
                         (int16_t *)&g_ring[gFrameOffset[slot]],
@@ -1892,6 +1941,9 @@ static void l3_storeCompletedScratchFrame(uint32_t slot, uint8_t scratch)
         gCompactIq16MaxUs = elapsedUs;
     }
     gCompactIq16Frames++;
+    if (l3_captureUsesAdaptiveIq16() && slot >= gCapturePlan.preFrames) {
+        gRetentionPostFrames = slot - gCapturePlan.preFrames + 1U;
+    }
 }
 #endif
 
@@ -2668,6 +2720,14 @@ int32_t l3_cli_dump(int32_t argc, char *argv[])
                     ? gPreFramesCaptured : gCapturePlan.preFrames;
     actualPost = (gPostFramesCaptured < gCapturePlan.postFrames)
                      ? gPostFramesCaptured : gCapturePlan.postFrames;
+#ifdef L3_RING_IQ8
+    if (l3_captureUsesAdaptiveIq16()) {
+        actualPost = gRetentionPostFrames;
+        if (actualPre < gCapturePlan.preFrames && gRetentionReason == 0U) {
+            gRetentionReason = L3_RETENTION_SHORT_HISTORY;
+        }
+    }
+#endif
     oldestPre = (gPreFramesCaptured >= gCapturePlan.preFrames)
                     ? (gPreFramesCaptured % gCapturePlan.preFrames) : 0U;
 #ifdef L3_RING_IQ8
@@ -2709,10 +2769,24 @@ int32_t l3_cli_dump(int32_t argc, char *argv[])
             h.version = L3_DUMP_VERSION_TEMPERATURE;
 #endif
         }
+#if defined(CONFIGURABLE_CAPTURE) && defined(L3_RING_IQ8)
+        if (l3_captureUsesAdaptiveIq16()) {
+            h.version = tempStatus == 0 ? L3_DUMP_VERSION_RETENTION_TEMPERATURE
+                                        : L3_DUMP_VERSION_RETENTION;
+        }
+#endif
         UART_writePolling(gDataUart, (uint8_t *)&h, sizeof(h));
         if (tempStatus == 0) {
             UART_writePolling(gDataUart, (uint8_t *)&tempReport, sizeof(tempReport));
         }
+#if defined(CONFIGURABLE_CAPTURE) && defined(L3_RING_IQ8)
+        if (l3_captureUsesAdaptiveIq16()) {
+            l3_writeU16Le(gRetentionReason);
+            l3_writeU16Le((uint16_t)actualPre);
+            l3_writeU16Le(gCapturePlan.totalFrames);
+            l3_writeU16Le(0U);
+        }
+#endif
     }
 #ifdef CONFIGURABLE_CAPTURE
     for (i = 0U; i < actualPre; i++) {
@@ -2828,6 +2902,14 @@ int32_t l3_cli_dump(int32_t argc, char *argv[])
     gHwaFreezeRequestFrame = 0U;
     gHwaFreezeTargetFrame = 0U;
 #ifdef CONFIGURABLE_CAPTURE
+#ifdef L3_RING_IQ8
+    gRetentionReason = 0U;
+    gRetentionPostFrames = 0U;
+    if (l3_captureUsesAdaptiveIq16()) {
+        memset(&gShadowState, 0, sizeof(gShadowState));
+        gShadowHavePrevious = 0U;
+    }
+#endif
     gPreFramesCaptured = 0U;
     gPostFramesCaptured = 0U;
     gPostFramesObserved = 0U;
@@ -3235,6 +3317,10 @@ static int32_t l3_sparseFreeze(void)
         return -1;
     }
 #endif
+    if (l3_captureUsesAdaptiveIq16()) {
+        CLI_write("Error: adaptive16 requires full retained dump\n");
+        return -1;
+    }
     return l3_freezeCapture();
 }
 
@@ -3352,6 +3438,14 @@ static int32_t l3_sparseRearm(void)
     gRingFrame = 0U;
     gHwaFreezeRequestFrame = 0U;
     gHwaFreezeTargetFrame = 0U;
+#ifdef L3_RING_IQ8
+    gRetentionReason = 0U;
+    gRetentionPostFrames = 0U;
+    if (l3_captureUsesAdaptiveIq16()) {
+        memset(&gShadowState, 0, sizeof(gShadowState));
+        gShadowHavePrevious = 0U;
+    }
+#endif
     gPreFramesCaptured = 0U;
     gPostFramesCaptured = 0U;
     gPostFramesObserved = 0U;
@@ -3699,7 +3793,8 @@ static int32_t l3_cli_stats(int32_t argc, char *argv[])
               (unsigned)gHwaFreezeRequests, (unsigned)gHwaFreezeCompletions,
               (unsigned)gHwaFreezeTimeouts,
               l3_captureUsesIq8() ? "iq8" :
-              (l3_captureUsesCompactIq16() ? "compact16" : "iq16"),
+              (l3_captureUsesAdaptiveIq16() ? "adaptive16" :
+               (l3_captureUsesCompactIq16() ? "compact16" : "iq16")),
               (unsigned)gCapturePlan.preFrames,
               (unsigned)gCapturePlan.postFrames,
               (unsigned)gCapturePlan.loops,
@@ -4310,6 +4405,14 @@ static int32_t l3_cli_sensorStart(int32_t argc, char *argv[])
     gSelfTriggerLatched = 0U;
     gTriggerEnabled = 0U;
     l3_clearTriggerMotion();
+#ifdef L3_RING_IQ8
+    gRetentionReason = 0U;
+    gRetentionPostFrames = 0U;
+    if (l3_captureUsesAdaptiveIq16()) {
+        memset(&gShadowState, 0, sizeof(gShadowState));
+        gShadowHavePrevious = 0U;
+    }
+#endif
     gPreFramesCaptured = 0U;
     gPostFramesCaptured = 0U;
     gPostFramesObserved = 0U;
@@ -4606,7 +4709,7 @@ static void l3_initTask(UArg arg0, UArg arg1)
     cliCfg.tableEntry[8].cmdHandlerFxn = l3_cli_phaseCaptureCfg;
 #ifdef L3_RING_IQ8
     cliCfg.tableEntry[9].cmd           = "captureFormat";
-    cliCfg.tableEntry[9].helpString    = "captureFormat iq16|iq8|compact16";
+    cliCfg.tableEntry[9].helpString    = "captureFormat iq16|iq8|compact16|adaptive16";
     cliCfg.tableEntry[9].cmdHandlerFxn = l3_cli_captureFormat;
 #ifdef L3_IQ8_EDMA_PACK
     cliCfg.tableEntry[10].cmd           = "iq8Scale";

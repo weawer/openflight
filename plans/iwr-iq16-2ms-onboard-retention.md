@@ -348,3 +348,17 @@ Hardware capabilities are described in the [TI IWR6843 datasheet](https://www.ti
 This plan targets IWR6843 with the existing mmWave SDK, not IWRL6843 or its different
 SDK. Actual selection cost, sample-retention quality and new-mode hardware timing
 remain unmeasured. No firmware or application code was changed to produce this plan.
+
+## Phase 4 implementation checkpoint — 2026-09-26
+
+The experimental `adaptive16` mode now implements the 14×32 / 6×53 / 16×12
+layout, channel-preserving IQ16 transport, frozen retention status, and explicit
+termination of retained flight evidence on uncertain selection. See the
+[release and operator test instructions](../firmware/releases/l3_dump_2ms_iq16_adaptive_20260926.md).
+
+This is an implementation checkpoint, not acceptance of the unchecked hardware
+criteria above. The user runs the next hardware tests. Track-loss captures are
+saved for diagnosis but cannot produce measurements. Acquisition finishes the
+configured post-trigger interval even if retention ends early; explicit net
+stopping, runtime stack peaks, separate latency measurements, and real-shot
+coverage remain to be qualified or completed before production use.

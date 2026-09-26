@@ -319,6 +319,9 @@ def prepare_shot_dump(
 ) -> PreparedShotDump:
     """Decode one already-projected two-TX dump for repeated track fits."""
     metadata, cube = parse_dump(raw)
+    retention = metadata.get("retention")
+    if retention and retention["reason"] != "complete":
+        raise ValueError(f"adaptive retention stopped: {retention['reason']}")
     geometry = geometry_from_header(metadata, loop_period_s=loop_period_s)
     frame_values = geometry.chirps_per_frame * geometry.n_rx * geometry.n_samples
     got_frames = cube.reshape(-1).size // frame_values

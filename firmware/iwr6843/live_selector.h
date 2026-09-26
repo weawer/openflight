@@ -3,6 +3,14 @@
 
 #include <stdint.h>
 
+enum {
+    L3_RETENTION_COMPLETE = 0,
+    L3_RETENTION_TRACK_LOST = 1,
+    L3_RETENTION_AMBIGUOUS = 2,
+    L3_RETENTION_RANGE_EDGE = 3,
+    L3_RETENTION_SHORT_HISTORY = 4
+};
+
 typedef struct {
     uint16_t windowBins;
     uint16_t maxJumpBins;
@@ -34,5 +42,7 @@ int32_t l3_live_select(const uint32_t *powers, uint16_t nBins,
                        const L3LiveSelectorParams *params,
                        L3LiveSelectorState *state,
                        L3LiveSelectorResult *result);
+
+uint16_t l3_retention_window(L3LiveSelectorResult *result, uint16_t nBins);
 
 #endif

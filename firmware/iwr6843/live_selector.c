@@ -3,6 +3,33 @@
 #include <stddef.h>
 #include <string.h>
 
+uint16_t l3_retention_window(L3LiveSelectorResult *result, uint16_t nBins)
+{
+    uint16_t low = result->selectedBin;
+    uint16_t high = low;
+    uint16_t i;
+    if (!result->accepted) {
+        return L3_RETENTION_TRACK_LOST;
+    }
+    if (result->ambiguous) {
+        for (i = 0U; i < result->candidateCount; i++) {
+            if (result->candidateBins[i] < low) low = result->candidateBins[i];
+            if (result->candidateBins[i] > high) high = result->candidateBins[i];
+        }
+    }
+    if (low < 2U || high + 2U >= nBins) {
+        return L3_RETENTION_RANGE_EDGE;
+    }
+    if (high - low + 5U > result->windowBins) {
+        return L3_RETENTION_AMBIGUOUS;
+    }
+    if (result->windowStart > low - 2U) result->windowStart = low - 2U;
+    if (result->windowStart + result->windowBins <= high + 2U) {
+        result->windowStart = high + 3U - result->windowBins;
+    }
+    return L3_RETENTION_COMPLETE;
+}
+
 static uint32_t l3_abs_diff(int32_t left, int32_t right)
 {
     return (uint32_t)(left >= right ? left - right : right - left);

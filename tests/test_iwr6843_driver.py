@@ -341,3 +341,21 @@ def test_watch_script_releases_a_trigger_in_the_arming_reply(monkeypatch):
 
     radar.release_sparse_freeze.assert_called_once()
     radar.close.assert_called_once()
+
+
+def test_adaptive_header_split_keeps_shadow_decisions(monkeypatch):
+    raw = pack_dump(
+        np.ones((1, 36, 4, 12), dtype=complex), n_tx=3, version=9,
+        sample_fmt=4, frame_period_us=2000, range_bin_starts=[30],
+        range_bin_counts=[12], frame_time_offsets_us=[0],
+        temperature_report={key: 40 for key in TEMP_REPORT_KEYS},
+        retention=dict(reason="complete", pre_frames=1, planned_frames=1),
+    )
+    prefix = b"SHD f=0 c=31,42 s=31 w=25,12 q=900 n=120 ok=1 a=0\r\n"
+    radar = _notice_radar([prefix + raw[:20], raw[20:44], raw[44:] + b"Done\r\nl3dump:/>"])
+    monkeypatch.setattr(radar.ser, "reset_input_buffer", lambda: None, raising=False)
+    monkeypatch.setattr(radar.ser, "write", lambda _: None, raising=False)
+    received, decisions = radar.read_shadow_dump(timeout_s=0.1)
+    assert received == raw
+    assert len(decisions) == 1
+    assert decisions[0]["selected"] == 31

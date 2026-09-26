@@ -283,7 +283,7 @@ class IWR6843Radar:
             if expected is None:
                 idx = buf.find(MAGIC)
                 if idx >= 0 and len(buf) - idx >= HEADER.size:
-                    prefix = bytes(buf[:idx])
+                    prefix += bytes(buf[:idx])
                     del buf[:idx]
                     try:
                         metadata = parse_header(buf)

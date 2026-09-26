@@ -231,6 +231,7 @@ class IWR6843CaptureMonitor:
         self.self_trigger = self_trigger
         # Firmware picks the cells itself (l3track). Cleared if it cannot.
         self.onboard_tracking = onboard_tracking
+        self._adaptive_retention = False
         self._trigger_notice = b""
         self._release_pending = False
 
@@ -251,6 +252,7 @@ class IWR6843CaptureMonitor:
         if not self.config_path.is_file():
             raise FileNotFoundError(f"IWR6843 config not found: {self.config_path}")
         config = read_capture_config(self.config_path)
+        self._adaptive_retention = config.capture_format == "adaptive16"
         if self.self_trigger is not None and config.capture_format == "iq8":
             raise ValueError("IQ8 capture does not support the IWR6843 self-trigger")
         if self.save_dumps:
@@ -472,6 +474,8 @@ class IWR6843CaptureMonitor:
         (``l3sparse``), then the full ring (``l3dump``). Each step falls back
         only when the firmware refused before streaming.
         """
+        if self._adaptive_retention:
+            return self.radar.read_dump(), None, None
         if self.onboard_tracking:
             try:
                 tracked = self.radar.read_tracked()
@@ -548,6 +552,9 @@ class IWR6843CaptureMonitor:
             if self.save_dumps:
                 path = self._capture_path(sequence, edge_timestamp)
                 path.write_bytes(raw)
+            retention = metadata.get("retention")
+            if retention and retention["reason"] != "complete":
+                raise ValueError(f"adaptive retention stopped: {retention['reason']}")
         except Exception as exc:  # pylint: disable=broad-exception-caught
             error = str(exc)
             raw = None
