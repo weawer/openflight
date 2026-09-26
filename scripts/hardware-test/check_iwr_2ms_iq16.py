@@ -26,6 +26,7 @@ ERROR_FIELDS = (
     "iq8_overrun",
     "iq8_edma_err",
     "compact16_err",
+    "shadow_err",
     "incomplete",
 )
 
@@ -107,12 +108,24 @@ def run(args: argparse.Namespace) -> None:
                     "compaction exceeded the frame period: "
                     f"{_numeric(current, 'compact16_max_us')} >= {expected_period_us} us"
                 )
+            if compact_mode and (
+                _numeric(current, "shadow_max_us")
+                + _numeric(current, "compact16_max_us")
+                >= expected_period_us
+            ):
+                raise RuntimeError(
+                    "selector plus compaction exceeded the frame period: "
+                    f"{_numeric(current, 'shadow_max_us')} + "
+                    f"{_numeric(current, 'compact16_max_us')} >= "
+                    f"{expected_period_us} us"
+                )
             baseline = current
             done = _numeric(current, "frames") - start_frames
             print(
                 f"frames {done}/{args.soak_frames}, "
                 f"rearm max {_numeric(current, 'rearm_max_us')} us, "
                 f"compact max {_numeric(current, 'compact16_max_us')} us"
+                f", selector max {_numeric(current, 'shadow_max_us')} us"
             )
             _write_event(output, "stats", stats=current)
 
@@ -143,6 +156,7 @@ def run(args: argparse.Namespace) -> None:
             f"maximum rearm latency {_numeric(baseline, 'rearm_max_us')} us, "
             f"maximum compaction latency "
             f"{_numeric(baseline, 'compact16_max_us')} us"
+            f", maximum selector latency {_numeric(baseline, 'shadow_max_us')} us"
         )
     finally:
         try:

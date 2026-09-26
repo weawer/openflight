@@ -354,6 +354,22 @@ def test_track_select_is_built_into_the_image():
     assert re.search(r"^SOURCES\s*=.*\btrack_select\.c\b", makefile, re.MULTILINE)
 
 
+def test_live_selector_runs_on_full_scratch_before_reference_compaction():
+    source = FIRMWARE.read_text(encoding="utf-8")
+    makefile = APP_MAKEFILE.read_text(encoding="utf-8")
+    store = _function_source(
+        source,
+        "static void l3_storeCompletedScratchFrame",
+        "static uint32_t l3_snapshotBinStart",
+    )
+
+    assert re.search(r"^SOURCES\s*=.*\blive_selector\.c\b", makefile, re.MULTILINE)
+    assert store.index("l3_live_select(") < store.index("l3_compact_iq16(")
+    assert "gShadowPower[bin]" in store
+    assert "current - gShadowPreviousPower[bin]" in store
+    assert "shadow_max_us=%u" in source
+
+
 def test_track_limits_match_the_capture_limits():
     """The tracker's fixed buffers must hold any capture the ring can freeze."""
     firmware = FIRMWARE.read_text(encoding="utf-8")

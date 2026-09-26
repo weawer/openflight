@@ -50,6 +50,7 @@
 
 #include "dump_format.h"
 #include "compact_iq16.h"
+#include "live_selector.h"
 #include "track_select.h"
 
 #if defined(L3_DUMP_IQ8) || defined(L3_RING_IQ8)
@@ -441,6 +442,23 @@ static volatile uint32_t gCompactIq16LastUs;
 static volatile uint32_t gCompactIq16MaxUs;
 static volatile uint32_t gCompactIq16Generation[2];
 static volatile uint8_t  gCaptureIncomplete;
+static uint32_t gShadowPower[N_SAMPLES];
+static uint32_t gShadowPreviousPower[N_SAMPLES];
+static uint8_t gShadowHavePrevious;
+static L3LiveSelectorParams gShadowParams = {12U, 8U, 2U, 768U};
+static L3LiveSelectorState gShadowState;
+static L3LiveSelectorResult gShadowLast;
+static volatile uint32_t gShadowFrames;
+static volatile uint32_t gShadowAccepted;
+static volatile uint32_t gShadowAmbiguous;
+static volatile uint32_t gShadowMisses;
+static volatile uint32_t gShadowErrors;
+static volatile uint32_t gShadowLastUs;
+static volatile uint32_t gShadowMaxUs;
+static uint8_t gShadowWindowStart[L3_MAX_CAPTURE_FRAMES];
+static uint8_t gShadowCandidate0[L3_MAX_CAPTURE_FRAMES];
+static uint8_t gShadowCandidate1[L3_MAX_CAPTURE_FRAMES];
+static uint16_t gShadowConfidence[L3_MAX_CAPTURE_FRAMES];
 #ifdef L3_IQ8_EDMA_PACK
 static volatile uint8_t  gIq8EdmaBusy[2];
 static volatile uint32_t gIq8EdmaDone;
@@ -1789,6 +1807,53 @@ static void l3_storeCompletedScratchFrame(uint32_t slot, uint8_t scratch)
         return;
     }
 
+    startCycles = Cycleprofiler_getTimeStamp();
+    {
+        uint32_t chirp;
+        uint32_t rx;
+        uint32_t bin;
+        uint32_t selectorStart = startCycles;
+
+        memset(gShadowPower, 0, sizeof(gShadowPower));
+        for (chirp = 0U; chirp < gCapturePlan.chirpsPerFrame; chirp++) {
+            for (rx = 0U; rx < N_RX; rx++) {
+                uint32_t row = (chirp * N_RX + rx) * N_SAMPLES * 2U;
+                for (bin = 0U; bin < N_SAMPLES; bin++) {
+                    int32_t imag = g_iq16FrameScratch[scratch][row + bin * 2U];
+                    int32_t real = g_iq16FrameScratch[scratch][row + bin * 2U + 1U];
+                    gShadowPower[bin] += (uint32_t)(imag < 0 ? -imag : imag) +
+                                         (uint32_t)(real < 0 ? -real : real);
+                }
+            }
+        }
+        for (bin = 0U; bin < N_SAMPLES; bin++) {
+            uint32_t current = gShadowPower[bin];
+            gShadowPower[bin] =
+                gShadowHavePrevious && current > gShadowPreviousPower[bin]
+                    ? current - gShadowPreviousPower[bin] : 0U;
+            gShadowPreviousPower[bin] = current;
+        }
+        gShadowHavePrevious = 1U;
+        if (l3_live_select(gShadowPower, N_SAMPLES, &gShadowParams,
+                           &gShadowState, &gShadowLast) != 0) {
+            gShadowErrors++;
+        } else {
+            gShadowFrames++;
+            gShadowAccepted += gShadowLast.accepted;
+            gShadowAmbiguous += gShadowLast.ambiguous;
+            gShadowMisses += !gShadowLast.accepted;
+            gShadowWindowStart[slot] = (uint8_t)gShadowLast.windowStart;
+            gShadowCandidate0[slot] = (uint8_t)gShadowLast.candidateBins[0];
+            gShadowCandidate1[slot] = (uint8_t)gShadowLast.candidateBins[1];
+            gShadowConfidence[slot] = gShadowLast.confidenceQ8;
+        }
+        elapsedUs = (Cycleprofiler_getTimeStamp() - selectorStart) /
+                    (gCpuClock / 1000000U);
+        gShadowLastUs = elapsedUs;
+        if (elapsedUs > gShadowMaxUs) {
+            gShadowMaxUs = elapsedUs;
+        }
+    }
     startCycles = Cycleprofiler_getTimeStamp();
     if (l3_compact_iq16(&g_iq16FrameScratch[scratch][0],
                         (int16_t *)&g_ring[gFrameOffset[slot]],
@@ -3613,6 +3678,26 @@ static int32_t l3_cli_stats(int32_t argc, char *argv[])
               (unsigned)gCompactIq16Generation[0],
               (unsigned)gCompactIq16Generation[1],
               (unsigned)gCaptureIncomplete);
+    CLI_write("shadow_frames=%u shadow_accept=%u shadow_ambiguous=%u "
+              "shadow_miss=%u shadow_err=%u shadow_last_us=%u shadow_max_us=%u\n",
+              (unsigned)gShadowFrames,
+              (unsigned)gShadowAccepted,
+              (unsigned)gShadowAmbiguous,
+              (unsigned)gShadowMisses,
+              (unsigned)gShadowErrors,
+              (unsigned)gShadowLastUs,
+              (unsigned)gShadowMaxUs);
+    CLI_write("shadow_last candidates=%u/%u selected=%u proposed=%u+%u "
+              "confidence_q8=%u noise=%u accepted=%u ambiguous=%u\n",
+              (unsigned)gShadowLast.candidateBins[0],
+              (unsigned)gShadowLast.candidateBins[1],
+              (unsigned)gShadowLast.selectedBin,
+              (unsigned)gShadowLast.windowStart,
+              (unsigned)gShadowLast.windowBins,
+              (unsigned)gShadowLast.confidenceQ8,
+              (unsigned)gShadowLast.noise,
+              (unsigned)gShadowLast.accepted,
+              (unsigned)gShadowLast.ambiguous);
 #else
     CLI_write("frames=%u wraps=%u active=%d calib=0x%x rf_faults=%u "
               "hwa_frames=%u hwa_out=%u hwa_rearms=%u hwa_rearm_err=%u "
@@ -4186,6 +4271,21 @@ static int32_t l3_cli_sensorStart(int32_t argc, char *argv[])
     gCompactIq16Generation[0] = 0U;
     gCompactIq16Generation[1] = 0U;
     gCaptureIncomplete = 0U;
+    memset(&gShadowState, 0, sizeof(gShadowState));
+    memset(&gShadowLast, 0, sizeof(gShadowLast));
+    memset(gShadowPreviousPower, 0, sizeof(gShadowPreviousPower));
+    gShadowHavePrevious = 0U;
+    memset(gShadowWindowStart, 0, sizeof(gShadowWindowStart));
+    memset(gShadowCandidate0, 0, sizeof(gShadowCandidate0));
+    memset(gShadowCandidate1, 0, sizeof(gShadowCandidate1));
+    memset(gShadowConfidence, 0, sizeof(gShadowConfidence));
+    gShadowFrames = 0U;
+    gShadowAccepted = 0U;
+    gShadowAmbiguous = 0U;
+    gShadowMisses = 0U;
+    gShadowErrors = 0U;
+    gShadowLastUs = 0U;
+    gShadowMaxUs = 0U;
 #ifdef L3_IQ8_EDMA_PACK
     gIq8EdmaBusy[0] = 0U;
     gIq8EdmaBusy[1] = 0U;
