@@ -4643,6 +4643,7 @@ class TestIWR6843OnboardTracking:
 
     def _monitor(self, radar):
         from openflight.iwr6843.monitor import IWR6843CaptureMonitor
+
         monitor = IWR6843CaptureMonitor.__new__(IWR6843CaptureMonitor)
         monitor.radar = radar
         monitor.onboard_tracking = False
@@ -4678,6 +4679,7 @@ class TestIWR6843OnboardTracking:
 
     def _init(self, monkeypatch, tmp_path, radar, **kwargs):
         from openflight.iwr6843.monitor import IWR6843CaptureMonitor as RealMonitor
+
         calibration = Calibration.identity()
         monitors = []
 
@@ -4796,7 +4798,12 @@ class TestSelfTriggerCli:
         config = server_module._self_trigger_config(_self_trigger_args(iwr6843_self_trigger=True))
 
         assert (config.tee_bin, config.snr, config.track_frames) == (35, 6.0, 2)
-        assert config.command == "triggerCfg 35 6.0 2"
+        assert config.command == "triggerCfg 35 6.0 2 12 3 0.0 1.0 1 1.5"
+
+    def test_switch_enables_doppler_gate_for_slow_near_tee_motion(self):
+        config = server_module._self_trigger_config(_self_trigger_args(iwr6843_self_trigger=True))
+
+        assert config.command == "triggerCfg 35 6.0 2 12 3 0.0 1.0 1 1.5"
 
     def test_explicit_tuning_wins(self):
         config = server_module._self_trigger_config(

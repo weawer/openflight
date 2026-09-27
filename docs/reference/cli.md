@@ -67,12 +67,12 @@ The supported angle radar.
 | `--iwr6843-tee-m` | float; default `1.575` | Antenna-center to tee slant range in metres (default: 1.575) |
 | `--iwr6843-net-m` | float; default `4.6` | Antenna-center to net range in metres (default: 4.6) |
 | `--iwr6843-flight` | choices: `net`, `range`, `course`; default `net` | net clamps tracks at the net. range or course keeps returns past it and measures the late-window descent after the shot is published |
-| `--iwr6843-self-trigger` | flag | Freeze the IWR ring after approach motion followed by outward progression beyond the tee and send S! to the OPS, instead of the sound-gate edge. Disconnect the SEN-14262 GATE from HOST_INT. Requires --iwr6843 and --trigger sound |
+| `--iwr6843-self-trigger` | flag | Freeze the IWR ring when a tracked approaching club reaches the tee, using a 1.5 m/s Doppler floor to reject slow nearby motion, and send S! to the OPS instead of using the sound-gate edge for IWR capture. Disconnect the SEN-14262 GATE from HOST_INT. Requires --iwr6843 and --trigger sound |
 | `--iwr6843-full-capture` | flag | Transfer all samples and TX channels instead of selected cells; about 7 seconds for the default profile. Use with `--debug` to save full diagnostic dumps. |
 | `--no-iwr6843-onboard-track` | flag | Select cells on the Pi instead of onboard; still transfers selected samples unless `--iwr6843-full-capture` is set. |
-| `--iwr6843-self-trigger-bin` | int | Local range bin of the tee (default: from --iwr6843-tee-m). Requires --iwr6843-self-trigger |
-| `--iwr6843-self-trigger-level` | float | Residual-power threshold (default: 1000). Requires --iwr6843-self-trigger |
-| `--iwr6843-self-trigger-hits` | int | Consecutive frames the tee bin must be occupied before it is ready, at least 1 (default: 2). Requires --iwr6843-self-trigger |
+| `--iwr6843-self-trigger-bin` | int | Global range-FFT bin of the tee (default: bias-corrected from --iwr6843-tee-m). Requires --iwr6843-self-trigger |
+| `--iwr6843-self-trigger-snr` | float | Candidate threshold as a multiple of the running noise floor (default: 6). Requires --iwr6843-self-trigger |
+| `--iwr6843-self-trigger-frames` | int | Associated frames required before the track may fire, at least 1 (default: 2). Requires --iwr6843-self-trigger |
 | `--iwr6843-tilt-deg` | float | Override mount tilt from the TI calibration JSON |
 | `--iwr6843-radar-height-m` | float | Override antenna-center height from the TI calibration JSON |
 | `--iwr6843-ball-height-m` | float; default `0.04` | Ball-center height above the floor/mat (default: 0.040) |

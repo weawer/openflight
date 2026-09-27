@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
-DEFAULT_STARTUP_LOG_PATH = str(Path.home() / "openflight_sessions" / "terminal_logs")
+DEFAULT_STARTUP_LOG_PATH = str(Path.cwd() / "openflight_sessions" / "terminal_logs")
 
 
 @dataclass(frozen=True)

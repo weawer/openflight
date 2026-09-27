@@ -491,7 +491,10 @@ def test_self_trigger_config_is_sent_before_the_worker_owns_the_port(tmp_path):
     monitor.start(armed=False)
     monitor.stop()
 
-    assert radar.commands[0] == ("triggerCfg 12 6.0 2", threading.current_thread().name)
+    assert radar.commands[0] == (
+        "triggerCfg 12 6.0 2 12 3 0.0 1.0 1 1.5",
+        threading.current_thread().name,
+    )
 
 
 def test_rejected_self_trigger_config_fails_start_and_releases_the_radar(tmp_path):
@@ -574,7 +577,8 @@ def test_other_profile_turns_the_trigger_off_and_back_on_even_on_failure(tmp_pat
     monitor.stop()
 
     lines = [line for line, _thread in radar.commands]
-    assert lines == ["triggerCfg 12 6.0 2", SELF_TRIGGER_OFF_COMMAND, "triggerCfg 12 6.0 2"]
+    command = "triggerCfg 12 6.0 2 12 3 0.0 1.0 1 1.5"
+    assert lines == [command, SELF_TRIGGER_OFF_COMMAND, command]
 
 
 def test_trigger_during_a_serial_job_is_rejected(tmp_path):
@@ -922,7 +926,7 @@ def test_tracker_configuration_precedes_trigger_and_listener(tmp_path):
     monitor.stop()
     assert [command for command, _ in radar.commands] == [
         "trackCfg 0.000135 0.046875 4 1 1.6",
-        "triggerCfg 12 6.0 2",
+        "triggerCfg 12 6.0 2 12 3 0.0 1.0 1 1.5",
     ]
     assert all(thread == threading.current_thread().name for _, thread in radar.commands)
     assert monitor.onboard_tracking
@@ -980,8 +984,10 @@ def test_failed_release_is_retried_without_another_notice(tmp_path):
 def test_adaptive_capture_bypasses_vertical_only_transfer(tmp_path):
     radar = FakeRadar(_raw_dump())
     monitor = IWR6843CaptureMonitor(
-        config_path=tmp_path / "unused.cfg", radar=radar,
-        output_dir=tmp_path, onboard_tracking=True,
+        config_path=tmp_path / "unused.cfg",
+        radar=radar,
+        output_dir=tmp_path,
+        onboard_tracking=True,
         slice_planner=lambda *_: pytest.fail("adaptive capture must preserve all TX"),
     )
     monitor._adaptive_retention = True
@@ -992,16 +998,21 @@ def test_adaptive_capture_bypasses_vertical_only_transfer(tmp_path):
 
 def test_adaptive_early_stop_is_saved_but_reported_as_capture_error(tmp_path):
     raw = pack_dump(
-        np.ones((20, 36, 4, 53), dtype=complex), n_tx=3, version=8,
-        frame_period_us=2000, sample_fmt=4,
+        np.ones((20, 36, 4, 53), dtype=complex),
+        n_tx=3,
+        version=8,
+        frame_period_us=2000,
+        sample_fmt=4,
         range_bin_starts=[20] * 14 + [32] * 6,
         range_bin_counts=[32] * 14 + [53] * 6,
         frame_time_offsets_us=list(range(0, 40_000, 2000)),
         retention=dict(reason="track_lost", pre_frames=14, planned_frames=36),
     )
     monitor = IWR6843CaptureMonitor(
-        config_path=tmp_path / "unused.cfg", radar=FakeRadar(raw),
-        output_dir=tmp_path, save_dumps=True,
+        config_path=tmp_path / "unused.cfg",
+        radar=FakeRadar(raw),
+        output_dir=tmp_path,
+        save_dumps=True,
     )
     monitor._adaptive_retention = True
     monitor._capture(time.time())
