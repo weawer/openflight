@@ -146,6 +146,7 @@ def tee_global_bin(
 SELF_TRIGGER_DEFAULT_SNR = 6.0
 # Consecutive associated frames a track needs before the impact gate may fire.
 SELF_TRIGGER_DEFAULT_TRACK_FRAMES = 2
+SELF_TRIGGER_DEFAULT_MIN_SPEED_MPS = 1.5
 
 
 @dataclass(frozen=True)
@@ -166,6 +167,7 @@ class SelfTriggerConfig:
     tee_bin: int  # global range-FFT bin (tee_global_bin), not a window offset
     snr: float
     track_frames: int
+    min_speed_mps: float = SELF_TRIGGER_DEFAULT_MIN_SPEED_MPS
 
     def __post_init__(self) -> None:
         if self.tee_bin < 0:
@@ -176,14 +178,17 @@ class SelfTriggerConfig:
         if self.track_frames < 1:
             # triggerCfg treats 0 frames as "off", which would leave the host
             # waiting for a notice that never comes.
-            raise ValueError(
-                f"self-trigger track frames must be >= 1, got {self.track_frames}"
-            )
+            raise ValueError(f"self-trigger track frames must be >= 1, got {self.track_frames}")
+        if not math.isfinite(self.min_speed_mps) or self.min_speed_mps < 0.0:
+            raise ValueError(f"self-trigger minimum speed must be >= 0, got {self.min_speed_mps}")
 
     @property
     def command(self) -> str:
         """CLI line that arms this trigger."""
-        return f"triggerCfg {self.tee_bin} {self.snr} {self.track_frames}"
+        return (
+            f"triggerCfg {self.tee_bin} {self.snr} {self.track_frames} "
+            f"12 3 0.0 1.0 1 {self.min_speed_mps}"
+        )
 
 
 # frames=0 disables the firmware trigger (see l3_cli_triggerCfg).

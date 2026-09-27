@@ -61,7 +61,7 @@ class SessionLogger:
     - error: Processing failures (component, context, optional exception metadata)
     """
 
-    DEFAULT_LOG_DIR = Path.home() / "openflight_sessions"
+    DEFAULT_LOG_DIR = Path.cwd() / "openflight_sessions"
 
     def __init__(
         self, log_dir: Optional[Path] = None, location: str = "range", enabled: bool = True
@@ -70,7 +70,7 @@ class SessionLogger:
         Initialize session logger.
 
         Args:
-            log_dir: Directory for log files (default: ~/openflight_sessions)
+            log_dir: Directory for log files (default: ./openflight_sessions)
             location: Location identifier for file naming (e.g., "range", "course", "home")
             enabled: Whether logging is enabled
         """

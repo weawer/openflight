@@ -4104,7 +4104,7 @@ def _run_cloud_push_for_ui():
         if log_dir is None:
             log_dir = session_logger.DEFAULT_LOG_DIR if session_logger else None
         if log_dir is None:
-            log_dir = Path.home() / "openflight_sessions"
+            log_dir = Path.cwd() / "openflight_sessions"
 
         messages = []
         summary = commands.cmd_push(
@@ -4624,7 +4624,7 @@ def main():
         help="Location identifier for session logs (e.g., 'range', 'course', 'home')",
     )
     parser.add_argument(
-        "--log-dir", help="Directory for session logs (default: ~/openflight_sessions)"
+        "--log-dir", help="Directory for session logs (default: ./openflight_sessions)"
     )
     parser.add_argument(
         "--profiles-path",
@@ -4760,8 +4760,9 @@ def main():
     parser.add_argument(
         "--iwr6843-self-trigger",
         action="store_true",
-        help="Freeze the IWR ring when the ball leaves the tee and send S! to the OPS, "
-        "instead of the sound-gate edge. The tee bin comes from --iwr6843-tee-m",
+        help="Freeze the IWR ring when an approaching club reaches the tee and send S! "
+        "to the OPS, instead of using the sound-gate edge for IWR capture. The tee bin "
+        "comes from --iwr6843-tee-m",
     )
     parser.add_argument(
         "--iwr6843-self-trigger-bin",
@@ -5140,7 +5141,7 @@ def main():
     if args.camera_capture:
         startup_status.start("camera", "Connecting high-speed camera")
         camera_capture_base = (
-            Path(args.log_dir).expanduser() if args.log_dir else Path.home() / "openflight_sessions"
+            Path(args.log_dir).expanduser() if args.log_dir else Path.cwd() / "openflight_sessions"
         )
         camera_capture_output_dir = camera_capture_base / args.session_location / "camera"
         if not init_camera_capture(
@@ -5177,7 +5178,7 @@ def main():
             else (
                 Path(args.log_dir).expanduser()
                 if args.log_dir
-                else Path.home() / "openflight_sessions"
+                else Path.cwd() / "openflight_sessions"
             )
             / "iwr6843"
         )
