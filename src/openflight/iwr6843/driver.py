@@ -9,7 +9,12 @@ Gotchas baked in (each cost a debugging session):
 - DTR/RTS must be held low on open (TI EVMs tie them to reset/boot mode).
 - One serial handle only — two handles on one tty steal each other's bytes.
 - The CP2105 can stall a stream for seconds (cp210x -110 control timeouts)
-  and resume; the reader waits out gaps up to ``stall_tolerance_s``.
+  and resume; the reader waits out gaps up to ``stall_tolerance_s`` (default
+  8.0s -- raised from 4.0s after two range-session dumps came back short,
+  507,450/510,508 and 440,594/441,348 bytes, consistent with a stall that
+  outlasted the old tolerance mid-transfer). A dump lost to a stall this way
+  cannot be re-requested: the firmware has already re-armed, and a fresh
+  ``l3dump`` returns whatever is in the ring next, not the same capture.
 """
 
 from __future__ import annotations
@@ -291,7 +296,7 @@ class IWR6843Radar:
         else:
             raise RuntimeError(f"IWR6843 did not enter active capture mode: {health.strip()}")
 
-    def read_dump(self, timeout_s: float = 40.0, stall_tolerance_s: float = 4.0) -> bytes:
+    def read_dump(self, timeout_s: float = 40.0, stall_tolerance_s: float = 8.0) -> bytes:
         """Fire `l3dump` and return one complete dump (best effort on stalls).
 
         Syncs on the ILD1 magic past the CLI echo and sizes the read from the
@@ -310,6 +315,16 @@ class IWR6843Radar:
                 buf.extend(chunk)
                 last = time.time()
             elif buf and time.time() - last > stall_tolerance_s:
+                # This fires the instant the gap crosses stall_tolerance_s, so
+                # the elapsed time logged here is always ~stall_tolerance_s --
+                # it does NOT reveal how long the real gap was, only that it
+                # was at least this long.
+                logger.warning(
+                    "[IWR6843] Dump stream stalled >= %.1fs, giving up (%d/%s bytes received)",
+                    stall_tolerance_s,
+                    len(buf),
+                    expected,
+                )
                 break
             if expected is None:
                 idx = buf.find(MAGIC)

@@ -248,6 +248,91 @@ def test_read_dump_waits_for_cli_ready_after_binary_payload():
     assert radar.ser.writes == [b"l3dump\n"]
 
 
+class StallingSerial:
+    """Reproduces the CP2105 cp210x -110 stall documented in driver.py's
+    module docstring: bytes stop arriving mid-transfer, then resume. Splits
+    the reply after ``split_at`` bytes and holds off the rest until
+    ``stall_s`` (real time, not mocked) has elapsed -- this is what happened
+    on hardware for two range-session dumps that came back short
+    (507,450/510,508 and 440,594/441,348 bytes): the read loop's
+    ``stall_tolerance_s`` window was too short to outlast the gap, so it gave
+    up and returned a truncated payload that can never be re-requested (a
+    fresh ``l3dump`` re-arms and returns whatever is in the ring next, not
+    the same capture).
+    """
+
+    def __init__(self, payload: bytes, split_at: int, stall_s: float):
+        self.first = bytearray(payload[:split_at])
+        self.rest = bytearray(payload[split_at:])
+        self.stall_s = stall_s
+        self.stall_started: float | None = None
+        self.writes: list[bytes] = []
+
+    @property
+    def in_waiting(self):
+        if self.first:
+            return len(self.first)
+        if self.stall_started is None:
+            self.stall_started = time.monotonic()
+        if time.monotonic() - self.stall_started < self.stall_s:
+            return 0
+        return len(self.rest)
+
+    def reset_input_buffer(self):
+        pass
+
+    def write(self, data: bytes):
+        self.writes.append(data)
+
+    def read(self, nbytes: int):
+        if self.first:
+            nbytes = min(nbytes, len(self.first))
+            chunk = self.first[:nbytes]
+            del self.first[:nbytes]
+            return bytes(chunk)
+        if self.stall_started is None or time.monotonic() - self.stall_started < self.stall_s:
+            return b""
+        nbytes = min(nbytes, len(self.rest))
+        chunk = self.rest[:nbytes]
+        del self.rest[:nbytes]
+        return bytes(chunk)
+
+
+@pytest.mark.parametrize(
+    "stall_tolerance_s,expect_complete",
+    [
+        (0.05, False),  # tolerance shorter than the gap: truncated, as on hardware
+        (0.5, True),  # tolerance longer than the gap: rides it out, full payload
+    ],
+)
+def test_read_dump_survives_a_uart_stall_only_if_tolerance_outlasts_it(
+    stall_tolerance_s, expect_complete
+):
+    raw = pack_dump(np.ones((2, 6, 4, 7), dtype=complex), n_tx=3, version=3)
+    reply = b"l3dump\r\n" + raw
+    split_at = len(reply) - 200  # stall partway through the binary payload
+
+    radar = IWR6843Radar.__new__(IWR6843Radar)
+    radar.ser = StallingSerial(reply, split_at, stall_s=0.2)
+
+    payload = radar.read_dump(timeout_s=2.0, stall_tolerance_s=stall_tolerance_s)
+
+    if expect_complete:
+        assert payload == raw
+    else:
+        assert len(payload) < len(raw)
+
+
+def test_default_stall_tolerance_is_8s():
+    """Raised from 4.0s: two range-session dumps came back short (see
+    StallingSerial's docstring above), consistent with a CP2105 stall that
+    outlasted the old default mid-transfer. Locks the default in so it isn't
+    silently lowered back."""
+    import inspect
+
+    assert inspect.signature(IWR6843Radar.read_dump).parameters["stall_tolerance_s"].default == 8.0
+
+
 def test_read_dump_reports_firmware_restart_error_after_binary_payload():
     raw = pack_dump(np.ones((1, 3, 4, 4), dtype=complex), n_tx=3, version=3)
     radar = IWR6843Radar.__new__(IWR6843Radar)

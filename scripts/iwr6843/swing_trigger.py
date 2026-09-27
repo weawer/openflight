@@ -14,6 +14,12 @@ ball-leave detector, and prints PASS or FAIL. Ctrl+C stops.
 
     uv run python scripts/iwr6843/swing_trigger.py --tee-m 1.575
     uv run python scripts/iwr6843/swing_trigger.py --port /dev/ttyUSB0 --tee-m 1.575
+
+For a latency measurement, pin the CPU governor first so frequency scaling
+doesn't add its own jitter to the result:
+    scripts/hardware-test/set_cpu_governor.sh
+    ... run the swing ...
+    scripts/hardware-test/set_cpu_governor.sh restore
 """
 
 from __future__ import annotations
