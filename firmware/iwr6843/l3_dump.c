@@ -2112,8 +2112,8 @@ static void l3_storeCompletedScratchFrame(uint32_t slot, uint8_t scratch)
                         for (rx = 0U; rx < N_RX; rx += L3_SHADOW_RX_STRIDE)
                         {
                             uint32_t row = (chirp * N_RX + rx) * N_SAMPLES * 2U;
-                                                        for (bin = analysisStart;
-                                                                 bin < analysisStart + analysisBins; bin++)
+                            for (bin = analysisStart;
+                                 bin < analysisStart + analysisBins; bin++)
                             {
                                 int32_t imag =
                                     g_iq16FrameScratch[scratch][row + bin * 2U];

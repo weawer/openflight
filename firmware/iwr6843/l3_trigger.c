@@ -485,10 +485,10 @@ int32_t l3_trig_update(l3_trig_t *trig, uint32_t frame, uint32_t teeBin, uint32_
         {
             trig->trackAge++;
         }
-        if (bin <= trig->trackStartBin)
+        if (bin < trig->trackStartBin)
         {
-            /* Still on the backswing, or wandered: the approach is
-             * measured from here. */
+            /* A real retreat resets the approach origin; equal-bin returns
+             * must not keep restarting the approach timer. */
             trig->trackStartBin = bin;
             trig->trackStartFrame = frame;
         }

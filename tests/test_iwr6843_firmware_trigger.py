@@ -618,6 +618,14 @@ def test_stationary_or_receding_gate_return_cannot_bypass_approach_rate(lib, bin
     assert det.counter("slow") > 0
 
 
+def test_repeated_gate_bin_then_one_bin_drift_does_not_fire(lib):
+    det = detector(lib)
+    for _ in range(10):
+        assert det.feed({18: CLUB}) is False
+    assert det.feed({19: CLUB}) is False
+    assert det.counter("slow") > 0
+
+
 def test_track_frames_of_one_fires_on_first_sight_in_the_gate(lib):
     det = detector(lib, trackFrames=1)
     assert det.feed({18: CLUB}) is True

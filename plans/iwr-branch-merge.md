@@ -46,6 +46,15 @@ checksum, and repeat-smoke command:
 [`l3_dump_2ms_iq16_timingfix2_20260927.md`](../firmware/releases/l3_dump_2ms_iq16_timingfix2_20260927.md).
 The follow-up image has not yet been hardware-tested.
 
+**Stationary false-trigger follow-up (2026-09-27):** `timingfix2` fired after
+repeated observations in bin 38 followed by a one-bin shift to bin 39. The
+approach timer was reset on equal-bin observations, making the final shift
+appear fast. The detector now resets the approach origin only on actual
+retreat; a native regression reproduces the hardware sequence. The independent
+test image and checksum are recorded in
+[`l3_dump_2ms_iq16_timingfix3_trigger_20260927.md`](../firmware/releases/l3_dump_2ms_iq16_timingfix3_trigger_20260927.md).
+This image has not yet been hardware-tested.
+
 The donor `l3_trigger.c/h` detector now consumes all-loop vertical-TX residuals
 from compacted IQ16 frames. Host configuration uses global bins with the
 existing range calibration. Adaptive16 retention and RF-stop retry behavior
