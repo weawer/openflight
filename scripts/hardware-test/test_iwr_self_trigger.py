@@ -18,6 +18,12 @@ or FAIL and the script exits non-zero if any check fails.
 Usage:
     uv run python scripts/hardware-test/test_iwr_self_trigger.py
     uv run python scripts/hardware-test/test_iwr_self_trigger.py --swing --tee-m 1.575
+
+For a --swing latency measurement, pin the CPU governor first so frequency
+scaling doesn't add its own jitter to the result:
+    scripts/hardware-test/set_cpu_governor.sh
+    ... run the test ...
+    scripts/hardware-test/set_cpu_governor.sh restore
 """
 
 from __future__ import annotations

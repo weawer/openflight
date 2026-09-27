@@ -373,6 +373,17 @@ def test_retention_requires_candidate_and_uncertainty_margin(
         ("184327", 8, 39.5, (22, 47), (31630, 30326), 47, 47, 1, 1, 614, 41, 12, "ambiguous"),
         ("184327", 9, 83.9, (51, 46), (76757, 40033), 53, 53, 0, 0, 1096, 47, 12, "track_lost"),
         ("184327", 10, 49.5, (37,), (7970,), 45, 45, 0, 0, 62, 39, 12, "track_lost"),
+        # session_20260927_185647_range.jsonl (driver/longer clubs, 56-115 mph)
+        ("185647", 1, 76.8, (), (), 48, 48, 0, 0, 1, 42, 12, "track_lost"),
+        ("185647", 2, 63.9, (39, 45), (24996, 19386), 47, 47, 0, 0, 586, 41, 12, "track_lost"),
+        ("185647", 3, 68.2, (39, 37), (20505, 17564), 44, 44, 0, 0, 494, 38, 12, "track_lost"),
+        ("185647", 4, 115.0, (44, 29), (23693, 10539), 46, 46, 0, 0, 408, 40, 12, "track_lost"),
+        ("185647", 6, 103.6, (43, 63), (36996, 14961), 46, 46, 0, 0, 620, 40, 12, "track_lost"),
+        ("185647", 7, 115.1, (39, 42), (16989, 10144), 45, 45, 0, 0, 301, 39, 12, "track_lost"),
+        ("185647", 8, 115.5, (44, 38), (24619, 23177), 46, 46, 0, 1, 545, 40, 12, "track_lost"),
+        ("185647", 9, 56.4, (43, 22), (10406, 9705), 37, 37, 0, 1, 281, 31, 12, "track_lost"),
+        ("185647", 10, 61.7, (22, 44), (28162, 11171), 39, 39, 0, 0, 404, 33, 12, "track_lost"),
+        ("185647", 11, 108.2, (34, 41), (30941, 2858), 48, 48, 0, 0, 327, 42, 12, "track_lost"),
     ],
 )
 def test_recorded_range_session_retention_stops_reproduce(
@@ -391,10 +402,10 @@ def test_recorded_range_session_retention_stops_reproduce(
     proposed_bins,
     reason,
 ):
-    """Real ``RST`` records from three range sessions (per-shot detail in
+    """Real ``RST`` records from four range sessions (per-shot detail in
     ``plans/iwr-trigger-timing-handoff.md``): every one of these hit either
     ``track_lost`` or ``ambiguous``, with no correlation to ball speed
-    (32-106 mph on both sides fail the same way) and, for every
+    (32-115 mph on both sides fail the same way) and, for every
     ``track_lost`` case, ``held_bin == selected_bin`` -- the selector never
     switches to the wrong candidate, it loses continuity on the one it already
     confirmed. This locks in that observed behavior as a fixture so a future
@@ -402,10 +413,11 @@ def test_recorded_range_session_retention_stops_reproduce(
     synthetic ones. Do not "fix" these by loosening a threshold without first
     understanding why the continuity check rejects a candidate this close to
     the held bin (session 180613 shots 7 and 9: two candidates within 1.02x
-    power of each other, both correctly flagged ambiguous). Session 184327
-    shot 7 has ``accepted=false`` with ``ambiguous=true`` set -- the only
-    recorded case of that combination -- and still resolves to ``track_lost``,
-    confirming ``accepted`` takes priority over ``ambiguous`` in the reason.
+    power of each other, both correctly flagged ambiguous). ``accepted=false``
+    with ``ambiguous=true`` set together (184327 shot 7; 185647 shots 8 and 9)
+    still resolves to ``track_lost`` in every recorded instance, confirming
+    ``accepted`` takes priority over ``ambiguous`` in the reason -- not a
+    one-off, it recurs across sessions.
     """
     result = CResult()
     result.accepted = accepted

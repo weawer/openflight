@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import time
 
 import numpy as np
@@ -142,12 +143,18 @@ class StallingSerial:
         self.first = bytearray(payload[:split_at])
         self.rest = bytearray(payload[split_at:])
         self.stall_s = stall_s
-        self.stalled = False
+        self.stall_started: float | None = None
         self.writes: list[bytes] = []
 
     @property
     def in_waiting(self):
-        return len(self.first) if self.first else len(self.rest)
+        if self.first:
+            return len(self.first)
+        if self.stall_started is None:
+            self.stall_started = time.monotonic()
+        if time.monotonic() - self.stall_started < self.stall_s:
+            return 0
+        return len(self.rest)
 
     def reset_input_buffer(self):
         pass
@@ -161,9 +168,8 @@ class StallingSerial:
             chunk = self.first[:nbytes]
             del self.first[:nbytes]
             return bytes(chunk)
-        if not self.stalled:
-            self.stalled = True
-            time.sleep(self.stall_s)
+        if self.stall_started is None or time.monotonic() - self.stall_started < self.stall_s:
+            return b""
         nbytes = min(nbytes, len(self.rest))
         chunk = self.rest[:nbytes]
         del self.rest[:nbytes]
@@ -193,6 +199,18 @@ def test_read_dump_survives_a_uart_stall_only_if_tolerance_outlasts_it(
         assert payload == raw
     else:
         assert len(payload) < len(raw)
+
+
+@pytest.mark.parametrize(
+    "method",
+    [IWR6843Radar.read_dump, IWR6843Radar.read_adaptive_dump, IWR6843Radar.read_shadow_dump],
+)
+def test_default_stall_tolerance_is_8s(method):
+    """Raised from 4.0s: two range-session dumps came back short (see
+    StallingSerial's docstring above), consistent with a CP2105 stall that
+    outlasted the old default mid-transfer. Locks the default in so it isn't
+    silently lowered back."""
+    assert inspect.signature(method).parameters["stall_tolerance_s"].default == 8.0
 
 
 def test_read_dump_waits_for_cli_ready_after_binary_payload():

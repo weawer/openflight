@@ -1556,70 +1556,82 @@ class OPS243Radar:
         bytes_received = 0
         self.last_hardware_trigger_first_byte_timestamp = None
 
-        while time.time() < deadline:
-            waiting = self.serial.in_waiting
-            if waiting:
-                chunk = self.serial.read(waiting)
-                first_byte_timestamp = None
-                if last_data_time is None:
-                    idle_bytes.extend(chunk)
-                    marker_offsets = [idle_bytes.find(marker) for marker in capture_markers]
-                    marker_offsets = [offset for offset in marker_offsets if offset >= 0]
-                    if not marker_offsets:
-                        # Preserve enough trailing bytes to recognize a marker split
-                        # across reads, while discarding unsolicited CLI/clock noise.
-                        max_marker = max(len(marker) for marker in capture_markers)
-                        if len(idle_bytes) > max_marker:
-                            del idle_bytes[:-max_marker]
-                        time.sleep(0.01)
-                        continue
-                    capture_start = min(marker_offsets)
-                    chunk = bytes(idle_bytes[capture_start:])
-                    idle_bytes.clear()
-                    first_byte_timestamp = time.time()
+        # Block in read() rather than sleep-polling: a fixed sleep between
+        # polls adds up to that much latency and jitter to the first-byte
+        # timestamp below, which is what trigger_delta_ms and the S!-relay
+        # latency are measured against. The port timeout bounds each read
+        # instead, short enough to keep cancel_event responsive.
+        old_timeout = getattr(self.serial, "timeout", None)
+        if old_timeout is not None:
+            self.serial.timeout = 0.05
+        try:
+            while time.time() < deadline:
+                waiting = self.serial.in_waiting
+                chunk = self.serial.read(waiting if waiting else 1)
+                if chunk:
+                    first_byte_timestamp = None
+                    if last_data_time is None:
+                        idle_bytes.extend(chunk)
+                        marker_offsets = [idle_bytes.find(marker) for marker in capture_markers]
+                        marker_offsets = [offset for offset in marker_offsets if offset >= 0]
+                        if not marker_offsets:
+                            # Preserve enough trailing bytes to recognize a marker split
+                            # across reads, while discarding unsolicited CLI/clock noise.
+                            max_marker = max(len(marker) for marker in capture_markers)
+                            if len(idle_bytes) > max_marker:
+                                del idle_bytes[:-max_marker]
+                            continue
+                        capture_start = min(marker_offsets)
+                        chunk = bytes(idle_bytes[capture_start:])
+                        idle_bytes.clear()
+                        first_byte_timestamp = time.time()
 
-                response_lines.append(chunk.decode("ascii", errors="ignore"))
-                bytes_received += len(chunk)
-                if first_byte_timestamp is not None:
-                    last_data_time = first_byte_timestamp
-                    self.last_hardware_trigger_first_byte_timestamp = last_data_time
-                    if on_first_byte is not None:
-                        try:
-                            on_first_byte()
-                        except Exception:
-                            logger.warning("[OPS] First-byte callback failed", exc_info=True)
-                    # The trigger fired — the dump is now in flight. Extend
-                    # the deadline so a late trigger gets its full dump.
-                    deadline = max(deadline, last_data_time + dump_grace)
-                    logger.debug(
-                        "[OPS] Hardware trigger: first byte after %.1fs",
-                        last_data_time - start_time,
-                    )
-                else:
-                    last_data_time = time.time()
+                    response_lines.append(chunk.decode("ascii", errors="ignore"))
+                    bytes_received += len(chunk)
+                    if first_byte_timestamp is not None:
+                        last_data_time = first_byte_timestamp
+                        self.last_hardware_trigger_first_byte_timestamp = last_data_time
+                        if on_first_byte is not None:
+                            try:
+                                on_first_byte()
+                            except Exception:
+                                logger.warning("[OPS] First-byte callback failed", exc_info=True)
+                        # The trigger fired — the dump is now in flight. Extend
+                        # the deadline so a late trigger gets its full dump.
+                        deadline = max(deadline, last_data_time + dump_grace)
+                        logger.debug(
+                            "[OPS] Hardware trigger: first byte after %.1fs",
+                            last_data_time - start_time,
+                        )
+                    else:
+                        last_data_time = time.time()
 
-                # Check if we have complete I/Q data
-                full_response = "".join(response_lines)
-                if '"Q"' in full_response:
-                    q_idx = full_response.rfind('"Q"')
-                    remaining = full_response[q_idx:]
-                    if "]}" in remaining or (
-                        remaining.rstrip().endswith("]")
-                        and remaining.count("[") == remaining.count("]")
-                    ):
-                        break
-
-                time.sleep(0.01)
-            else:
-                if cancel_event is not None and cancel_event.is_set() and last_data_time is None:
-                    logger.info("[OPS] Hardware trigger wait cancelled before capture")
-                    break
-                # If we've started receiving data, use shorter timeout
-                if last_data_time and (time.time() - last_data_time) > 0.5:
+                    # Check if we have complete I/Q data
                     full_response = "".join(response_lines)
                     if '"Q"' in full_response:
+                        q_idx = full_response.rfind('"Q"')
+                        remaining = full_response[q_idx:]
+                        if "]}" in remaining or (
+                            remaining.rstrip().endswith("]")
+                            and remaining.count("[") == remaining.count("]")
+                        ):
+                            break
+                else:
+                    if (
+                        cancel_event is not None
+                        and cancel_event.is_set()
+                        and last_data_time is None
+                    ):
+                        logger.info("[OPS] Hardware trigger wait cancelled before capture")
                         break
-                time.sleep(0.02)
+                    # If we've started receiving data, use shorter timeout
+                    if last_data_time and (time.time() - last_data_time) > 0.5:
+                        full_response = "".join(response_lines)
+                        if '"Q"' in full_response:
+                            break
+        finally:
+            if old_timeout is not None:
+                self.serial.timeout = old_timeout
 
         full_response = "".join(response_lines) if response_lines else ""
 

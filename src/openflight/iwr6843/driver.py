@@ -388,6 +388,19 @@ class IWR6843Radar:
                 buf.extend(chunk)
                 last = time.time()
             elif buf and time.time() - last > stall_tolerance_s:
+                # This fires the instant the gap crosses stall_tolerance_s, so
+                # the elapsed time logged here is always ~stall_tolerance_s --
+                # it does NOT reveal how long the real gap was, only that it
+                # was at least this long. If this recurs, cross-reference the
+                # dump's own dump_duration_s (session JSONL) against the
+                # expected transfer time for a rough bound, or use a manual
+                # probe (see driver.py history) to observe true resume timing.
+                logger.warning(
+                    "[IWR6843] Dump stream stalled >= %.1fs, giving up (%d/%s bytes received)",
+                    stall_tolerance_s,
+                    len(buf),
+                    expected,
+                )
                 break
             if expected is None:
                 idx = buf.find(MAGIC)
