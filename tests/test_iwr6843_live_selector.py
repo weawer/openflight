@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 
 from openflight.iwr6843.driver import parse_retention_stop
+from openflight.iwr6843.dump import RETENTION_REASONS as RETENTION_REASON_NAMES
 from openflight.iwr6843.live_selector import (
     SelectorParams,
     SelectorResult,
@@ -337,6 +338,97 @@ def test_retention_requires_candidate_and_uncertainty_margin(
         for candidate in candidates:
             assert result.window_start <= candidate - 2
             assert candidate + 2 < result.window_start + result.window_bins
+
+
+@pytest.mark.parametrize(
+    "session,shot,ball_mph,candidates,powers,selected,held,accepted,ambiguous,noise,"
+    "proposed_start,proposed_bins,reason",
+    [
+        # session_20260927_175111_range.jsonl (1.845 m tee, triggerCfg 41 6.0 2 12 3 0.0 1.0 1 1.5)
+        ("175111", 1, 91.3, (51, 45), (11112, 1885), 53, 53, 0, 0, 115, 47, 12, "track_lost"),
+        ("175111", 5, 39.2, (51, 48), (23245, 16770), 55, 55, 0, 0, 701, 49, 12, "track_lost"),
+        ("175111", 6, 40.9, (48, 25), (60186, 19516), 51, 51, 0, 0, 1005, 45, 12, "track_lost"),
+        ("175111", 7, 95.2, (47,), (25385,), 57, 57, 0, 0, 198, 51, 12, "track_lost"),
+        ("175111", 8, 79.5, (51, 48), (37302, 12753), 53, 53, 0, 0, 586, 47, 12, "track_lost"),
+        ("175111", 9, 95.4, (49, 51), (15429, 8524), 51, 51, 0, 0, 225, 45, 12, "track_lost"),
+        # session_20260927_180613_range.jsonl (pitching wedge, same tee/triggerCfg)
+        ("180613", 1, 65.0, (46, 57), (35282, 29594), 51, 51, 0, 0, 938, 45, 12, "track_lost"),
+        ("180613", 3, 33.9, (23, 45), (50389, 35879), 49, 49, 0, 0, 883, 43, 12, "track_lost"),
+        ("180613", 4, 53.5, (40, 47), (10535, 6106), 52, 52, 0, 0, 130, 46, 12, "track_lost"),
+        ("180613", 5, 65.4, (46,), (16015,), 51, 51, 0, 0, 167, 45, 12, "track_lost"),
+        ("180613", 6, 43.2, (46, 27), (21047, 18860), 48, 48, 0, 0, 401, 42, 12, "track_lost"),
+        ("180613", 7, 46.2, (27, 49), (12198, 11925), 49, 49, 1, 1, 316, 43, 12, "ambiguous"),
+        ("180613", 8, 34.2, (24, 47), (53147, 36675), 50, 50, 0, 0, 1268, 44, 12, "track_lost"),
+        ("180613", 9, 35.7, (23, 49), (31333, 30684), 49, 49, 1, 1, 505, 43, 12, "ambiguous"),
+        ("180613", 10, 47.1, (), (), 49, 49, 0, 0, 1, 43, 12, "track_lost"),
+        # session_20260927_184327_range.jsonl (5 hybrid then 7 iron, same session)
+        ("184327", 1, 37.4, (22, 24), (28948, 7832), 40, 40, 0, 0, 465, 34, 12, "track_lost"),
+        ("184327", 2, 45.3, (48, 23), (15300, 14681), 48, 48, 1, 1, 327, 42, 12, "ambiguous"),
+        ("184327", 3, 106.3, (48,), (39914,), 52, 52, 0, 0, 671, 46, 12, "track_lost"),
+        ("184327", 4, 32.3, (48, 22), (9681, 9283), 48, 48, 1, 1, 226, 42, 12, "ambiguous"),
+        ("184327", 5, 60.0, (49, 45), (18127, 3677), 53, 53, 0, 0, 222, 47, 12, "track_lost"),
+        ("184327", 6, 41.7, (47, 44), (36187, 8285), 51, 51, 0, 0, 530, 45, 12, "track_lost"),
+        # Only recorded case where ambiguous is set on a rejected (not accepted) candidate.
+        ("184327", 7, 71.7, (45, 70), (12426, 11189), 56, 56, 0, 1, 368, 50, 12, "track_lost"),
+        ("184327", 8, 39.5, (22, 47), (31630, 30326), 47, 47, 1, 1, 614, 41, 12, "ambiguous"),
+        ("184327", 9, 83.9, (51, 46), (76757, 40033), 53, 53, 0, 0, 1096, 47, 12, "track_lost"),
+        ("184327", 10, 49.5, (37,), (7970,), 45, 45, 0, 0, 62, 39, 12, "track_lost"),
+    ],
+)
+def test_recorded_range_session_retention_stops_reproduce(
+    c_retention,
+    session,
+    shot,
+    ball_mph,
+    candidates,
+    powers,
+    selected,
+    held,
+    accepted,
+    ambiguous,
+    noise,
+    proposed_start,
+    proposed_bins,
+    reason,
+):
+    """Real ``RST`` records from three range sessions (per-shot detail in
+    ``plans/iwr-trigger-timing-handoff.md``): every one of these hit either
+    ``track_lost`` or ``ambiguous``, with no correlation to ball speed
+    (32-106 mph on both sides fail the same way) and, for every
+    ``track_lost`` case, ``held_bin == selected_bin`` -- the selector never
+    switches to the wrong candidate, it loses continuity on the one it already
+    confirmed. This locks in that observed behavior as a fixture so a future
+    threshold change can be checked against real captures instead of only
+    synthetic ones. Do not "fix" these by loosening a threshold without first
+    understanding why the continuity check rejects a candidate this close to
+    the held bin (session 180613 shots 7 and 9: two candidates within 1.02x
+    power of each other, both correctly flagged ambiguous). Session 184327
+    shot 7 has ``accepted=false`` with ``ambiguous=true`` set -- the only
+    recorded case of that combination -- and still resolves to ``track_lost``,
+    confirming ``accepted`` takes priority over ``ambiguous`` in the reason.
+    """
+    result = CResult()
+    result.accepted = accepted
+    result.ambiguous = ambiguous
+    result.coasting = 0
+    result.held_bin = held
+    result.candidate_count = len(candidates)
+    result.selected_bin = selected
+    result.window_start = proposed_start
+    result.window_bins = proposed_bins
+    result.noise = noise
+    for index, (bin_value, power) in enumerate(zip(candidates, powers)):
+        result.candidate_bins[index] = bin_value
+        result.candidate_power[index] = power
+
+    code = c_retention(ctypes.byref(result), 128)
+
+    assert RETENTION_REASON_NAMES[code] == reason, (
+        f"session {session} shot {shot} ({ball_mph} mph): expected {reason}, "
+        f"got {RETENTION_REASON_NAMES[code]}"
+    )
+    if reason == "track_lost":
+        assert held == selected, "recorded track_lost stops never switch bins"
 
 
 def test_sixteen_flight_windows_keep_fast_target_with_stronger_distractor(c_select, c_retention):
