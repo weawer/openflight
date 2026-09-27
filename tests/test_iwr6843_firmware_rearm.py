@@ -580,3 +580,33 @@ def test_release_rearms_a_frozen_ring_without_streaming():
     assert freeze.index("l3_stopFrozenRing()") < freeze.index("gCaptureIncomplete")
     assert 'tableEntry[17].cmd           = "l3release"' in source
     assert "static int32_t l3_cli_release(int32_t argc, char *argv[]);" in source
+
+
+def test_front_end_state_is_tracked_where_rf_starts_stops_and_closes():
+    source = FIRMWARE.read_text(encoding="utf-8")
+    start = _function_source(
+        source, "static int32_t l3_startFrontEnd(void)\n{", "static uint8_t l3_dumpCancelRequested"
+    )
+    stop = _function_source(
+        source,
+        "static int32_t l3_cli_sensorStop(int32_t argc, char *argv[])\n{",
+        "static void l3_initTask",
+    )
+
+    assert "MMWave_start(" in start
+    assert start.index("MMWave_start(") < start.index("gFrontEndRunning = 1U")
+    assert stop.index("MMWave_close(") < stop.index("gFrontEndRunning = 0U")
+
+
+def test_sensor_stop_disables_the_trigger_and_ends_the_session_unlatched():
+    """No new latch may land while the capture shuts down, and none may
+    survive into the next session's sensorStop."""
+    source = FIRMWARE.read_text(encoding="utf-8")
+    stop = _function_source(
+        source,
+        "static int32_t l3_cli_sensorStop(int32_t argc, char *argv[])\n{",
+        "static void l3_initTask",
+    )
+
+    assert stop.index("gTriggerEnabled = 0U") < stop.index("if (gCaptureActive)")
+    assert stop.rindex("gSelfTriggerLatched = 0U") > stop.index("MMWave_close(")

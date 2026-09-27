@@ -6,6 +6,9 @@
 - Toolchain: TI mmWave SDK 3.6.2 LTS, ARM compiler 20.2.7 LTS, native build.
 - Supersedes `l3_dump_2ms_iq16_adaptive_selftrigger_20260927.bin`.
 - Hardware status: not flashed or tested by the agent.
+- **Superseded by `l3_dump_2ms_iq16_adaptive_rfstate_20260927.bin`:** this
+  image can call `MMWave_stop` on an already-stopped front end in
+  `sensorStop` (`MMWave_stop failed (-203227134)`).
 
 **The host now requires this firmware.** It releases unwanted self-trigger
 freezes with `l3release` and reports "flash the current firmware" if the

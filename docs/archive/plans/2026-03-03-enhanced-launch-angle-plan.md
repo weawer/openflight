@@ -73,7 +73,7 @@ Update `estimate_launch_angle()` in `src/openflight/server.py`:
 
 ```python
 def estimate_launch_angle(
-    club: ClubType,
+    club: lets ,
     ball_speed_mph: float,
     club_speed_mph: Optional[float] = None,
     spin_rpm: Optional[float] = None,

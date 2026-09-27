@@ -241,3 +241,66 @@ def test_release_stops_rf_then_rearms_and_discards_an_incomplete_capture(
 def test_a_readback_still_refuses_an_incomplete_capture(firmware):
     assert firmware.freeze_incomplete(0) == 0
     assert firmware.freeze_incomplete(1) == -1
+
+
+@pytest.fixture(scope="module")
+def rf_stop(tmp_path_factory):
+    """The real l3_finishCaptureStop, compiled against stubbed SDK calls."""
+    compiler = shutil.which("cc")
+    if compiler is None:
+        pytest.skip("C compiler unavailable")
+    source = Path("firmware/iwr6843/l3_dump.c").read_text()
+    stop = _function(source, "static int32_t l3_finishCaptureStop(void)")
+    harness = (
+        """
+#include <stdint.h>
+#include <stddef.h>
+#define L3_EDMA_CHANNEL 0
+#define EDMA3_CHANNEL_TYPE_DMA 0
+static void *gMMWaveHandle, *gEdmaHandle;
+static uint8_t gCaptureActive, gFrontEndRunning;
+static int stopCalls, stopResult;
+static int MMWave_stop(void *handle, int32_t *err) { stopCalls++; *err = -1; return stopResult; }
+static void Task_sleep(unsigned ticks) { }
+static void CLI_write(const char *format, ...) { }
+static int EDMA_disableChannel(void *handle, int channel, int type) { return 0; }
+"""
+        + stop
+        + """
+int finish_stop(int running, int result) {
+    gCaptureActive = 1; gFrontEndRunning = running; stopCalls = 0; stopResult = result;
+    return l3_finishCaptureStop();
+}
+int mmwave_stop_calls(void) { return stopCalls; }
+int front_end_running(void) { return gFrontEndRunning; }
+int capture_active(void) { return gCaptureActive; }
+"""
+    )
+    root = tmp_path_factory.mktemp("rf-stop-c")
+    c_file = root / "rf_stop.c"
+    c_file.write_text(harness)
+    lib_file = root / "rf_stop.so"
+    subprocess.run(
+        [compiler, "-shared", "-fPIC", "-O2", str(c_file), "-o", str(lib_file)], check=True
+    )
+    return ctypes.CDLL(str(lib_file))
+
+
+@pytest.mark.parametrize(
+    "running,result,status,calls,still_running,active",
+    [
+        (1, 0, 0, 1, 0, 0),  # RF running: stop it
+        (1, -1, -1, 1, 1, 1),  # stop failed: RF still counted as running
+        # 2026-09-27 hardware: a self-trigger latched just before sensorStop
+        # shut the capture down, the latch outlived the stopped sensor, and
+        # the next session's sensorStop called MMWave_stop on it:
+        # "MMWave_stop failed (-203227134)" (MMWAVE_EINVAL). Stopping a
+        # stopped front end is now a no-op.
+        (0, -1, 0, 0, 0, 0),
+    ],
+)
+def test_rf_stop_is_idempotent(rf_stop, running, result, status, calls, still_running, active):
+    assert rf_stop.finish_stop(running, result) == status
+    assert rf_stop.mmwave_stop_calls() == calls
+    assert rf_stop.front_end_running() == still_running
+    assert rf_stop.capture_active() == active

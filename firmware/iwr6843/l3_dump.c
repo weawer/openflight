@@ -450,6 +450,10 @@ static volatile uint32_t gCompactIq16LastUs;
 static volatile uint32_t gCompactIq16MaxUs;
 static volatile uint32_t gCompactIq16Generation[2];
 static volatile uint8_t  gCaptureIncomplete;
+/* RF front end started by MMWave_start and not yet stopped or closed. The
+ * self-trigger latch cannot stand in for this: a latch can outlive a
+ * shutdown that already stopped RF. */
+static volatile uint8_t  gFrontEndRunning;
 static uint32_t gShadowPower[N_SAMPLES];
 static uint32_t gShadowPreviousPower[N_SAMPLES];
 static uint8_t gShadowHavePrevious;
@@ -2231,9 +2235,13 @@ static int32_t l3_finishCaptureStop(void)
 {
     int32_t errCode;
 
-    if (MMWave_stop(gMMWaveHandle, &errCode) < 0) {
-        CLI_write("Error: MMWave_stop failed (%d)\n", errCode);
-        return -1;
+    /* Idempotent: MMWave_stop on a stopped front end fails (MMWAVE_EINVAL). */
+    if (gFrontEndRunning) {
+        if (MMWave_stop(gMMWaveHandle, &errCode) < 0) {
+            CLI_write("Error: MMWave_stop failed (%d)\n", errCode);
+            return -1;
+        }
+        gFrontEndRunning = 0U;
     }
     Task_sleep(10);
 #ifdef HWA_CHAINED_SNAPSHOT_RING
@@ -2720,7 +2728,11 @@ static int32_t l3_startFrontEnd(void)
     calibrationCfg.u.chirpCalibrationCfg.enableCalibration    = true;
     calibrationCfg.u.chirpCalibrationCfg.enablePeriodicity    = true;
     calibrationCfg.u.chirpCalibrationCfg.periodicTimeInFrames = 10U;
-    return MMWave_start(gMMWaveHandle, &calibrationCfg, &errCode);
+    if (MMWave_start(gMMWaveHandle, &calibrationCfg, &errCode) < 0) {
+        return -1;
+    }
+    gFrontEndRunning = 1U;
+    return 0;
 }
 
 static uint8_t l3_dumpCancelRequested(void)
@@ -4590,6 +4602,8 @@ static int32_t l3_cli_sensorStop(int32_t argc, char *argv[])
     int32_t errCode;
     (void)argc; (void)argv;
 
+    /* No new self-trigger may latch while the capture shuts down. */
+    gTriggerEnabled = 0U;
     if (gCaptureActive) {
 #ifdef LIVE_SNAPSHOT_RING
         gRawFrameReadyMask = 0U;
@@ -4613,7 +4627,11 @@ static int32_t l3_cli_sensorStop(int32_t argc, char *argv[])
             return -1;
         }
         gSensorOpened = 0U;
+        gFrontEndRunning = 0U;
     }
+    /* The session is over: a latch left by a freeze that shutdown already
+     * stopped must not reach the next session's sensorStop. */
+    gSelfTriggerLatched = 0U;
     return status;
 }
 
