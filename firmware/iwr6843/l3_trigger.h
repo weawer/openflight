@@ -60,6 +60,7 @@
 /* Defaults for the optional triggerCfg parameters. */
 #define L3_TRIG_DEFAULT_APPROACH_BINS 12U  /* ~0.56 m short of the tee */
 #define L3_TRIG_DEFAULT_GATE_BINS 3U       /* ~0.14 m either side of it */
+#define L3_TRIG_MIN_APPROACH_BINS 2U       /* reject one-bin stationary jitter */
 #define L3_TRIG_DEFAULT_MIN_COHERENCE 0.0F /* off until measured */
 #define L3_TRIG_DEFAULT_MIN_STEP_BINS 1.0F /* ~15 m/s radial at 3 ms */
 #define L3_TRIG_DEFAULT_MIN_SPEED_MPS 0.0F /* Doppler gate off until measured */

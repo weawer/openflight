@@ -507,7 +507,9 @@ int32_t l3_trig_update(l3_trig_t *trig, uint32_t frame, uint32_t teeBin, uint32_
         {
             why = L3_TRIG_WHY_TOO_YOUNG;
         }
-        else if ((elapsed > 0U && (float)progress < cfg->minStepBins * (float)elapsed) ||
+        else if ((cfg->trackFrames > 1U &&
+              progress < (int32_t)L3_TRIG_MIN_APPROACH_BINS) ||
+             (elapsed > 0U && (float)progress < cfg->minStepBins * (float)elapsed) ||
                  (elapsed == 0U && cfg->minStepBins > 0.0F && cfg->trackFrames > 1U))
         {
             why = L3_TRIG_WHY_TOO_SLOW;

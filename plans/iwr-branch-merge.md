@@ -55,6 +55,14 @@ test image and checksum are recorded in
 [`l3_dump_2ms_iq16_timingfix3_trigger_20260927.md`](../firmware/releases/l3_dump_2ms_iq16_timingfix3_trigger_20260927.md).
 This image has not yet been hardware-tested.
 
+**Second stationary trigger trace (2026-09-27):** `timingfix3` fired on bin 39
+after a missed frame, retreat to bin 38, and one-bin return to bin 39. The
+rate threshold was met exactly over one frame. Multi-observation triggers now
+require two bins of net approach as well as the configured rate; one-frame
+mode is unchanged. The separate image and stationary test are documented in
+[`l3_dump_2ms_iq16_timingfix4_trigger_20260927.md`](../firmware/releases/l3_dump_2ms_iq16_timingfix4_trigger_20260927.md).
+This build is not yet hardware-validated.
+
 The donor `l3_trigger.c/h` detector now consumes all-loop vertical-TX residuals
 from compacted IQ16 frames. Host configuration uses global bins with the
 existing range calibration. Adaptive16 retention and RF-stop retry behavior

@@ -626,6 +626,15 @@ def test_repeated_gate_bin_then_one_bin_drift_does_not_fire(lib):
     assert det.counter("slow") > 0
 
 
+def test_missed_frame_and_one_bin_jitter_near_tee_does_not_fire(lib):
+    det = detector(lib)
+    assert det.feed({19: CLUB}) is False
+    assert det.feed() is False
+    assert det.feed({18: CLUB}) is False
+    assert det.feed({19: CLUB}) is False
+    assert det.counter("slow") > 0
+
+
 def test_track_frames_of_one_fires_on_first_sight_in_the_gate(lib):
     det = detector(lib, trackFrames=1)
     assert det.feed({18: CLUB}) is True
