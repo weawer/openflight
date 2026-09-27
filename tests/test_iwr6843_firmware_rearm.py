@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 FIRMWARE = Path(__file__).parents[1] / "firmware" / "iwr6843" / "l3_dump.c"
@@ -341,8 +342,6 @@ def test_dynamic_window_start_is_recorded_per_ring_slot():
 
 # --- l3track: on-chip ball track and cell selection -------------------------
 
-import re  # noqa: E402
-
 from openflight.iwr6843 import sparse  # noqa: E402
 
 TRACK_HEADER = Path(__file__).parents[1] / "firmware" / "iwr6843" / "track_select.h"
@@ -358,10 +357,10 @@ def _define(source: str, name: str) -> int:
 def test_track_commands_are_registered_on_the_cli():
     source = FIRMWARE.read_text(encoding="utf-8")
 
-    assert 'tableEntry[13].cmd           = "l3track"' in source
-    assert "tableEntry[13].cmdHandlerFxn = l3_cli_track;" in source
-    assert 'tableEntry[14].cmd           = "trackCfg"' in source
-    assert "tableEntry[14].cmdHandlerFxn = l3_cli_trackCfg;" in source
+    assert re.search(r'tableEntry\[13\]\.cmd\s*=\s*"l3track";', source)
+    assert re.search(r"tableEntry\[13\]\.cmdHandlerFxn\s*=\s*l3_cli_track;", source)
+    assert re.search(r'tableEntry\[14\]\.cmd\s*=\s*"trackCfg";', source)
+    assert re.search(r"tableEntry\[14\]\.cmdHandlerFxn\s*=\s*l3_cli_trackCfg;", source)
 
 
 def test_track_select_is_built_into_the_image():
@@ -424,6 +423,21 @@ def test_adaptive_pretrigger_seeds_impact_baseline_without_running_selector():
     assert "slot < gCapturePlan.preFrames" in store
     assert "l3_live_select(" in store
     assert store.index("l3_seedShadowPretriggerFrame(scratch);") < store.index("l3_live_select(")
+
+
+def test_adaptive_impact_selector_reads_only_its_configured_range_window():
+    source = FIRMWARE.read_text(encoding="utf-8")
+    store = _function_source(
+        source,
+        "static void l3_storeCompletedScratchFrame",
+        "static uint32_t l3_snapshotBinStart",
+    )
+
+    assert "analysisStart = gCapturePlan.impactStart;" in store
+    assert "analysisBins = gCapturePlan.impactBins;" in store
+    assert "bin < analysisStart + analysisBins" in store
+    assert "slot == gCapturePlan.preFrames + gCapturePlan.impactFrames" in store
+    assert "gShadowHavePrevious = 0U;" in store
 
 
 def test_trigger_trace_has_an_explicit_cli_toggle():
@@ -548,9 +562,11 @@ def test_self_triggered_freeze_stops_rf_before_any_rearm():
     a sensor that was still running. The latched branch must stop RF too."""
     source = FIRMWARE.read_text(encoding="utf-8")
     freeze = _function_source(
-        source, "static int32_t l3_stopFrozenRing(void)\n{", "static int32_t l3_freezeCapture"
+        source, "static int32_t l3_stopFrozenRing(void)", "static int32_t l3_freezeCapture(void)"
     )
-    latched = freeze[freeze.index("if (gSelfTriggerLatched) {") : freeze.index("} else if")]
+    match = re.search(r"if\s*\(gSelfTriggerLatched\)\s*\{(.*?)\}\s*else if", freeze, re.S)
+    assert match is not None
+    latched = match.group(1)
 
     assert "l3_finishCaptureStop()" in latched
     # The latch is only consumed once the freeze has actually completed.
@@ -598,7 +614,7 @@ def test_release_rearms_a_frozen_ring_without_streaming():
     assert stop < release.index("gCaptureIncomplete = 0U") < release.index("l3_sparseRearm()")
     assert "l3_stopFrozenRing()" in freeze
     assert freeze.index("l3_stopFrozenRing()") < freeze.index("gCaptureIncomplete")
-    assert 'tableEntry[17].cmd           = "l3release"' in source
+    assert re.search(r'tableEntry\[17\]\.cmd\s*=\s*"l3release";', source)
     assert "static int32_t l3_cli_release(int32_t argc, char *argv[]);" in source
 
 

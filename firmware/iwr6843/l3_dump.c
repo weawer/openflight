@@ -2080,11 +2080,27 @@ static void l3_storeCompletedScratchFrame(uint32_t slot, uint8_t scratch)
             uint32_t tx;
             uint32_t rx;
             uint32_t bin;
+            uint32_t analysisStart = 0U;
+            uint32_t analysisBins = N_SAMPLES;
             uint32_t selectorStart = startCycles;
             uint8_t hadPreviousRows = gShadowHavePrevious;
 
-            memset(gShadowPower, 0, sizeof(gShadowPower));
-            memset(gShadowCoherent, 0, sizeof(gShadowCoherent));
+            if (l3_captureUsesAdaptiveIq16() &&
+                slot < gCapturePlan.preFrames + gCapturePlan.impactFrames)
+            {
+                analysisStart = gCapturePlan.impactStart;
+                analysisBins = gCapturePlan.impactBins;
+            }
+            if (l3_captureUsesAdaptiveIq16() &&
+                slot == gCapturePlan.preFrames + gCapturePlan.impactFrames)
+            {
+                gShadowHavePrevious = 0U;
+                hadPreviousRows = 0U;
+            }
+            memset(&gShadowPower[analysisStart], 0,
+                   analysisBins * sizeof(gShadowPower[0]));
+            memset(&gShadowCoherent[analysisStart], 0,
+                   analysisBins * sizeof(gShadowCoherent[0]));
             {
                 uint32_t sampledRow = 0U;
                 for (loop = 0U; loop < gCapturePlan.loops;
@@ -2096,7 +2112,8 @@ static void l3_storeCompletedScratchFrame(uint32_t slot, uint8_t scratch)
                         for (rx = 0U; rx < N_RX; rx += L3_SHADOW_RX_STRIDE)
                         {
                             uint32_t row = (chirp * N_RX + rx) * N_SAMPLES * 2U;
-                            for (bin = 0U; bin < N_SAMPLES; bin++)
+                                                        for (bin = analysisStart;
+                                                                 bin < analysisStart + analysisBins; bin++)
                             {
                                 int32_t imag =
                                     g_iq16FrameScratch[scratch][row + bin * 2U];
@@ -2131,7 +2148,7 @@ static void l3_storeCompletedScratchFrame(uint32_t slot, uint8_t scratch)
                     }
                 }
             }
-            for (bin = 0U; bin < N_SAMPLES; bin++)
+            for (bin = analysisStart; bin < analysisStart + analysisBins; bin++)
             {
                 uint32_t current = gShadowPower[bin];
                 gShadowPower[bin] =
@@ -2142,22 +2159,6 @@ static void l3_storeCompletedScratchFrame(uint32_t slot, uint8_t scratch)
             }
             gShadowHavePrevious = 1U;
             {
-                uint32_t activeStart = 0U;
-                uint32_t activeBins = N_SAMPLES;
-                if (l3_captureUsesAdaptiveIq16() &&
-                    slot < gCapturePlan.preFrames + gCapturePlan.impactFrames)
-                {
-                    activeStart = gCapturePlan.impactStart;
-                    activeBins = gCapturePlan.impactBins;
-                    for (bin = 0U; bin < N_SAMPLES; bin++)
-                    {
-                        if (bin < activeStart || bin >= activeStart + activeBins)
-                        {
-                            gShadowPower[bin] = 0U;
-                            gShadowCoherent[bin] = 0U;
-                        }
-                    }
-                }
                 /* Coherent gate (plans/iwr-coherent-gate.md): a rise bin is kept
                  * only if it is backed by a well-above-average coherent
                  * difference, which static/quasi-static clutter does not
@@ -2171,9 +2172,10 @@ static void l3_storeCompletedScratchFrame(uint32_t slot, uint8_t scratch)
                 memset(gShadowGated, 0, sizeof(gShadowGated));
                 if (hadPreviousRows)
                 {
-                    l3_coherent_gate(&gShadowPower[activeStart],
-                                     &gShadowCoherent[activeStart], activeBins,
-                                     L3_COHERENT_GATE_Q8, &gShadowGated[activeStart]);
+                    l3_coherent_gate(&gShadowPower[analysisStart],
+                                     &gShadowCoherent[analysisStart], analysisBins,
+                                     L3_COHERENT_GATE_Q8,
+                                     &gShadowGated[analysisStart]);
                 }
             }
             if (l3_live_select(gShadowGated, N_SAMPLES, &gShadowParams,

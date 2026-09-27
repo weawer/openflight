@@ -35,6 +35,17 @@ frame period as the hard limit. On a false latch, it saves the frozen dump when
 [`l3_dump_2ms_iq16_timingfix_20260927.md`](../firmware/releases/l3_dump_2ms_iq16_timingfix_20260927.md).
 This build is not yet hardware-validated.
 
+**Capture-phase timing result (2026-09-27):** the first timing-fix smoke run
+passed its static soak at 1,426 us, but a capture-phase frame reached 1,832 us.
+The maximum-work frame attributed 1,473 us to shadow selection, 314 us to
+compaction, 39 us to rearm, and zero to trigger processing; no HWA frame was
+missed and no unexpected trigger occurred. The follow-up image limits the
+adaptive impact-phase shadow reduction to its configured range window and
+re-primes the baseline on transition to full-range flight selection. Image,
+checksum, and repeat-smoke command:
+[`l3_dump_2ms_iq16_timingfix2_20260927.md`](../firmware/releases/l3_dump_2ms_iq16_timingfix2_20260927.md).
+The follow-up image has not yet been hardware-tested.
+
 The donor `l3_trigger.c/h` detector now consumes all-loop vertical-TX residuals
 from compacted IQ16 frames. Host configuration uses global bins with the
 existing range calibration. Adaptive16 retention and RF-stop retry behavior
