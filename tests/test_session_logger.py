@@ -9,6 +9,7 @@ import pytest
 
 from openflight import session_logger as session_logger_module
 from openflight.clubs import ClubType
+from openflight.iwr6843.flight_track import FlightTrack, score_flight_track
 from openflight.launch_monitor import Shot
 from openflight.session_logger import SessionLogger, log_session_error
 
@@ -514,6 +515,33 @@ class TestLogIWR6843Capture:
 
         entry = json.loads(logger.session_path.read_text().strip().split("\n")[-1])
         assert entry["retention_stop"] == stop
+        assert entry["flight_track"] is None
+
+    def test_iwr6843_capture_logs_flight_track(self, tmp_path):
+        """Whether the IWR followed the ball must be readable from the log."""
+        logger = SessionLogger(log_dir=tmp_path, enabled=True)
+        logger.start_session(mode="rolling-buffer", trigger_type="sound")
+        flight_track = score_flight_track(
+            FlightTrack(flight_frames=9, start_bin=46.0, end_bin=60.0, range_rate_mph=78.0),
+            83.9,
+        )
+
+        logger.log_iwr6843_capture(
+            shot_number=1,
+            shot_timestamp=100.0,
+            trigger_timestamp=100.002,
+            capture_path="/tmp/x.l3dump",
+            capture_bytes=0,
+            dump_duration_s=4.4,
+            capture_error="adaptive retention stopped: track_lost",
+            ball_speed_mph=83.9,
+            flight_track=flight_track,
+        )
+
+        entry = json.loads(logger.session_path.read_text().strip().split("\n")[-1])
+        assert entry["flight_track"]["status"] == "follows_ball"
+        assert entry["flight_track"]["range_rate_mph"] == 78.0
+        assert entry["flight_track"]["ops_ball_mph"] == 83.9
 
     def test_iwr6843_capture_club_path_defaults_to_none(self, tmp_path):
         logger = SessionLogger(log_dir=tmp_path, enabled=True)

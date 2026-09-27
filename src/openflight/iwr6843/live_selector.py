@@ -4,12 +4,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import numpy as np
+
 RETENTION_COMPLETE = 0
 RETENTION_TRACK_LOST = 1
 RETENTION_AMBIGUOUS = 2
 RETENTION_RANGE_EDGE = 3
 RETENTION_MARGIN_BINS = 2
 MAX_TRACK_HITS = 255
+RANGE_FFT_SIZE = 128
+# l3_storeCompletedScratchFrame sums every third loop and every second RX.
+SHADOW_LOOP_STRIDE = 3
+SHADOW_RX = (0, 2)
+# l3_dump.c L3_COHERENT_GATE_Q8: keep a rise bin only at >= 2x the mean coherent change.
+COHERENT_GATE_Q8 = 512
 
 
 @dataclass(frozen=True)
@@ -189,7 +197,9 @@ def retention_window(result: SelectorResult, n_bins: int) -> tuple[int, int]:
     return RETENTION_COMPLETE, start
 
 
-def coherent_gate(rise: list[int], coherent: list[int], gate_q8: int = 512) -> list[int]:
+def coherent_gate(
+    rise: list[int], coherent: list[int], gate_q8: int = COHERENT_GATE_Q8
+) -> list[int]:
     """Suppress rise bins whose coherent difference is not well above average.
 
     ``rise`` is the existing magnitude-rise selector input; ``coherent`` is the
@@ -210,3 +220,74 @@ def coherent_gate(rise: list[int], coherent: list[int], gate_q8: int = 512) -> l
     mean_coherent = max(1, sum(coherent) // len(coherent))
     threshold = mean_coherent * gate_q8 // 256
     return [value if coherent[index] >= threshold else 0 for index, value in enumerate(rise)]
+
+
+def _shadow_frames(meta: dict, cube: np.ndarray):
+    """Sampled rows (every third loop, all TX, RX 0/2) and window per frame."""
+    frames = meta["n_frames"]
+    n_tx = meta["n_tx"]
+    loops = meta["chirps_per_frame"] // n_tx
+    starts = meta.get("range_bin_starts") or [meta["range_bin_start"]] * frames
+    counts = meta.get("range_bin_counts") or [meta["n_samples"]] * frames
+    chirps = [
+        loop * n_tx + tx for loop in range(0, loops, SHADOW_LOOP_STRIDE) for tx in range(n_tx)
+    ]
+    for frame in range(frames):
+        rows = cube[frame][chirps][:, list(SHADOW_RX), : counts[frame]]
+        yield rows.reshape(-1, counts[frame]), starts[frame], counts[frame]
+
+
+def _l1(values: np.ndarray) -> np.ndarray:
+    return (np.abs(values.real) + np.abs(values.imag)).sum(axis=0)
+
+
+def _placed(start: int, values) -> list[int]:
+    power = [0] * RANGE_FFT_SIZE
+    for offset, value in enumerate(values):
+        power[start + offset] = int(value)
+    return power
+
+
+def selector_powers(meta: dict, cube: np.ndarray) -> list[list[int] | None]:
+    """Rebuild the firmware's magnitude-rise input from a parsed IQ16 dump.
+
+    Mirrors ``l3_storeCompletedScratchFrame``: sum |I|+|Q| over every third
+    loop, all TX and RX 0/2, then keep only the rise over the previous frame,
+    placed at global range bins. Frames whose predecessor retained a different
+    bin window cannot be rebuilt and are None, as is frame 0. This is the
+    input before the coherent gate; see ``gated_selector_inputs``.
+    """
+    frames = list(_shadow_frames(meta, cube))
+    sums = [_placed(start, _l1(rows)) for rows, start, _count in frames]
+    rises: list[list[int] | None] = [None]
+    for frame in range(1, len(frames)):
+        same_window = frames[frame][1:] == frames[frame - 1][1:]
+        rises.append(
+            [max(0, now - before) for now, before in zip(sums[frame], sums[frame - 1])]
+            if same_window
+            else None
+        )
+    return rises
+
+
+def gated_selector_inputs(
+    meta: dict, cube: np.ndarray, gate_q8: int = COHERENT_GATE_Q8
+) -> list[list[int] | None]:
+    """The rise after the firmware's coherent gate: what ``l3_live_select`` sees.
+
+    The coherent difference is |dI|+|dQ| of the same sampled rows between
+    consecutive frames. The firmware takes the gate's mean over its analysis
+    window (the impact bins, or all 128 in flight); a dump only has the
+    retained window, so the mean here is over that window instead.
+    """
+    frames = list(_shadow_frames(meta, cube))
+    gated: list[list[int] | None] = []
+    for frame, rise in enumerate(selector_powers(meta, cube)):
+        if rise is None:
+            gated.append(None)
+            continue
+        rows, start, count = frames[frame]
+        coherent = _l1(rows - frames[frame - 1][0]).astype(int).tolist()
+        kept = coherent_gate(rise[start : start + count], coherent, gate_q8)
+        gated.append(_placed(start, kept))
+    return gated

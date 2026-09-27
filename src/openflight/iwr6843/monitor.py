@@ -16,6 +16,7 @@ from typing import Callable
 from openflight.gpio_factory import ensure_lgpio_pin_factory
 from openflight.iwr6843.driver import IWR6843Radar, UnsupportedCommand
 from openflight.iwr6843.dump import HEADER, parse_header, payload_nbytes
+from openflight.iwr6843.flight_track import FlightTrack, measure_flight_track
 from openflight.iwr6843.sparse import OnboardTrack, SlicePlanner
 from openflight.iwr6843.tracking import RANGE_SPAN_M
 
@@ -38,6 +39,8 @@ class CaptureConfigSummary:
     frame_period_s: float | None = None
     chirp_period_s: float | None = None
     capture_format: str | None = None
+    pre_frames: int | None = None
+    impact_frames: int | None = None
 
     @property
     def n_tx(self) -> int:
@@ -56,6 +59,8 @@ def read_capture_config(config_path: str | Path) -> CaptureConfigSummary:
     """Parse chirp TX masks and the first saved range window from a cfg."""
     masks: list[str] = []
     window: tuple[int, int] | None = None
+    pre_frames: int | None = None
+    impact_frames: int | None = None
     loops: int | None = None
     frame_period_s: float | None = None
     chirp_period_s: float | None = None
@@ -68,6 +73,8 @@ def read_capture_config(config_path: str | Path) -> CaptureConfigSummary:
                 masks.append(line.rsplit(maxsplit=1)[-1])
             elif line.startswith("phaseCaptureCfg") and window is None:
                 window = (int(fields[1]), int(fields[2]))
+                pre_frames = int(fields[3])
+                impact_frames = int(fields[6])
             elif line.startswith("profileCfg"):
                 chirp_period_s = (float(fields[3]) + float(fields[5])) * 1e-6
             elif line.startswith("frameCfg"):
@@ -83,6 +90,8 @@ def read_capture_config(config_path: str | Path) -> CaptureConfigSummary:
         frame_period_s=frame_period_s,
         chirp_period_s=chirp_period_s,
         capture_format=capture_format,
+        pre_frames=pre_frames,
+        impact_frames=impact_frames,
     )
 
 
@@ -222,6 +231,8 @@ class IWR6843Capture:
     onboard_track: OnboardTrack | None = None
     # Firmware selector record for the first frame adaptive16 did not retain.
     retention_stop: dict | None = None
+    # Range rate of what the selector retained, kept when retention stopped.
+    flight_track: FlightTrack | None = None
 
     @property
     def valid(self) -> bool:
@@ -283,6 +294,7 @@ class IWR6843CaptureMonitor:
         # Firmware picks the cells itself (l3track). Cleared if it cannot.
         self.onboard_tracking = onboard_tracking
         self._adaptive_retention = False
+        self._impact_frames: int | None = None
         self._trigger_notice = b""
         self._release_pending = False
 
@@ -304,6 +316,7 @@ class IWR6843CaptureMonitor:
             raise FileNotFoundError(f"IWR6843 config not found: {self.config_path}")
         config = read_capture_config(self.config_path)
         self._adaptive_retention = config.capture_format == "adaptive16"
+        self._impact_frames = config.impact_frames
         if self.self_trigger is not None and config.capture_format == "iq8":
             raise ValueError("IQ8 capture does not support the IWR6843 self-trigger")
         if self.save_dumps:
@@ -471,6 +484,14 @@ class IWR6843CaptureMonitor:
                 logger.warning("[IWR6843] Trigger observer failed", exc_info=True)
         return True
 
+    def _measure_flight_track(self, metadata: dict) -> FlightTrack | None:
+        """Diagnostic only: a failure here must not discard the capture."""
+        try:
+            return measure_flight_track(metadata, impact_frames=self._impact_frames)
+        except Exception:  # pylint: disable=broad-exception-caught
+            logger.warning("[IWR6843] Flight track measurement failed", exc_info=True)
+            return None
+
     def _validate_dump(self, raw: bytes) -> dict:
         if len(raw) < HEADER.size:
             raise ValueError(f"short IWR6843 dump: {len(raw)} bytes")
@@ -601,6 +622,7 @@ class IWR6843CaptureMonitor:
         noise_power = None
         onboard_track = None
         retention_stop = None
+        flight_track = None
         try:
             logger.info("[IWR6843] Trigger #%d: reading track samples", sequence)
             raw, noise_power, onboard_track, retention_stop = self._read_capture()
@@ -608,6 +630,8 @@ class IWR6843CaptureMonitor:
             if self.save_dumps:
                 path = self._capture_path(sequence, edge_timestamp)
                 path.write_bytes(raw)
+            if self._impact_frames is not None:
+                flight_track = self._measure_flight_track(metadata)
             retention = metadata.get("retention")
             if retention and retention["reason"] != "complete":
                 raise ValueError(f"adaptive retention stopped: {retention['reason']}")
@@ -630,6 +654,7 @@ class IWR6843CaptureMonitor:
             noise_power=noise_power,
             onboard_track=onboard_track,
             retention_stop=retention_stop,
+            flight_track=flight_track,
         )
         with self._condition:
             self._capture_active = False

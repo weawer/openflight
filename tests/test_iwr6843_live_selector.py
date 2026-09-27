@@ -17,8 +17,10 @@ from openflight.iwr6843.live_selector import (
     SelectorResult,
     SelectorState,
     coherent_gate,
+    gated_selector_inputs,
     retention_window,
     select_window,
+    selector_powers,
 )
 
 CONFIRMED = SelectorParams().confirm_frames
@@ -460,44 +462,13 @@ def test_sixteen_flight_windows_keep_fast_target_with_stronger_distractor(c_sele
 SESSIONS = ROOT / "openflight_sessions"
 STATIC_SMOKE_DIR = SESSIONS / "iwr-adaptive-smoke"
 MOTION_REFERENCE = SESSIONS / "iwr-shadow-association" / "shadow-reference-001.l3dump"
-SHADOW_LOOP_STRIDE = 3
-SHADOW_RX = (0, 2)
 
 
 def _shadow_powers(path: Path) -> list[list[int] | None]:
-    """Rebuild the firmware selector input from a retained IQ16 dump.
-
-    Mirrors ``l3_storeCompletedScratchFrame``: sum |I|+|Q| over every third loop,
-    all TX and RX 0/2, then keep only the rise over the previous frame. Frames
-    whose predecessor retained a different bin window cannot be rebuilt and are
-    returned as None, as is frame 0.
-    """
-    import numpy as np
-
     from openflight.iwr6843.dump import parse_dump
 
     meta, cube = parse_dump(path.read_bytes())[:2]
-    frames = meta["n_frames"]
-    starts = meta.get("range_bin_starts") or [meta["range_bin_start"]] * frames
-    counts = meta.get("range_bin_counts") or [meta["n_samples"]] * frames
-    chirps = [loop * 3 + tx for loop in range(0, 12, SHADOW_LOOP_STRIDE) for tx in range(3)]
-    sums = []
-    for frame in range(frames):
-        window = cube[frame][chirps][:, list(SHADOW_RX), : counts[frame]]
-        power = [0] * 128
-        per_bin = (np.abs(window.real) + np.abs(window.imag)).sum(axis=(0, 1))
-        for offset, value in enumerate(per_bin):
-            power[starts[frame] + offset] = int(value)
-        sums.append(power)
-    rises: list[list[int] | None] = [None]
-    for frame in range(1, frames):
-        same_window = (starts[frame], counts[frame]) == (starts[frame - 1], counts[frame - 1])
-        rises.append(
-            [max(0, now - before) for now, before in zip(sums[frame], sums[frame - 1])]
-            if same_window
-            else None
-        )
-    return rises
+    return selector_powers(meta, cube)
 
 
 def _step(c_select, powers, params, state):
@@ -965,3 +936,48 @@ def test_retention_stop_record_fits_the_firmware_buffer_at_field_maxima(c_format
 
     # l3_cli_dump formats into a 128-byte stack buffer.
     assert 0 < written < len(buffer)
+
+
+def _gate_cube(frames):
+    """Two-frame cube over a 16-bin window: {bin: complex} per frame."""
+    cube = np.zeros((len(frames), 36, 4, 16), dtype=complex)
+    for index, targets in enumerate(frames):
+        for bin_offset, value in targets.items():
+            cube[index, :, :, bin_offset] = value
+    meta = {
+        "n_frames": len(frames),
+        "n_tx": 3,
+        "chirps_per_frame": 36,
+        "n_samples": 16,
+        "range_bin_starts": (40,) * len(frames),
+        "range_bin_counts": (16,) * len(frames),
+    }
+    return meta, cube
+
+
+def test_gated_input_keeps_an_arriving_target_and_drops_static_returns():
+    meta, cube = _gate_cube([{2: 1000}, {2: 1000, 9: 3000 + 3000j}])
+
+    gated = gated_selector_inputs(meta, cube)
+
+    assert gated[0] is None
+    assert gated[1][42] == 0  # static: no rise
+    assert gated[1][49] > 0
+
+
+def test_gated_input_drops_a_small_rise_the_coherent_gate_rejects():
+    """A slowly brightening static return rises in magnitude, but its complex
+    change is far below twice the window mean set by a real arrival."""
+    meta, cube = _gate_cube([{2: 1000}, {2: 1100, 9: 3000}])
+
+    assert selector_powers(meta, cube)[1][42] > 0
+    gated = gated_selector_inputs(meta, cube)
+    assert gated[1][42] == 0
+    assert gated[1][49] > 0
+
+
+def test_gated_input_needs_an_unmoved_window():
+    meta, cube = _gate_cube([{2: 1000}, {9: 3000}])
+    meta["range_bin_starts"] = (40, 41)
+
+    assert gated_selector_inputs(meta, cube) == [None, None]

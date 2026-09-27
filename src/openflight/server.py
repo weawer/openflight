@@ -2583,6 +2583,7 @@ def _process_iwr6843_angle(shot: Shot) -> float | None:
     """Apply a correlated LCMF-v1 result without risking the OPS shot."""
     if iwr6843_runtime is None or shot.mode == "mock":
         return None
+    from .iwr6843.flight_track import score_flight_track
 
     started = time.time()
     try:
@@ -2624,6 +2625,10 @@ def _process_iwr6843_angle(shot: Shot) -> float | None:
                 ),
                 retention_stop=(
                     getattr(capture, "retention_stop", None) if capture is not None else None
+                ),
+                flight_track=score_flight_track(
+                    getattr(capture, "flight_track", None) if capture is not None else None,
+                    shot.ball_speed_mph,
                 ),
             )
 

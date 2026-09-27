@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 from openflight.iwr6843.dump import pack_dump
+from openflight.iwr6843.flight_track import BIN_M, MPS_TO_MPH
 from openflight.iwr6843.monitor import (
     SELF_TRIGGER_OFF_COMMAND,
     IWR6843CaptureMonitor,
@@ -1033,3 +1034,71 @@ def test_adaptive_early_stop_is_saved_but_reported_as_capture_error(tmp_path):
     monitor.radar.raw = _raw_dump()
     monitor._capture(time.time())
     assert monitor._captures[-1].error is None
+
+
+def _outbound_adaptive_dump(flight_frames: int) -> bytes:
+    n_frames = 20 + flight_frames
+    return pack_dump(
+        np.ones((n_frames, 36, 4, 53), dtype=complex),
+        n_tx=3,
+        version=8,
+        frame_period_us=2000,
+        sample_fmt=4,
+        range_bin_starts=[20] * 14 + [32] * 6 + [40 + 2 * k for k in range(flight_frames)],
+        range_bin_counts=[32] * 14 + [53] * 6 + [12] * flight_frames,
+        frame_time_offsets_us=list(range(0, 2000 * n_frames, 2000)),
+        retention=dict(reason="track_lost", pre_frames=14, planned_frames=36),
+    )
+
+
+def test_early_stop_keeps_the_flight_track_of_what_was_retained(tmp_path):
+    """The dump is rejected for measurement, but what the selector followed
+    before it stopped is exactly the evidence the session log needs."""
+    monitor = IWR6843CaptureMonitor(
+        config_path=tmp_path / "unused.cfg",
+        radar=FakeRadar(_outbound_adaptive_dump(8)),
+        output_dir=tmp_path,
+    )
+    monitor._adaptive_retention = True
+    monitor._impact_frames = 6
+
+    monitor._capture(time.time())
+
+    capture = monitor._captures[0]
+    assert capture.error == "adaptive retention stopped: track_lost"
+    assert capture.flight_track.flight_frames == 8
+    assert capture.flight_track.start_bin == 46.0
+    assert capture.flight_track.range_rate_mph == pytest.approx(2.0 * BIN_M / 0.002 * MPS_TO_MPH)
+
+
+def test_no_flight_track_without_a_phase_capture_cfg(tmp_path):
+    monitor = IWR6843CaptureMonitor(
+        config_path=tmp_path / "unused.cfg",
+        radar=FakeRadar(_outbound_adaptive_dump(8)),
+        output_dir=tmp_path,
+    )
+    monitor._adaptive_retention = True
+
+    monitor._capture(time.time())
+
+    assert monitor._captures[0].flight_track is None
+
+
+def test_flight_track_failure_does_not_discard_a_valid_capture(tmp_path, monkeypatch):
+    def broken(*_args, **_kwargs):
+        raise ValueError("unexpected metadata")
+
+    monkeypatch.setattr("openflight.iwr6843.monitor.measure_flight_track", broken)
+    monitor = IWR6843CaptureMonitor(
+        config_path=tmp_path / "unused.cfg",
+        radar=FakeRadar(_raw_dump()),
+        output_dir=tmp_path,
+    )
+    monitor._impact_frames = 6
+
+    monitor._capture(time.time())
+
+    capture = monitor._captures[0]
+    assert capture.valid
+    assert capture.error is None
+    assert capture.flight_track is None

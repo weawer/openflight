@@ -16,6 +16,7 @@ from openflight import server as server_module
 from openflight.camera.replay import ReplayNotFoundError, ReplayPreparationError
 from openflight.clubs import ClubType
 from openflight.iwr6843 import Calibration
+from openflight.iwr6843.flight_track import FlightTrack
 from openflight.kld7.types import KLD7Angle
 from openflight.launch_monitor import Shot
 from openflight.ops243 import UART_BAUD_COMMANDS
@@ -673,6 +674,77 @@ class TestIWR6843ShotIntegration:
                 },
             )
         ]
+
+    def test_early_stopped_capture_logs_flight_track_scored_against_ops(self, monkeypatch):
+        capture = SimpleNamespace(
+            trigger_timestamp=100.01,
+            path=Path("/tmp/test.l3dump"),
+            raw=None,
+            dump_duration_s=4.4,
+            error="adaptive retention stopped: track_lost",
+            valid=False,
+            sequence=1,
+            flight_track=FlightTrack(
+                flight_frames=9, start_bin=46.0, end_bin=60.0, range_rate_mph=78.0
+            ),
+        )
+        runtime = FakeIWRRuntime(
+            process_shot=lambda **kwargs: SimpleNamespace(capture=capture, measurement=None)
+        )
+        logged = []
+        session = SimpleNamespace(
+            stats={"shots_detected": 0},
+            log_iwr6843_capture=lambda **kwargs: logged.append(kwargs),
+        )
+        monkeypatch.setattr(server_module, "iwr6843_runtime", runtime)
+        monkeypatch.setattr(server_module, "get_session_logger", lambda: session)
+        monkeypatch.setattr(server_module.socketio, "emit", lambda *args, **kwargs: None)
+
+        shot = Shot(
+            ball_speed_mph=83.9,
+            club_speed_mph=65.0,
+            timestamp=datetime.now(),
+            impact_timestamp=100.0,
+            club=ClubType.IRON_7,
+        )
+        server_module._process_iwr6843_angle(shot)
+
+        assert logged[0]["flight_track"]["status"] == "follows_ball"
+        assert logged[0]["flight_track"]["ops_ball_mph"] == 83.9
+        assert logged[0]["flight_track"]["speed_ratio"] == pytest.approx(78.0 / 83.9)
+
+    def test_capture_without_flight_track_logs_none(self, monkeypatch):
+        capture = SimpleNamespace(
+            trigger_timestamp=100.01,
+            path=None,
+            raw=None,
+            dump_duration_s=9.2,
+            error="short IWR6843 dump: 507450 bytes, expected 510508",
+            valid=False,
+            sequence=1,
+        )
+        runtime = FakeIWRRuntime(
+            process_shot=lambda **kwargs: SimpleNamespace(capture=capture, measurement=None)
+        )
+        logged = []
+        session = SimpleNamespace(
+            stats={"shots_detected": 0},
+            log_iwr6843_capture=lambda **kwargs: logged.append(kwargs),
+        )
+        monkeypatch.setattr(server_module, "iwr6843_runtime", runtime)
+        monkeypatch.setattr(server_module, "get_session_logger", lambda: session)
+        monkeypatch.setattr(server_module.socketio, "emit", lambda *args, **kwargs: None)
+
+        shot = Shot(
+            ball_speed_mph=91.3,
+            club_speed_mph=70.0,
+            timestamp=datetime.now(),
+            impact_timestamp=100.0,
+            club=ClubType.IRON_7,
+        )
+        server_module._process_iwr6843_angle(shot)
+
+        assert logged[0]["flight_track"] is None
 
     def test_iwr6843_horizontal_confidence_derived_from_coherence(self, monkeypatch):
         measurement = SimpleNamespace(
