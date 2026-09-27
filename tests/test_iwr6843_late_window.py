@@ -33,7 +33,7 @@ from openflight.iwr6843.late_window import (
     net_gate_m,
     plan_late_window,
 )
-from openflight.iwr6843.monitor import tee_local_bin
+from openflight.iwr6843.monitor import tee_global_bin
 from openflight.iwr6843.runtime import IWR6843Runtime
 
 # Amateur TrackMan averages. Driver is the longest flight, not the timing limit.
@@ -97,7 +97,7 @@ def _late_dump(
 
 def test_enable_flag_bin_comes_from_the_tee_distance():
     cfg = "config/iwr6843_l3dump_wide_24f3ms_53bin_iq16.cfg"
-    assert tee_local_bin(1.575, cfg) == 14
+    assert tee_global_bin(1.575, cfg) == 34
 
 
 def test_net_keeps_the_gate():

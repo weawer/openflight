@@ -28,11 +28,12 @@ import time
 
 sys.path.insert(0, "src")
 
+from openflight.iwr6843.calibration import DEFAULT_CAL_PATH, Calibration  # noqa: E402
 from openflight.iwr6843.driver import IWR6843Radar  # noqa: E402
 from openflight.iwr6843.monitor import (  # noqa: E402
     SELF_TRIGGER_OFF_COMMAND,
     SelfTriggerConfig,
-    tee_local_bin,
+    tee_global_bin,
 )
 from openflight.iwr6843.sparse import (  # noqa: E402
     POWER_MAGIC,
@@ -66,7 +67,7 @@ def _every_cell(summary) -> list[tuple[int, int]]:
 def check_trigger_cfg(radar: IWR6843Radar) -> bool:
     """Valid lines answer Done; malformed ones answer Error."""
     ok = True
-    good = radar.cmd(SelfTriggerConfig(local_bin=10, level=1000.0, hits=2).command, 2.0)
+    good = radar.cmd(SelfTriggerConfig(tee_bin=34, snr=6.0, track_frames=2).command, 2.0)
     ok &= _report("triggerCfg valid line", "Done" in good and "Error" not in good, good.strip())
     for line in ("triggerCfg 10 1000", "triggerCfg x 1000 2", "triggerCfg 10 -5 2"):
         reply = radar.cmd(line, 2.0)
@@ -182,9 +183,10 @@ def main() -> int:
     parser.add_argument("--port", default=None)
     parser.add_argument("--config", default=DEFAULT_CONFIG)
     parser.add_argument("--swing", action="store_true", help="also wait for a real swing")
+    parser.add_argument("--cal", default=DEFAULT_CAL_PATH)
     parser.add_argument("--tee-m", type=float, default=1.575)
-    parser.add_argument("--level", type=float, default=1000.0)
-    parser.add_argument("--hits", type=int, default=2)
+    parser.add_argument("--snr", type=float, default=6.0)
+    parser.add_argument("--frames", type=int, default=2)
     parser.add_argument("--wait-s", type=float, default=60.0)
     args = parser.parse_args()
 
@@ -200,9 +202,11 @@ def main() -> int:
         ]
         if args.swing:
             config = SelfTriggerConfig(
-                local_bin=tee_local_bin(args.tee_m, args.config),
-                level=args.level,
-                hits=args.hits,
+                tee_bin=tee_global_bin(
+                    args.tee_m, args.config, range_bias_m=Calibration.load(args.cal).range_bias_m
+                ),
+                snr=args.snr,
+                track_frames=args.frames,
             )
             results.append(check_swing(radar, config, args.wait_s))
     finally:

@@ -14,7 +14,7 @@ from openflight.iwr6843.monitor import (
     IWR6843CaptureMonitor,
     SelfTriggerConfig,
     read_capture_config,
-    tee_local_bin,
+    tee_global_bin,
     tx_order_from_config,
 )
 from openflight.iwr6843.sparse import SparseCapture
@@ -130,7 +130,7 @@ def test_capture_monitor_rejects_iq8_self_trigger_before_configuring_hardware(tm
         config_path=config,
         output_dir=tmp_path / "dumps",
         radar=radar,
-        self_trigger=SelfTriggerConfig(local_bin=1, level=2.0, hits=2),
+        self_trigger=SelfTriggerConfig(tee_bin=1, snr=2.0, track_frames=2),
     )
 
     with pytest.raises(ValueError, match="IQ8.*self-trigger"):
@@ -453,7 +453,7 @@ def _self_trigger_monitor(tmp_path, radar, **kwargs) -> IWR6843CaptureMonitor:
         output_dir=tmp_path / "dumps",
         radar=radar,
         button_factory=FakeButton,
-        self_trigger=SelfTriggerConfig(local_bin=12, level=1000.0, hits=2),
+        self_trigger=SelfTriggerConfig(tee_bin=12, snr=6.0, track_frames=2),
         **kwargs,
     )
 
@@ -491,7 +491,7 @@ def test_self_trigger_config_is_sent_before_the_worker_owns_the_port(tmp_path):
     monitor.start(armed=False)
     monitor.stop()
 
-    assert radar.commands[0] == ("triggerCfg 12 1000.0 2", threading.current_thread().name)
+    assert radar.commands[0] == ("triggerCfg 12 6.0 2", threading.current_thread().name)
 
 
 def test_rejected_self_trigger_config_fails_start_and_releases_the_radar(tmp_path):
@@ -574,7 +574,7 @@ def test_other_profile_turns_the_trigger_off_and_back_on_even_on_failure(tmp_pat
     monitor.stop()
 
     lines = [line for line, _thread in radar.commands]
-    assert lines == ["triggerCfg 12 1000.0 2", SELF_TRIGGER_OFF_COMMAND, "triggerCfg 12 1000.0 2"]
+    assert lines == ["triggerCfg 12 6.0 2", SELF_TRIGGER_OFF_COMMAND, "triggerCfg 12 6.0 2"]
 
 
 def test_trigger_during_a_serial_job_is_rejected(tmp_path):
@@ -681,9 +681,9 @@ def test_sparse_failure_after_freeze_is_a_capture_error_not_a_fallback(tmp_path)
 @pytest.mark.parametrize(
     ("kwargs", "message"),
     [
-        ({"local_bin": -1, "level": 1000.0, "hits": 2}, "bin"),
-        ({"local_bin": 3, "level": 0.0, "hits": 2}, "level"),
-        ({"local_bin": 3, "level": 1000.0, "hits": 0}, "hits"),
+        ({"tee_bin": -1, "snr": 6.0, "track_frames": 2}, "bin"),
+        ({"tee_bin": 3, "snr": 0.5, "track_frames": 2}, "snr"),
+        ({"tee_bin": 3, "snr": 6.0, "track_frames": 0}, "frames"),
     ],
 )
 def test_self_trigger_config_rejects_values_the_firmware_would_misread(kwargs, message):
@@ -713,11 +713,14 @@ def test_capture_config_summary_reads_masks_and_first_window(tmp_path):
     assert tx_order_from_config(path) == "normal"
 
 
-def test_tee_local_bin_is_relative_to_the_first_window(tmp_path):
+def test_tee_global_bin_is_a_physical_bin_not_a_window_offset(tmp_path):
+    """Ported from Cormac131/feat/iwr-calcs (f72c352): every bin the firmware
+    speaks of is global, never a window offset -- their own hardware run
+    found the club at bins 46-50 while a fixed-tee setup watched bin 34."""
     path = _cfg(tmp_path, "phaseCaptureCfg 20 53 9 32 53 7 47 53 47 8 1")
 
-    # 1.575 m / (6 m / 128) = bin 33.6 -> 34; 34 - 20 = 14.
-    assert tee_local_bin(1.575, path) == 14
+    # 1.575 m / (6 m / 128) = bin 33.6 -> 34.
+    assert tee_global_bin(1.575, path) == 34
 
 
 @pytest.mark.parametrize("tee_m", [0.5, 4.0])
@@ -725,33 +728,33 @@ def test_tee_outside_the_first_window_is_an_error(tmp_path, tee_m):
     path = _cfg(tmp_path, "phaseCaptureCfg 20 53 9 32 53 7 47 53 47 8 1")
 
     with pytest.raises(ValueError, match="outside the first capture window"):
-        tee_local_bin(tee_m, path)
+        tee_global_bin(tee_m, path)
 
 
 def test_tee_bin_needs_a_capture_window(tmp_path):
     with pytest.raises(ValueError, match="no phaseCaptureCfg"):
-        tee_local_bin(1.5, _cfg(tmp_path, "sensorStart"))
+        tee_global_bin(1.5, _cfg(tmp_path, "sensorStart"))
 
 
-def test_tee_local_bin_defaults_to_the_uncorrected_nominal_mapping(tmp_path):
+def test_tee_global_bin_defaults_to_the_uncorrected_nominal_mapping(tmp_path):
     """2026-09-26 hardware calibration: a stationary reflector at 1.20 m and
     1.845 m both centroided ~1.6-1.8 bins beyond this nominal mapping (RF
     group delay/cabling, not a measurement error). Without a range_bias_m,
-    tee_local_bin has no way to know that, and a self-trigger armed from its
+    tee_global_bin has no way to know that, and a self-trigger armed from its
     unmodified output would watch a bin ~7-8 cm short of the true tee."""
     path = _cfg(tmp_path, "phaseCaptureCfg 20 53 9 32 53 7 47 53 47 8 1")
-    assert tee_local_bin(1.845, path) == 39 - 20
+    assert tee_global_bin(1.845, path) == 39
 
 
-def test_tee_local_bin_applies_a_measured_range_bias(tmp_path):
+def test_tee_global_bin_applies_a_measured_range_bias(tmp_path):
     path = _cfg(tmp_path, "phaseCaptureCfg 20 53 9 32 53 7 47 53 47 8 1")
     # Same two calibration points as the config comment in
     # config/iwr6843_l3dump_adaptive_36f2ms_iq16.cfg: true bin - nominal bin.
-    assert tee_local_bin(1.20, path, range_bias_m=0.0) == tee_local_bin(
+    assert tee_global_bin(1.20, path, range_bias_m=0.0) == tee_global_bin(
         1.20, path
     )  # zero bias is a no-op
-    assert tee_local_bin(1.20, path, range_bias_m=0.075) == 27 - 20
-    assert tee_local_bin(1.845, path, range_bias_m=0.075) == 41 - 20
+    assert tee_global_bin(1.20, path, range_bias_m=0.075) == 27
+    assert tee_global_bin(1.845, path, range_bias_m=0.075) == 41
 
 
 def test_listener_serial_error_does_not_kill_the_worker(tmp_path):
@@ -919,7 +922,7 @@ def test_tracker_configuration_precedes_trigger_and_listener(tmp_path):
     monitor.stop()
     assert [command for command, _ in radar.commands] == [
         "trackCfg 0.000135 0.046875 4 1 1.6",
-        "triggerCfg 12 1000.0 2",
+        "triggerCfg 12 6.0 2",
     ]
     assert all(thread == threading.current_thread().name for _, thread in radar.commands)
     assert monitor.onboard_tracking

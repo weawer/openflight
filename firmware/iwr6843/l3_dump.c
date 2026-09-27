@@ -20,6 +20,7 @@
  * loop=c/N_TX), matching iwr6843_l3dump.
  */
 #include <stdint.h>
+#include <float.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,6 +53,7 @@
 #include "compact_iq16.h"
 #include "live_selector.h"
 #include "track_select.h"
+#include "l3_trigger.h"
 
 #if defined(L3_DUMP_IQ8) || defined(L3_RING_IQ8)
 #define L3_ANY_IQ8 1
@@ -404,24 +406,18 @@ static volatile uint8_t  gHwaRearmBusy;
 static volatile uint8_t  gHwaFreezeRequested;
 static volatile uint8_t  gTriggerEnabled;
 static volatile uint8_t  gSelfTriggerLatched;
-static volatile uint32_t gTriggerBin;
-static volatile float    gTriggerPower;
-static volatile uint32_t gTriggerHits;
-static volatile uint32_t gTriggerRun;
-static volatile uint8_t  gTriggerReady;
-static volatile uint8_t  gTriggerToward;
-static volatile uint8_t  gTriggerAway;
-static volatile uint32_t gTriggerPeakBin;
-static volatile uint8_t  gTriggerHavePeak;
-static volatile uint32_t gTriggerDepartureBin;
-static volatile uint8_t  gTriggerHaveDeparture;
-static volatile uint32_t gTriggerMotionFrames;
-static volatile uint32_t gTriggerMissedFrames;
-static volatile uint8_t  gTriggerPhase;
-static volatile uint32_t gTriggerTeePower;
-static volatile uint32_t gTriggerApproachPower;
-static volatile uint8_t  gTriggerDebug;
-static volatile uint8_t  gTriggerDebugPhase = 0xFFU;
+/* Self-trigger detector (l3_trigger.c). Ported from Cormac131/feat/iwr-calcs:
+ * tracks a clubhead's range bin toward the tee against an adaptive noise
+ * floor, instead of the previous fixed-level "ball leaves the tee" rule
+ * (which false-fired on ordinary room clutter -- see the ported release
+ * notes). gTrigLoopPeriodS is set at sensorStart from the physical chirp
+ * timing, for the detector's Doppler readout. */
+static l3_trig_cfg_t     gTrigCfg;
+static l3_trig_t         gTrig;
+static l3_trig_t         gTrigReadback;
+static Semaphore_Handle gTriggerNoticeSemaphore;
+static uint32_t gTriggerLastUs, gTriggerMaxUs, gFrameWorkMaxUs;
+static float             gTrigLoopPeriodS;
 static volatile uint8_t  gHwaShutdownRequested;
 static volatile uint32_t gHwaFreezeRequestFrame;
 static volatile uint32_t gHwaFreezeTargetFrame;
@@ -539,6 +535,7 @@ static void l3_snapshotTask(UArg arg0, UArg arg1);
 #ifdef HWA_CHAINED_SNAPSHOT_RING
 static void l3_hwaRearmTask(UArg arg0, UArg arg1);
 static void l3_considerSelfTrigger(void);
+static void l3_trigRearm(void);
 #endif
 
 #ifdef CONFIGURABLE_CAPTURE
@@ -2506,6 +2503,13 @@ static void l3_hwaRearmTask(UArg arg0, UArg arg1)
                 }
             }
 #endif
+#ifdef CONFIGURABLE_CAPTURE
+            {
+                uint32_t workUs = (Cycleprofiler_getTimeStamp() - rearmStartCycles) /
+                                  (gCpuClock / 1000000U);
+                if (workUs > gFrameWorkMaxUs) gFrameWorkMaxUs = workUs;
+            }
+#endif
             key = Hwi_disable();
             gHwaRearmBusy = 0U;
             Hwi_restore(key);
@@ -2986,6 +2990,7 @@ int32_t l3_cli_dump(int32_t argc, char *argv[])
         gShadowHavePrevious = 0U;
     }
 #endif
+    l3_trigRearm();
     gPreFramesCaptured = 0U;
     gPostFramesCaptured = 0U;
     gPostFramesObserved = 0U;
@@ -3164,83 +3169,141 @@ static void l3_verticalPowerLoops(uint32_t slot, uint32_t localBin, float *out)
     }
 }
 
-/* Loop-0 residual power of one bin; the self-trigger's per-frame probe. */
-static float l3_verticalPowerAt(uint32_t slot, uint32_t localBin)
+/* Self-trigger detector (l3_trigger.c). Ported from Cormac131/feat/iwr-calcs:
+ * an adaptive noise floor over the bins short of the tee, a range-continuity
+ * track of the strongest coherent return, and an impact gate that fires once
+ * the track is old enough and has approached fast enough. Replaces the
+ * previous fixed-level "ball leaves the tee" rule, which needed a level
+ * tuned per room and profile and still false-fired on ordinary static
+ * clutter near the tee (2026-09-27 hardware run: constant re-triggering on
+ * an empty static scene). */
+
+/* Burst-MTI residual of one bin over every loop of a frame, summed over the
+ * vertical TX pair (TX0 and TX2 of three) and all RX: the energy integrated
+ * over every loop, the strongest single loop's power, loop 0 alone, and the
+ * lag-1 loop autocorrelation the detector reads Doppler from. The index math
+ * matches l3_iq16Sample exactly (advancing loop by one TX-stride of chirps);
+ * inlined as raw pointer arithmetic to avoid a function-call index
+ * recomputation per sample in this per-frame hot path. */
+static void l3_verticalResidual(uint32_t slot, uint32_t localBin, l3_trig_obs_t *obs)
 {
-    float perLoop[L3_MAX_LOOPS];
+    const int16_t *frame = (const int16_t *)&g_ring[gFrameOffset[slot]];
+    uint32_t binCount = gFrameBinCount[slot];
+    uint32_t ntx = gCapturePlan.chirpsPerFrame / gCapturePlan.loops;
+    uint32_t loops = gCapturePlan.loops;
+    uint32_t loopStride = ntx * N_RX * binCount * 2U;
+    float loopPower[L3_MAX_LOOPS];
+    float energy = 0.0F;
+    float peak = 0.0F;
+    float r1Re = 0.0F;
+    float r1Im = 0.0F;
+    uint32_t tx;
+    uint32_t loop;
 
-    l3_verticalPowerLoops(slot, localBin, perLoop);
-    return perLoop[0];
-}
-
-/* Clubhead is short of the ball. Twelve bins is about 0.6 m at the wide profile. */
-#define L3_TRIGGER_APPROACH_BINS 12U
-
-static void l3_clearTriggerMotion(void)
-{
-    gTriggerReady = 0U;
-    gTriggerToward = 0U;
-    gTriggerAway = 0U;
-    gTriggerRun = 0U;
-    gTriggerPeakBin = 0U;
-    gTriggerHavePeak = 0U;
-    gTriggerHaveDeparture = 0U;
-    gTriggerDepartureBin = 0U;
-    gTriggerMotionFrames = 0U;
-    gTriggerMissedFrames = 0U;
-}
-
-static const char *l3_triggerPhaseName(uint8_t phase)
-{
-    static const char *const names[] = {
-        "off", "no-frame", "bin-outside", "tee-low", "occupying",
-        "watching", "no-approach", "toward", "away", "fired"
-    };
-
-    if (phase >= (uint8_t)(sizeof(names) / sizeof(names[0]))) {
-        return "unknown";
+    for (loop = 0U; loop < loops; loop++) {
+        loopPower[loop] = 0.0F;
     }
-    return names[phase];
+    for (tx = 0U; tx < ntx; tx++) {
+        uint32_t rx;
+        if (ntx == 3U && tx == 1U) {
+            continue;
+        }
+        for (rx = 0U; rx < N_RX; rx++) {
+            const int16_t *base = &frame[((tx * N_RX + rx) * binCount + localBin) * 2U];
+            const int16_t *sample = base;
+            float meanIm = 0.0F;
+            float meanRe = 0.0F;
+            float prevIm = 0.0F;
+            float prevRe = 0.0F;
+
+            for (loop = 0U; loop < loops; loop++) {
+                meanIm += (float)sample[0];
+                meanRe += (float)sample[1];
+                sample += loopStride;
+            }
+            meanIm /= (float)loops;
+            meanRe /= (float)loops;
+            sample = base;
+            for (loop = 0U; loop < loops; loop++) {
+                float im = (float)sample[0] - meanIm;
+                float re = (float)sample[1] - meanRe;
+                float power = im * im + re * re;
+                sample += loopStride;
+                energy += power;
+                loopPower[loop] += power;
+                if (loop > 0U) {
+                    /* residual[loop] * conj(residual[loop - 1]) */
+                    r1Re += re * prevRe + im * prevIm;
+                    r1Im += im * prevRe - re * prevIm;
+                }
+                prevIm = im;
+                prevRe = re;
+            }
+        }
+    }
+    for (loop = 0U; loop < loops; loop++) {
+        if (loopPower[loop] > peak) {
+            peak = loopPower[loop];
+        }
+    }
+    obs->energy = energy;
+    obs->peak = peak;
+    obs->loop0 = loopPower[0];
+    obs->r1Re = r1Re;
+    obs->r1Im = r1Im;
 }
 
-static void l3_writeTriggerDebug(uint8_t phase)
+/* The ring was re-armed for the next shot: drop the track and any fired
+ * state, keep the noise floor, counters and log (triggerLog stays readable
+ * across a rearm). */
+static void l3_trigRearm(void)
 {
-    if (!gTriggerDebug) {
+    l3_trig_rearm(&gTrig);
+}
+
+/* Per completed pre-trigger slot: reduce the watch region (the approach bins
+ * short of the tee, through the impact gate) to one observation per bin and
+ * hand it to the detector. Runs inline on the high-priority rearm task, like
+ * the rule it replaces; feeding it from a separate lower-priority task (as
+ * upstream now does) is a further change this port does not make. */
+static void l3_updateSelfTrigger(void)
+{
+    /* Static: this runs on the rearm task, whose stack is small. */
+    static l3_trig_obs_t obs[L3_TRIG_MAX_BINS];
+    uint32_t slot;
+    uint32_t first;
+    uint32_t count;
+    uint32_t bin;
+    int32_t fired;
+    uintptr_t key;
+
+    if (!gTriggerEnabled) {
         return;
     }
-    if (phase == gTriggerDebugPhase) {
+    if (gSelfTriggerLatched || gHwaFreezeRequested || gPostCaptureStarted) {
         return;
     }
-    gTriggerDebugPhase = phase;
-    CLI_write(
-        "trig phase=%s tee=%u approach=%u ready=%u toward=%u away=%u "
-        "run=%u peak=%u have=%u bin=%u level=%u latched=%u\n",
-        l3_triggerPhaseName(phase),
-        (unsigned)gTriggerTeePower,
-        (unsigned)gTriggerApproachPower,
-        (unsigned)gTriggerReady,
-        (unsigned)gTriggerToward,
-        (unsigned)gTriggerAway,
-        (unsigned)gTriggerRun,
-        (unsigned)gTriggerPeakBin,
-        (unsigned)gTriggerHavePeak,
-        (unsigned)gTriggerBin,
-        (unsigned)gTriggerPower,
-        (unsigned)gSelfTriggerLatched);
-}
-
-static void l3_noteTrigger(uint8_t phase, float tee, float approach)
-{
-    gTriggerPhase = phase;
-    gTriggerTeePower = (uint32_t)tee;
-    gTriggerApproachPower = (uint32_t)approach;
-    l3_writeTriggerDebug(phase);
-}
-
-static void l3_latchSelfTrigger(float tee, float approach)
-{
-    uintptr_t key = Hwi_disable();
-
+    /* Freezing before the ring has wrapped would hand the host pre-trigger
+     * slots this session never wrote. */
+    if (gCapturePlan.preFrames == 0U || gCapturePlan.loops == 0U ||
+        gPreFramesCaptured < gCapturePlan.preFrames) {
+        return;
+    }
+    slot = (gPreFramesCaptured - 1U) % gCapturePlan.preFrames;
+    if (!l3_trig_region(&gTrigCfg, gTrigCfg.teeBin, gFrameBinStart[slot], gFrameBinCount[slot],
+                        &first, &count)) {
+        return;
+    }
+    for (bin = 0U; bin < count; bin++) {
+        l3_verticalResidual(slot, first + bin, &obs[bin]);
+    }
+    gTrig.loopPeriodS = gTrigLoopPeriodS;
+    fired = l3_trig_update(&gTrig, gPreFramesCaptured, gTrigCfg.teeBin,
+                           gFrameBinStart[slot] + first, obs, count);
+    if (!fired) {
+        return;
+    }
+    key = Hwi_disable();
     gHwaFreezeRequested = 1U;
     gPostCaptureStarted = 0U;
     gPostFramesCaptured = 0U;
@@ -3249,127 +3312,24 @@ static void l3_latchSelfTrigger(float tee, float approach)
     gSelfTriggerLatched = 1U;
     gHwaFreezeRequests++;
     Hwi_restore(key);
-    l3_clearTriggerMotion();
-    l3_noteTrigger(9U, tee, approach);
-    CLI_write("Triggered\n");
+    Semaphore_post(gTriggerNoticeSemaphore);
 }
 
 static void l3_considerSelfTrigger(void)
 {
-    uint32_t slot;
-    uint32_t bin;
-    uint32_t first;
-    uint32_t peakBin = 0U;
-    float peak = 0.0F;
-    float tee;
-    uint8_t havePeak = 0U;
+    uint32_t started = Cycleprofiler_getTimeStamp();
+    l3_updateSelfTrigger();
+    gTriggerLastUs = (Cycleprofiler_getTimeStamp() - started) / (gCpuClock / 1000000U);
+    if (gTriggerLastUs > gTriggerMaxUs) gTriggerMaxUs = gTriggerLastUs;
+}
 
-    if (!gTriggerEnabled) {
-        l3_noteTrigger(0U, 0.0F, 0.0F);
-        return;
+static void l3_triggerNoticeTask(UArg arg0, UArg arg1)
+{
+    (void)arg0; (void)arg1;
+    while (1) {
+        Semaphore_pend(gTriggerNoticeSemaphore, BIOS_WAIT_FOREVER);
+        if (gSelfTriggerLatched) CLI_write("Triggered\n");
     }
-    if (gSelfTriggerLatched || gHwaFreezeRequested || gPostCaptureStarted) {
-        l3_noteTrigger(9U, (float)gTriggerTeePower, (float)gTriggerApproachPower);
-        return;
-    }
-    if (gPreFramesCaptured < gCapturePlan.preFrames || gCapturePlan.preFrames == 0U || gCapturePlan.loops == 0U) {
-        l3_noteTrigger(1U, 0.0F, 0.0F);
-        return;
-    }
-    if (gTriggerBin >= gFrameBinCount[0] && gTriggerBin >= gCapturePlan.preBins) {
-        l3_clearTriggerMotion();
-        l3_noteTrigger(2U, 0.0F, 0.0F);
-        return;
-    }
-    slot = (gPreFramesCaptured - 1U) % gCapturePlan.preFrames;
-    if (gTriggerBin >= gFrameBinCount[slot]) {
-        l3_clearTriggerMotion();
-        l3_noteTrigger(2U, 0.0F, 0.0F);
-        return;
-    }
-    tee = l3_verticalPowerAt(slot, gTriggerBin);
-    if (gTriggerToward) {
-        gTriggerMotionFrames++;
-        if (gTriggerMotionFrames * gFramePeriodUs > 60000U) {
-            l3_clearTriggerMotion();
-        }
-    }
-    if (tee < gTriggerPower && !gTriggerToward) {
-        l3_clearTriggerMotion();
-        l3_noteTrigger(3U, tee, 0.0F);
-        return;
-    }
-    if (!gTriggerReady) {
-        gTriggerRun++;
-        if (gTriggerRun >= gTriggerHits) {
-            gTriggerReady = 1U;
-        }
-        l3_noteTrigger(gTriggerReady ? 5U : 4U, tee, 0.0F);
-        return;
-    }
-    if (gTriggerToward) {
-        uint32_t pastEnd = gTriggerBin + 1U + L3_TRIGGER_APPROACH_BINS;
-        uint32_t pastBin = 0U;
-        float pastPeak = 0.0F;
-
-        if (pastEnd > gFrameBinCount[slot]) {
-            pastEnd = gFrameBinCount[slot];
-        }
-        for (bin = gTriggerBin + 1U; bin < pastEnd; bin++) {
-            float past = l3_verticalPowerAt(slot, bin);
-            if (past > pastPeak) {
-                pastPeak = past;
-                pastBin = bin;
-            }
-        }
-        if (pastPeak >= gTriggerPower) {
-            if (gTriggerHaveDeparture && pastBin > gTriggerDepartureBin) {
-                l3_latchSelfTrigger(tee, pastPeak);
-                return;
-            }
-            if (gTriggerHaveDeparture && pastBin < gTriggerDepartureBin) {
-                l3_clearTriggerMotion();
-                l3_noteTrigger(5U, tee, 0.0F);
-                return;
-            }
-            gTriggerDepartureBin = pastBin;
-            gTriggerHaveDeparture = 1U;
-            gTriggerMissedFrames = 0U;
-            l3_noteTrigger(8U, tee, pastPeak);
-            return;
-        }
-    }
-    gTriggerHaveDeparture = 0U;
-    first = (gTriggerBin > L3_TRIGGER_APPROACH_BINS) ? (gTriggerBin - L3_TRIGGER_APPROACH_BINS) : 0U;
-    for (bin = first; bin < gTriggerBin; bin++) {
-        float power;
-        if (bin >= gFrameBinCount[slot]) {
-            break;
-        }
-        power = l3_verticalPowerAt(slot, bin);
-        if (power >= gTriggerPower && (!havePeak || power > peak)) {
-            peak = power;
-            peakBin = bin;
-            havePeak = 1U;
-        }
-    }
-    if (!havePeak) {
-        gTriggerMissedFrames++;
-        if (gTriggerMissedFrames > 2U) {
-            l3_clearTriggerMotion();
-        }
-        l3_noteTrigger(6U, tee, 0.0F);
-        return;
-    }
-    gTriggerMissedFrames = 0U;
-    if (gTriggerHavePeak && peakBin > gTriggerPeakBin) {
-        gTriggerToward = 1U;
-    } else if (gTriggerToward && gTriggerHavePeak && peakBin < gTriggerPeakBin) {
-        l3_clearTriggerMotion();
-    }
-    gTriggerPeakBin = peakBin;
-    gTriggerHavePeak = 1U;
-    l3_noteTrigger(gTriggerToward ? 7U : 5U, tee, peak);
 }
 #endif
 
@@ -3544,6 +3504,7 @@ static int32_t l3_sparseRearm(void)
         gShadowHavePrevious = 0U;
     }
 #endif
+    l3_trigRearm();
     gPreFramesCaptured = 0U;
     gPostFramesCaptured = 0U;
     gPostFramesObserved = 0U;
@@ -3798,58 +3759,187 @@ static int32_t l3_cli_trackCfg(int32_t argc, char *argv[])
     return 0;
 }
 
-/* CLI "triggerCfg <localBin> <power> <hits>": arm contact detection.
- * The tee bin must stay occupied for <hits> frames. A second return must then
- * walk toward that bin and back away, and the tee return must leave. hits of
- * 0 disables it. */
+/* CLI "triggerCfg <bin> <snr> <frames> [approach gate minCoh minStep stat
+ * minSpeed]": arm the approaching-clubhead detector around the tee bin, a
+ * GLOBAL range-FFT bin (the host converts the tee range; bin 34 is 1.59 m on
+ * a 128-point FFT over 6 m). A candidate needs a residual statistic of at
+ * least <snr> times the running noise floor; its track needs <frames>
+ * observations before entering the impact gate fires the capture. frames of
+ * 0 disables the trigger. The optional values are the bins watched short of
+ * the tee, the gate half-width in bins, the minimum Doppler coherence
+ * (0..1, 0 = off), the minimum mean approach rate in bins per frame, the
+ * statistic (0 = energy over all loops, 1 = strongest loop) and the minimum
+ * apparent Doppler speed of a candidate in m/s (0 = off). Ported from
+ * Cormac131/feat/iwr-calcs. Re-arming clears the log. */
 static int32_t l3_cli_triggerCfg(int32_t argc, char *argv[])
 {
-    unsigned long bin;
-    unsigned long hits;
-    float power;
+    l3_trig_cfg_t cfg;
+    unsigned long value;
     char *end;
 
-    if (argc != 4) {
-        CLI_write("Error: triggerCfg <localBin> <power> <hits>\n");
+    if (argc < 4 || argc > 10) {
+        CLI_write("Error: triggerCfg <bin> <snr> <frames> "
+                  "[approach gate minCoh minStep stat minSpeed]\n");
         return -1;
     }
-    bin = strtoul(argv[1], &end, 10);
+    l3_trig_cfg_defaults(&cfg);
+    value = strtoul(argv[1], &end, 10);
     if (*end != '\0') {
         CLI_write("Error: trigger bin\n");
         return -1;
     }
-    power = strtof(argv[2], &end);
-    if (*end != '\0' || power < 0.0F) {
-        CLI_write("Error: trigger power\n");
-        return -1;
-    }
-    hits = strtoul(argv[3], &end, 10);
+    cfg.teeBin = (uint32_t)value;
+    cfg.snr = strtof(argv[2], &end);
     if (*end != '\0') {
-        CLI_write("Error: trigger hits\n");
+        CLI_write("Error: trigger snr\n");
         return -1;
     }
-    gTriggerBin = (uint32_t)bin;
-    gTriggerPower = power;
-    gTriggerHits = (uint32_t)hits;
-    gTriggerRun = 0U;
-    gTriggerReady = 0U;
-    gTriggerToward = 0U;
-    gTriggerAway = 0U;
-    gTriggerPeakBin = 0U;
-    gTriggerHavePeak = 0U;
-    gTriggerHaveDeparture = 0U;
-    gTriggerDepartureBin = 0U;
-    gTriggerMotionFrames = 0U;
-    gTriggerMissedFrames = 0U;
-    gTriggerEnabled = (hits > 0U) ? 1U : 0U;
+    value = strtoul(argv[3], &end, 10);
+    if (*end != '\0') {
+        CLI_write("Error: trigger frames\n");
+        return -1;
+    }
+    cfg.trackFrames = (uint32_t)value;
+    if (argc > 4) {
+        value = strtoul(argv[4], &end, 10);
+        if (*end != '\0') {
+            CLI_write("Error: trigger approach bins\n");
+            return -1;
+        }
+        cfg.approachBins = (uint32_t)value;
+    }
+    if (argc > 5) {
+        value = strtoul(argv[5], &end, 10);
+        if (*end != '\0') {
+            CLI_write("Error: trigger gate bins\n");
+            return -1;
+        }
+        cfg.gateBins = (uint32_t)value;
+    }
+    if (argc > 6) {
+        cfg.minCoherence = strtof(argv[6], &end);
+        if (*end != '\0') {
+            CLI_write("Error: trigger min coherence\n");
+            return -1;
+        }
+    }
+    if (argc > 7) {
+        cfg.minStepBins = strtof(argv[7], &end);
+        if (*end != '\0') {
+            CLI_write("Error: trigger min step\n");
+            return -1;
+        }
+    }
+    if (argc > 8) {
+        value = strtoul(argv[8], &end, 10);
+        if (*end != '\0') {
+            CLI_write("Error: trigger stat\n");
+            return -1;
+        }
+        cfg.stat = (uint32_t)value;
+    }
+    if (argc > 9) {
+        cfg.minSpeedMps = strtof(argv[9], &end);
+        if (*end != '\0') {
+            CLI_write("Error: trigger min speed\n");
+            return -1;
+        }
+    }
+    if (cfg.trackFrames != 0U && l3_trig_cfg_check(&cfg) != 0) {
+        CLI_write("Error: trigger config (snr >= 1, gate < approach <= %u)\n",
+                  (unsigned)L3_TRIG_MAX_BINS);
+        return -1;
+    }
+    if (cfg.trackFrames != 0U &&
+        (l3_captureUsesIq8() || cfg.teeBin < gCapturePlan.preStart ||
+         cfg.teeBin >= gCapturePlan.preStart + gCapturePlan.preBins ||
+         !(cfg.snr <= FLT_MAX) || !(cfg.minCoherence <= FLT_MAX) ||
+         !(cfg.minStepBins <= FLT_MAX) || !(cfg.minSpeedMps <= FLT_MAX))) {
+        CLI_write("Error: trigger needs finite thresholds and a tee inside the IQ16 pre-window\n");
+        return -1;
+    }
+    gTriggerEnabled = 0U;
+    gTrigCfg = cfg;
+    l3_trig_init(&gTrig, &gTrigCfg, gTrigLoopPeriodS);
+    gTriggerEnabled = (cfg.trackFrames != 0U) ? 1U : 0U;
     CLI_write("Done\n");
     return 0;
 }
 
-/* CLI "debugCfg <0|1>": stream one trig line per detection frame. */
+/* CLI "triggerLog [trace|clear]". Bare: the detector's state and counters,
+ * its configuration, then one line per logged frame, oldest first (only
+ * frames with a candidate or an active track are logged; gap= counts the
+ * quiet frames before each). "trace" prints the per-bin maximum of the
+ * detection statistic since arming, then the raw-input trace: the region's
+ * strongest bin whenever it reached the trace bar, whether or not it became
+ * a candidate -- a swing that never crosses the detector's threshold is
+ * still visible here. "clear" empties the trace and its maxima without
+ * touching the log or the arm. Ported from Cormac131/feat/iwr-calcs. */
+static int32_t l3_cli_triggerLog(int32_t argc, char *argv[])
+{
+    /* Static, not on the CLI task's small stack. */
+    static char line[256];
+    l3_trig_record_t record;
+    uint32_t count;
+    uint32_t index;
+    UInt key;
+
+    if (argc == 2 && strcmp(argv[1], "clear") == 0) {
+        key = Task_disable();
+        l3_trig_trace_clear(&gTrig);
+        Task_restore(key);
+        CLI_write("Done\n");
+        return 0;
+    }
+    key = Task_disable();
+    gTrigReadback = gTrig;
+    Task_restore(key);
+    if (argc == 2 && strcmp(argv[1], "trace") == 0) {
+        l3_trig_trace_t entry;
+
+        (void)l3_trig_format_trace_header(&gTrigReadback, line, sizeof(line));
+        CLI_write("%s\n", line);
+        for (index = 0U; index < gTrigReadback.maxBins; index += 8U) {
+            (void)l3_trig_format_maxhold(&gTrigReadback, index, 8U, line, sizeof(line));
+            CLI_write("%s\n", line);
+        }
+        count = l3_trig_trace_count(&gTrigReadback);
+        for (index = 0U; index < count; index++) {
+            if (!l3_trig_trace_get(&gTrigReadback, index, &entry)) {
+                break;
+            }
+            (void)l3_trig_format_trace(&entry, line, sizeof(line));
+            CLI_write("%s\n", line);
+        }
+        CLI_write("Done\n");
+        return 0;
+    }
+    if (argc != 1) {
+        CLI_write("Error: triggerLog [trace|clear]\n");
+        return -1;
+    }
+    (void)l3_trig_format_summary(&gTrigReadback, line, sizeof(line));
+    CLI_write("%s\n", line);
+    (void)l3_trig_format_config(&gTrigReadback, line, sizeof(line));
+    CLI_write("%s\n", line);
+    count = l3_trig_log_count(&gTrigReadback);
+    for (index = 0U; index < count; index++) {
+        if (!l3_trig_log_get(&gTrigReadback, index, &record)) {
+            break;
+        }
+        (void)l3_trig_format_record(&record, line, sizeof(line));
+        CLI_write("%s\n", line);
+    }
+    CLI_write("Done\n");
+    return 0;
+}
+
+/* CLI "debugCfg <0|1>": accepted for compatibility. Per-frame streaming is
+ * dropped with the old detector; use triggerLog for diagnostics instead
+ * (continuous per-frame CLI writes from the rearm task previously raced
+ * other replies -- see l3_dump_2ms_iq16_adaptive_l3release_20260927.md). */
 static int32_t l3_cli_debugCfg(int32_t argc, char *argv[])
 {
-#ifdef CONFIGURABLE_CAPTURE
     unsigned long enabled;
     char *end;
 
@@ -3862,25 +3952,15 @@ static int32_t l3_cli_debugCfg(int32_t argc, char *argv[])
         CLI_write("Error: debugCfg <0|1>\n");
         return -1;
     }
-    gTriggerDebug = (uint8_t)enabled;
-    if (!gTriggerDebug) {
-        gTriggerDebugPhase = 0xFFU;
-    } else {
-        l3_writeTriggerDebug(gTriggerPhase);
-    }
     CLI_write("Done\n");
     return 0;
-#else
-    (void)argc;
-    (void)argv;
-    CLI_write("Error: debugCfg requires configurable capture\n");
-    return -1;
-#endif
 }
 
 /* CLI "stats": report capture counters (diagnostic). */
 static int32_t l3_cli_stats(int32_t argc, char *argv[])
 {
+    /* Static, not on the CLI task's small stack. */
+    static char trigLine[256];
     (void)argc; (void)argv;
 #ifdef LIVE_SNAPSHOT_RING
     CLI_write("frames=%u wraps=%u active=%d calib=0x%x rf_faults=%u "
@@ -4018,9 +4098,11 @@ static int32_t l3_cli_stats(int32_t argc, char *argv[])
               (unsigned)gHwaRearmLastUs, (unsigned)gHwaRearmMaxUs);
 #endif
 #ifdef CONFIGURABLE_CAPTURE
-    CLI_write("trig phase=%s tee=%u latched=%u enabled=%u\n",
-              l3_triggerPhaseName(gTriggerPhase),
-              (unsigned)gTriggerTeePower,
+    CLI_write("trigger_last_us=%u trigger_max_us=%u frame_work_max_us=%u\n",
+              (unsigned)gTriggerLastUs, (unsigned)gTriggerMaxUs, (unsigned)gFrameWorkMaxUs);
+    (void)l3_trig_format_summary(&gTrig, trigLine, sizeof(trigLine));
+    CLI_write("%s\n", trigLine);
+    CLI_write("latched=%u enabled=%u\n",
               (unsigned)gSelfTriggerLatched,
               (unsigned)gTriggerEnabled);
 #endif
@@ -4467,6 +4549,10 @@ static int32_t l3_cli_sensorStart(int32_t argc, char *argv[])
         gFramePeriodUs =
             (uint16_t)(gCtrlCfg.u.frameCfg.frameCfg.framePeriodicity / 200U);
 #ifdef CONFIGURABLE_CAPTURE
+        /* One loop is one chirp per TX; idle and ramp are in 10 ns units.
+         * The self-trigger's Doppler readout is aliased at +/- lambda/(4T). */
+        gTrigLoopPeriodS = (float)(profCfg.idleTimeConst + profCfg.rampEndTime) *
+                           1.0e-8F * (float)chirpCount;
         if (l3_finalizeCapturePlan(gCtrlCfg.u.frameCfg.frameCfg.numLoops) != 0) {
             return -1;
         }
@@ -4517,7 +4603,7 @@ static int32_t l3_cli_sensorStart(int32_t argc, char *argv[])
 #ifdef CONFIGURABLE_CAPTURE
     gSelfTriggerLatched = 0U;
     gTriggerEnabled = 0U;
-    l3_clearTriggerMotion();
+    gTriggerLastUs = gTriggerMaxUs = gFrameWorkMaxUs = 0U;
 #ifdef L3_RING_IQ8
     gRetentionReason = 0U;
     gRetentionPostFrames = 0U;
@@ -4526,6 +4612,7 @@ static int32_t l3_cli_sensorStart(int32_t argc, char *argv[])
         gShadowHavePrevious = 0U;
     }
 #endif
+    l3_trigRearm();
     gPreFramesCaptured = 0U;
     gPostFramesCaptured = 0U;
     gPostFramesObserved = 0U;
@@ -4787,6 +4874,14 @@ static void l3_initTask(UArg arg0, UArg arg1)
     taskParams.priority = L3_HWA_REARM_TASK_PRIORITY;
     taskParams.stackSize = 2U * 1024U;
     Task_create(l3_hwaRearmTask, &taskParams, NULL);
+#ifdef CONFIGURABLE_CAPTURE
+    gTriggerNoticeSemaphore = Semaphore_create(0, &semaphoreParams, NULL);
+    if (gTriggerNoticeSemaphore == NULL) return;
+    Task_Params_init(&taskParams);
+    taskParams.priority = L3_CLI_TASK_PRIORITY;
+    taskParams.stackSize = 2U * 1024U;
+    Task_create(l3_triggerNoticeTask, &taskParams, NULL);
+#endif
 #endif
 
     /* CLI with the mmWave extension. */
@@ -4850,7 +4945,7 @@ static void l3_initTask(UArg arg0, UArg arg1)
     cliCfg.tableEntry[11].helpString    = "Freeze, send residual power, then requested cells";
     cliCfg.tableEntry[11].cmdHandlerFxn = l3_cli_sparse;
     cliCfg.tableEntry[12].cmd           = "triggerCfg";
-    cliCfg.tableEntry[12].helpString    = "triggerCfg <localBin> <power> <hits>";
+    cliCfg.tableEntry[12].helpString    = "triggerCfg <bin> <snr> <frames> [approach gate minCoh minStep stat minSpeed]";
     cliCfg.tableEntry[12].cmdHandlerFxn = l3_cli_triggerCfg;
     cliCfg.tableEntry[13].cmd           = "l3track";
     cliCfg.tableEntry[13].helpString    = "Freeze, pick ball and club cells on-chip, send them";
@@ -4859,7 +4954,7 @@ static void l3_initTask(UArg arg0, UArg arg1)
     cliCfg.tableEntry[14].helpString    = "trackCfg <loopPeriodS> <rangeResM> <maxRangeM> <clubLoM> <clubHiM>";
     cliCfg.tableEntry[14].cmdHandlerFxn = l3_cli_trackCfg;
     cliCfg.tableEntry[15].cmd           = "debugCfg";
-    cliCfg.tableEntry[15].helpString    = "debugCfg <0|1> stream trigger decisions";
+    cliCfg.tableEntry[15].helpString    = "debugCfg <0|1> accepted; see triggerLog";
     cliCfg.tableEntry[15].cmdHandlerFxn = l3_cli_debugCfg;
 #if defined(CONFIGURABLE_CAPTURE) && defined(L3_RING_IQ8)
     cliCfg.tableEntry[16].cmd           = "l3shadow";
@@ -4870,6 +4965,9 @@ static void l3_initTask(UArg arg0, UArg arg1)
     cliCfg.tableEntry[17].cmd           = "l3release";
     cliCfg.tableEntry[17].helpString    = "Rearm a frozen ring without streaming it";
     cliCfg.tableEntry[17].cmdHandlerFxn = l3_cli_release;
+    cliCfg.tableEntry[18].cmd           = "triggerLog";
+    cliCfg.tableEntry[18].helpString    = "triggerLog [trace|clear]: self-trigger state and log";
+    cliCfg.tableEntry[18].cmdHandlerFxn = l3_cli_triggerLog;
 #endif
     CLI_open(&cliCfg);
 }

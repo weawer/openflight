@@ -11,11 +11,13 @@ from pathlib import Path
 
 sys.path.insert(0, "src")
 
+from openflight.iwr6843.calibration import DEFAULT_CAL_PATH, Calibration  # noqa: E402
 from openflight.iwr6843.driver import IWR6843Radar  # noqa: E402
 from openflight.iwr6843.dump import (  # noqa: E402
     SAMPLE_RANGE_FFT_IQ16_VARIABLE_TIMED,
     parse_dump,
 )
+from openflight.iwr6843.monitor import SelfTriggerConfig, tee_global_bin  # noqa: E402
 
 DEFAULT_CONFIG = "config/iwr6843_l3dump_diagnostic_24f2ms_53bin_iq16.cfg"
 ERROR_FIELDS = (
@@ -34,14 +36,17 @@ ERROR_FIELDS = (
 def parse_capture_stats(response: str) -> dict[str, int | str]:
     """Parse firmware ``stats`` key/value fields."""
     parsed: dict[str, int | str] = {}
-    for token in response.split():
-        if "=" not in token:
-            continue
-        key, value = token.split("=", 1)
-        try:
-            parsed[key] = int(value, 0)
-        except ValueError:
-            parsed[key] = value
+    for line in response.splitlines():
+        prefix = "trigger_" if line.startswith("trig ") else ""
+        for token in line.split():
+            if "=" not in token:
+                continue
+            key, value = token.split("=", 1)
+            key = prefix + key
+            try:
+                parsed[key] = int(value, 0)
+            except ValueError:
+                parsed[key] = value
     return parsed
 
 
@@ -70,6 +75,8 @@ def _check_errors(stats: dict[str, int | str], baseline: dict[str, int | str]) -
 
 
 def _check_timing(current, expected_period_us, compact_mode):
+    if _numeric(current, "frame_work_max_us") >= expected_period_us:
+        raise RuntimeError("combined frame work exceeded the frame period")
     if compact_mode and _numeric(current, "compact16_max_us") >= expected_period_us:
         raise RuntimeError(
             "compaction exceeded the frame period: "
@@ -166,6 +173,15 @@ def run(args: argparse.Namespace) -> None:
     try:
         radar.send_config(args.config)
         configured = True
+        if args.self_trigger_tee_m is not None:
+            tee = tee_global_bin(
+                args.self_trigger_tee_m,
+                args.config,
+                range_bias_m=Calibration.load(args.cal).range_bias_m,
+            )
+            reply = radar.cmd(SelfTriggerConfig(tee, 6.0, 2).command)
+            if "Done" not in reply or "Error" in reply:
+                raise RuntimeError(f"self-trigger configuration rejected: {reply}")
         baseline = _health(radar)
         expected_frames, expected_period_us = _expected_geometry(args.config)
         compact_mode = baseline.get("format") in ("compact16", "adaptive16")
@@ -176,6 +192,8 @@ def run(args: argparse.Namespace) -> None:
         while _numeric(baseline, "frames") < target:
             time.sleep(min(args.poll_s, 60.0))
             current = _health(radar)
+            if args.self_trigger_tee_m is not None and _numeric(current, "latched"):
+                raise RuntimeError("unexpected self-trigger during the static soak")
             _check_errors(current, baseline)
             _check_timing(current, expected_period_us, compact_mode)
             baseline = current
@@ -185,6 +203,7 @@ def run(args: argparse.Namespace) -> None:
                 f"rearm max {_numeric(current, 'rearm_max_us')} us, "
                 f"compact max {_numeric(current, 'compact16_max_us')} us"
                 f", selector max {_numeric(current, 'shadow_max_us')} us"
+                f", total work max {_numeric(current, 'frame_work_max_us')} us"
             )
             _write_event(output, "stats", stats=current)
 
@@ -250,6 +269,8 @@ def run(args: argparse.Namespace) -> None:
             ):
                 raise RuntimeError(f"cycle {cycle}: explicit frame gap in {offsets}")
             current = _health(radar)
+            if args.self_trigger_tee_m is not None and _numeric(current, "latched"):
+                raise RuntimeError("unexpected self-trigger during the static soak")
             _check_errors(current, baseline)
             _check_timing(current, expected_period_us, compact_mode)
             baseline = current
@@ -277,6 +298,7 @@ def run(args: argparse.Namespace) -> None:
             f"maximum compaction latency "
             f"{_numeric(baseline, 'compact16_max_us')} us"
             f", maximum selector latency {_numeric(baseline, 'shadow_max_us')} us"
+            f", total work max {_numeric(baseline, 'frame_work_max_us')} us"
         )
     finally:
         try:
@@ -291,6 +313,12 @@ def run(args: argparse.Namespace) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", default=None)
+    parser.add_argument(
+        "--self-trigger-tee-m",
+        type=float,
+        help="arm the detector during a static soak; any self-trigger fails",
+    )
+    parser.add_argument("--cal", default=DEFAULT_CAL_PATH)
     parser.add_argument("--config", default=DEFAULT_CONFIG)
     parser.add_argument("--soak-frames", type=int, default=100_000)
     parser.add_argument("--cycles", type=int, default=0)

@@ -1081,11 +1081,6 @@ def init_camera_capture(
         return False
 
 
-# Residual power at the tee bin that counts as "ball present" on the wide
-# 53-bin IQ16 profile. Tune with --iwr6843-self-trigger-level.
-_SELF_TRIGGER_DEFAULT_LEVEL = 1000.0
-# Consecutive frames the tee bin must stay occupied before the trigger arms.
-_SELF_TRIGGER_DEFAULT_HITS = 2
 # OPS rolling-buffer split (S#n of 32 segments, ~4.27 ms each at 30 ksps).
 # The self-trigger reaches the OPS as S! a few ms to tens of ms after impact,
 # so keep more of the buffer before the request than the sound gate needs.
@@ -1102,14 +1097,19 @@ def _self_trigger_config(args) -> "SelfTriggerConfig | None":
     command line cannot silently change which trigger drives the shot.
     """
     from .iwr6843.calibration import Calibration
-    from .iwr6843.monitor import SelfTriggerConfig, tee_local_bin
+    from .iwr6843.monitor import (
+        SELF_TRIGGER_DEFAULT_SNR,
+        SELF_TRIGGER_DEFAULT_TRACK_FRAMES,
+        SelfTriggerConfig,
+        tee_global_bin,
+    )
 
     tuning = [
         flag
         for flag, value in (
             ("--iwr6843-self-trigger-bin", args.iwr6843_self_trigger_bin),
-            ("--iwr6843-self-trigger-level", args.iwr6843_self_trigger_level),
-            ("--iwr6843-self-trigger-hits", args.iwr6843_self_trigger_hits),
+            ("--iwr6843-self-trigger-snr", args.iwr6843_self_trigger_snr),
+            ("--iwr6843-self-trigger-frames", args.iwr6843_self_trigger_frames),
         )
         if value is not None
     ]
@@ -1123,17 +1123,17 @@ def _self_trigger_config(args) -> "SelfTriggerConfig | None":
         # already knows the true bin. Otherwise correct --iwr6843-tee-m for
         # this radar's measured range bias before mapping it to a bin, or a
         # self-trigger armed from the uncorrected mapping watches a few bins
-        # short of the true tee (see tee_local_bin's range_bias_m docstring).
+        # short of the true tee (see tee_global_bin's range_bias_m docstring).
         range_bias_m = Calibration.load(args.iwr6843_cal).range_bias_m
-        bin_index = tee_local_bin(
+        bin_index = tee_global_bin(
             args.iwr6843_tee_m, args.iwr6843_config, range_bias_m=range_bias_m
         )
-    level = args.iwr6843_self_trigger_level
-    hits = args.iwr6843_self_trigger_hits
+    snr = args.iwr6843_self_trigger_snr
+    frames = args.iwr6843_self_trigger_frames
     return SelfTriggerConfig(
-        local_bin=bin_index,
-        level=_SELF_TRIGGER_DEFAULT_LEVEL if level is None else level,
-        hits=_SELF_TRIGGER_DEFAULT_HITS if hits is None else hits,
+        tee_bin=bin_index,
+        snr=SELF_TRIGGER_DEFAULT_SNR if snr is None else snr,
+        track_frames=SELF_TRIGGER_DEFAULT_TRACK_FRAMES if frames is None else frames,
     )
 
 
@@ -4767,21 +4767,22 @@ def main():
         "--iwr6843-self-trigger-bin",
         type=int,
         default=None,
-        help="Local range bin of the tee (default: from --iwr6843-tee-m). "
-        "Requires --iwr6843-self-trigger",
+        help="Global range-FFT bin of the tee (default: from --iwr6843-tee-m, "
+        "bias-corrected). Requires --iwr6843-self-trigger",
     )
     parser.add_argument(
-        "--iwr6843-self-trigger-level",
+        "--iwr6843-self-trigger-snr",
         type=float,
         default=None,
-        help="Residual-power threshold (default: 1000). Requires --iwr6843-self-trigger",
+        help="Candidate threshold as a multiple of the running noise floor "
+        "(default: 6). Requires --iwr6843-self-trigger",
     )
     parser.add_argument(
-        "--iwr6843-self-trigger-hits",
+        "--iwr6843-self-trigger-frames",
         type=int,
         default=None,
-        help="Consecutive frames the tee bin must be occupied before it is ready "
-        "(default: 2 with --iwr6843-self-trigger)",
+        help="Consecutive associated frames a track needs before the impact gate "
+        "may fire (default: 2 with --iwr6843-self-trigger)",
     )
     parser.add_argument(
         "--iwr6843-full-capture",

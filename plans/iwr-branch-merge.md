@@ -4,16 +4,43 @@
 > Branches: `Cormac131/feat/iwr-calcs` at `f72c352` (99 commits since the shared
 > base) and `feat/iwr-offloading` at `483f11b` (38 commits since the base).
 > Shared base: `3989ac9`.
-> Status: comparison done; not started. No code has been moved between the
-> branches for this plan.
+> Status (2026-09-27): selective detector port implemented on
+> `feat/iwr-2ms-trigger-merge`, preserving the offloading capture architecture.
+> The original full-merge direction below remains background, not the scope
+> of this implementation. Hardware validation is pending.
+
+## Implemented detector slice
+
+The donor `l3_trigger.c/h` detector now consumes all-loop vertical-TX residuals
+from compacted IQ16 frames. Host configuration uses global bins with the
+existing range calibration. Adaptive16 retention and RF-stop retry behavior
+remain in place. Dump/release paths reset the fired detector while preserving
+its learned noise floor, allowing subsequent captures.
+
+The one-shot trigger notification is deferred to a CLI-priority task;
+per-frame UART debug streaming stays disabled. Trigger logs use a stable
+snapshot. Stats expose detector time and combined frame-work time so the
+2 ms budget can be checked with the detector enabled. The test parser keeps
+acquisition frame counts separate from detector frame counts.
+
+This is not the full donor architecture: the separate detection task,
+general notice queue, ball-placement/follow feature, UART RX interrupt change,
+and DSS solve are not ported. The detector still runs in the rearm task;
+real-board timing is a prerequisite for accepting that arrangement.
+
+Release and operator checks:
+[`l3_dump_2ms_iq16_adaptive_trigger_20260927.md`](../firmware/releases/l3_dump_2ms_iq16_adaptive_trigger_20260927.md).
+The user runs flashing and hardware tests. Static soak validates timing and
+capture/rearm mechanics; successful real swings and repeated self-triggers
+remain separate acceptance checks.
 
 > **Ported ahead (2026-09-27, uncommitted, for a new branch):** from the
 > calcs branch, `l3release` (section 4), the host `cmd()` reading through the
 > prompt (section 5, host half of `294fdbf`), and readbacks dropping a stale
 > notice. See
 > `firmware/releases/l3_dump_2ms_iq16_adaptive_l3release_20260927.md`.
-> Still to do: the firmware half of `294fdbf` (notice queue task),
-> `48a81a8`, and everything in sections 1–2.
+> The detector slice above supersedes this earlier status. The general notice
+> queue, `48a81a8`, and ball-placement/follow work remain deferred.
 
 ## Summary
 

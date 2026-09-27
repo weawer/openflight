@@ -466,29 +466,15 @@ def test_track_config_takes_the_fields_the_runtime_sends():
     assert "l3track_default_params(&gTrackParams)" in config
 
 
-def test_stats_reports_trigger_state_and_debug_prints_on_phase_change_only():
-    """A missed Triggered line must still be visible, without a per-frame UART write."""
+def test_stats_reports_detector_state_without_per_frame_uart_streaming():
     source = FIRMWARE.read_text(encoding="utf-8")
-    stats = _function_source(
-        source, "static int32_t l3_cli_stats", "static int32_t l3_cli_hwaStats"
-    )
-    debug_write = _function_source(
-        source,
-        "static void l3_writeTriggerDebug",
-        "static void l3_noteTrigger",
-    )
-    debug_cfg = _function_source(
-        source,
-        "static int32_t l3_cli_debugCfg",
-        "static int32_t l3_cli_stats",
-    )
-
-    assert 'CLI_write("trig phase=%s tee=%u latched=%u enabled=%u\\n"' in stats
-    assert "l3_triggerPhaseName(gTriggerPhase)" in stats
-    assert stats.index("trig phase=") < stats.index("return 0")
-    assert "if (phase == gTriggerDebugPhase)" in debug_write
-    assert debug_write.index("gTriggerDebugPhase = phase") < debug_write.index("CLI_write(")
-    assert "gTriggerDebugPhase = 0xFFU" in debug_cfg
+    stats = _function_source(source, "static int32_t l3_cli_stats", "static int32_t l3_cli_hwaStats")
+    debug = _function_source(source, "static int32_t l3_cli_debugCfg", "static int32_t l3_cli_stats")
+    assert "l3_trig_format_summary" in stats
+    assert "latched=%u enabled=%u" in stats
+    assert "l3_writeTriggerDebug" not in source
+    assert "gTriggerEnabled =" not in debug
+    assert "enabled > 1U" in debug
 
 
 def test_stats_reports_rearm_latency_maximum_for_2ms_deadline_checks():

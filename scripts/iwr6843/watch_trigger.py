@@ -1,8 +1,15 @@
 #!/usr/bin/env python3
-"""Print the IWR6843 ball-leave detector as it runs.
+"""Watch the IWR6843 self-trigger detector and print why it fires.
 
-Stop the kiosk first. This owns the TI UART, arms triggerCfg, turns on
-debugCfg, and prints one line per frame until you press Ctrl+C.
+Stop the kiosk first. This owns the TI UART. Arms ``triggerCfg``, then polls
+until Ctrl+C: prints ``triggerLog`` every ``--poll-s`` seconds, and on a fire
+prints it once more (showing the frame that fired), releases the frozen
+ring, and keeps watching. Ported for the detector added in
+Cormac131/feat/iwr-calcs; the old per-frame ``debugCfg`` stream is gone (see
+firmware/releases/l3_dump_2ms_iq16_adaptive_l3release_20260927.md) -- use
+``triggerLog trace`` on the board for what the detector saw between prints.
+
+    uv run python scripts/iwr6843/watch_trigger.py --tee-m 1.845
 """
 
 from __future__ import annotations
@@ -10,9 +17,14 @@ from __future__ import annotations
 import argparse
 import time
 
-from openflight.iwr6843.calibration import DEFAULT_TEE_RANGE_M
-from openflight.iwr6843.driver import TRIGGER_NOTICE, IWR6843Radar
-from openflight.iwr6843.monitor import tee_local_bin
+from openflight.iwr6843.calibration import DEFAULT_CAL_PATH, DEFAULT_TEE_RANGE_M, Calibration
+from openflight.iwr6843.driver import IWR6843Radar
+from openflight.iwr6843.monitor import (
+    SELF_TRIGGER_DEFAULT_SNR,
+    SELF_TRIGGER_DEFAULT_TRACK_FRAMES,
+    SelfTriggerConfig,
+    tee_global_bin,
+)
 
 _DEFAULT_CFG = "config/iwr6843_l3dump_wide_24f3ms_53bin_iq16.cfg"
 
@@ -21,52 +33,53 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", default=None)
     parser.add_argument("--config", default=_DEFAULT_CFG)
+    parser.add_argument("--cal", default=DEFAULT_CAL_PATH)
     parser.add_argument("--tee-m", type=float, default=DEFAULT_TEE_RANGE_M)
-    parser.add_argument("--level", type=float, default=1000.0)
-    parser.add_argument("--hits", type=int, default=2)
+    parser.add_argument("--snr", type=float, default=SELF_TRIGGER_DEFAULT_SNR)
+    parser.add_argument("--frames", type=int, default=SELF_TRIGGER_DEFAULT_TRACK_FRAMES)
+    parser.add_argument("--poll-s", type=float, default=2.0)
     args = parser.parse_args()
 
-    local_bin = tee_local_bin(args.tee_m, args.config)
+    if args.poll_s <= 0:
+        parser.error("--poll-s must be positive")
+    tee_bin = tee_global_bin(
+        args.tee_m, args.config, range_bias_m=Calibration.load(args.cal).range_bias_m
+    )
+    trigger = SelfTriggerConfig(tee_bin, args.snr, args.frames)
     radar = IWR6843Radar(port=args.port)
+    configured = False
     try:
         radar.send_config(args.config)
-        # Debug first so the frames right after arming are visible: a fire in
-        # that window used to be swallowed by the next command's buffer reset.
-        reply = radar.cmd("debugCfg 1")
-        if "Done" not in reply:
-            raise SystemExit(f"debugCfg rejected: {reply.strip()}")
+        configured = True
+        reply = radar.cmd(trigger.command)
+        if "Done" not in reply or "Error" in reply:
+            raise SystemExit(f"triggerCfg rejected: {reply.strip()}")
         print(
-            f"watching local bin {local_bin}, level {args.level:g}, "
-            f"{args.hits} hits. Ctrl+C to stop.",
+            f"watching global bin {tee_bin}, snr {args.snr:g}, "
+            f"{args.frames} frames. Ctrl+C to stop.",
             flush=True,
         )
-        reply = radar.cmd(f"triggerCfg {local_bin} {args.level} {args.hits}")
-        if "Done" not in reply:
-            raise SystemExit(f"triggerCfg rejected: {reply.strip()}")
-        print(reply.replace("Done", "").strip(), flush=True)
-        pending = reply.encode()
+        pending = b""
+        last_print = 0.0
         while True:
-            if TRIGGER_NOTICE in pending:
-                pending = b""
+            fired, pending = radar.wait_trigger_notice(pending)
+            if fired:
+                print(radar.cmd("triggerLog"), flush=True)
                 radar.release_sparse_freeze()
-                print("\n-- fired: released the frozen ring, watching again --", flush=True)
-            else:
-                pending = pending[-(len(TRIGGER_NOTICE) - 1) :]
-            waiting = radar.ser.in_waiting
-            chunk = radar.ser.read(waiting or 1)
-            if not chunk:
-                time.sleep(0.02)
+                print("-- fired: released the frozen ring, watching again --", flush=True)
+                last_print = time.monotonic()
                 continue
-            print(chunk.decode(errors="replace"), end="", flush=True)
-            pending += chunk
+            if time.monotonic() - last_print >= args.poll_s:
+                print(radar.cmd("triggerLog"), flush=True)
+                last_print = time.monotonic()
     except KeyboardInterrupt:
         print()
     finally:
         try:
-            radar.cmd("debugCfg 0", window=0.5)
-        except Exception:
-            pass
-        radar.close()
+            if configured:
+                radar.stop_sensor()
+        finally:
+            radar.close()
 
 
 if __name__ == "__main__":

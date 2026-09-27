@@ -98,13 +98,20 @@ def tx_order_from_config(config_path: str | Path) -> str:
     raise ValueError(f"IWR6843 config must contain chirp TX masks 1/4, 4/1, or 1/2/4, got {masks}")
 
 
-def tee_local_bin(
+def tee_global_bin(
     tee_range_m: float,
     config_path: str | Path,
     fft_size: int = 128,
     range_bias_m: float = 0.0,
 ) -> int:
-    """Tee bin inside the cfg's first saved window.
+    """The tee's global range-FFT bin, checked to lie in the cfg's first window.
+
+    The firmware speaks global bins everywhere (ported from
+    Cormac131/feat/iwr-calcs, f72c352: a physical bin read as a window offset
+    in one place and a physical bin in another is a bug waiting to happen --
+    their own hardware run found the club at bins 46-50 while a fixed-tee
+    setup watched bin 34). This is bin 34 = 1.59 m on a 128-point FFT over
+    6 m, not offset by any capture window's start.
 
     ``range_bias_m`` corrects for the radar's own range bias (RF group delay,
     cabling): a 2026-09-26 hardware calibration found a stationary reflector
@@ -114,48 +121,72 @@ def tee_local_bin(
     the true tee. Pass the calibration's ``Calibration.range_bias_m`` (0.0 is
     the old, uncorrected behavior).
 
-    Raises when the tee falls outside that window: the firmware would watch a
-    bin that never sees the ball.
+    Raises when the tee falls outside the cfg's first saved window: the
+    firmware would watch a bin that never sees the ball.
     """
     summary = read_capture_config(config_path)
     if summary.first_window_start is None or summary.first_window_bins is None:
         raise ValueError(f"{config_path} has no phaseCaptureCfg")
     absolute = int(round((tee_range_m + range_bias_m) / (RANGE_SPAN_M / fft_size)))
-    local = absolute - summary.first_window_start
-    if not 0 <= local < summary.first_window_bins:
+    if not (
+        summary.first_window_start
+        <= absolute
+        < summary.first_window_start + summary.first_window_bins
+    ):
         raise ValueError(
             f"tee at {tee_range_m:.2f} m (bin {absolute}) is outside the first capture "
             f"window, bins {summary.first_window_start}-"
             f"{summary.first_window_start + summary.first_window_bins - 1}"
         )
-    return local
+    return absolute
+
+
+# Conservative starting values (ported from Cormac131/feat/iwr-calcs);
+# real-shot tuning is still open, see plans/iwr-branch-merge.md.
+SELF_TRIGGER_DEFAULT_SNR = 6.0
+# Consecutive associated frames a track needs before the impact gate may fire.
+SELF_TRIGGER_DEFAULT_TRACK_FRAMES = 2
 
 
 @dataclass(frozen=True)
 class SelfTriggerConfig:
-    """Firmware ``triggerCfg``: freeze when the ball leaves the tee bin."""
+    """Firmware ``triggerCfg``: freeze when a tracked clubhead reaches the tee.
 
-    local_bin: int
-    level: float
-    hits: int
+    Ported from Cormac131/feat/iwr-calcs. The firmware watches the range bins
+    short of ``tee_bin`` for a moving return of at least ``snr`` times its
+    running noise floor, follows it frame to frame, and fires once it has
+    been seen ``track_frames`` times and enters the impact gate around the
+    tee. The gate width, approach depth, Doppler coherence and approach-rate
+    tunables keep their firmware defaults; ``triggerLog`` on the board
+    reports what each frame saw. Replaces the previous fixed-level "ball
+    leaves the tee" rule, which false-fired on ordinary static clutter near
+    the tee (2026-09-27 hardware run).
+    """
+
+    tee_bin: int  # global range-FFT bin (tee_global_bin), not a window offset
+    snr: float
+    track_frames: int
 
     def __post_init__(self) -> None:
-        if self.local_bin < 0:
-            raise ValueError(f"self-trigger bin must be >= 0, got {self.local_bin}")
-        if not math.isfinite(self.level) or self.level <= 0.0:
-            raise ValueError(f"self-trigger level must be > 0, got {self.level}")
-        if self.hits < 1:
-            # triggerCfg treats 0 hits as "off", which would leave the host
+        if self.tee_bin < 0:
+            raise ValueError(f"self-trigger bin must be >= 0, got {self.tee_bin}")
+        if not math.isfinite(self.snr) or self.snr < 1.0:
+            # Below the floor itself every frame would be a candidate.
+            raise ValueError(f"self-trigger snr must be >= 1, got {self.snr}")
+        if self.track_frames < 1:
+            # triggerCfg treats 0 frames as "off", which would leave the host
             # waiting for a notice that never comes.
-            raise ValueError(f"self-trigger hits must be >= 1, got {self.hits}")
+            raise ValueError(
+                f"self-trigger track frames must be >= 1, got {self.track_frames}"
+            )
 
     @property
     def command(self) -> str:
         """CLI line that arms this trigger."""
-        return f"triggerCfg {self.local_bin} {self.level} {self.hits}"
+        return f"triggerCfg {self.tee_bin} {self.snr} {self.track_frames}"
 
 
-# hits=0 disables the firmware trigger (see l3_cli_triggerCfg).
+# frames=0 disables the firmware trigger (see l3_cli_triggerCfg).
 SELF_TRIGGER_OFF_COMMAND = "triggerCfg 0 0 0"
 
 
@@ -696,12 +727,14 @@ class IWR6843CaptureMonitor:
 
 
 __all__ = [
+    "SELF_TRIGGER_DEFAULT_SNR",
+    "SELF_TRIGGER_DEFAULT_TRACK_FRAMES",
     "SELF_TRIGGER_OFF_COMMAND",
     "CaptureConfigSummary",
     "IWR6843Capture",
     "IWR6843CaptureMonitor",
     "SelfTriggerConfig",
     "read_capture_config",
-    "tee_local_bin",
+    "tee_global_bin",
     "tx_order_from_config",
 ]

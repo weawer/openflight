@@ -1,17 +1,20 @@
-"""Execute the firmware detector with synthetic range-power frames."""
+"""Execute the RF-stop/release paths with a native C harness.
+
+The self-trigger detector itself (firmware/iwr6843/l3_trigger.c, ported from
+Cormac131/feat/iwr-calcs) has its own dedicated host-testable unit tests in
+test_iwr6843_firmware_trigger.py, which builds and drives it directly. This
+file no longer needs to compile it: l3_freezeCapture and l3_cli_release call
+gTriggerEnabled/gSelfTriggerLatched only, not detector internals.
+"""
 
 from __future__ import annotations
 
 import ctypes
-import re
 import shutil
 import subprocess
 from pathlib import Path
 
-import numpy as np
 import pytest
-
-from openflight.iwr6843.self_trigger import PHASES, BallLeaveDetector
 
 
 def _function(source, name):
@@ -31,22 +34,14 @@ def firmware(tmp_path_factory):
     if compiler is None:
         pytest.skip("C compiler unavailable")
     source = Path("firmware/iwr6843/l3_dump.c").read_text()
-    globals_ = "\n".join(re.findall(r"^static volatile[^\n]*\bgTrigger\w*[^\n]*;", source, re.M))
     stop_frozen = _function(source, "static int32_t l3_stopFrozenRing(void)")
     freeze = _function(source, "static int32_t l3_freezeCapture(void)")
     release = _function(source, "static int32_t l3_cli_release(int32_t argc, char *argv[])")
-    clear = _function(source, "static void l3_clearTriggerMotion(void)")
-    consider = _function(source, "static void l3_considerSelfTrigger(void)")
     harness = (
         """
 #include <stdint.h>
 #include <stddef.h>
-#define L3_TRIGGER_APPROACH_BINS 12U
 static uint8_t gSelfTriggerLatched, gHwaFreezeRequested, gPostCaptureStarted;
-static uint32_t gPreFramesCaptured = 1, gFramePeriodUs = 3000;
-static uint32_t gFrameBinCount[1];
-static struct { uint32_t preFrames, loops, preBins; } gCapturePlan = {1, 12, 53};
-static const float *powers;
 static uint8_t gCaptureActive, gCaptureIncomplete;
 static void *gHwaFreezeSemaphore = (void *)1;
 static int permit, stopCalls, rfStopCalls, rfStopResult, rearmCalls;
@@ -55,21 +50,7 @@ static void CLI_write(const char *format, ...) { }
 static int l3_stopCaptureAtBoundary(void) { stopCalls++; return 0; }
 static int l3_finishCaptureStop(void) { rfStopCalls++; return rfStopResult; }
 static int l3_sparseRearm(void) { rearmCalls++; return 0; }
-static float l3_verticalPowerAt(uint32_t slot, uint32_t bin) { return powers[bin]; }
 """
-        + globals_
-        + "\n"
-        + clear
-        + """
-static void l3_noteTrigger(uint8_t phase, float tee, float approach) { gTriggerPhase = phase; }
-static void l3_latchSelfTrigger(float tee, float approach) {
-    gSelfTriggerLatched = 1;
-    l3_clearTriggerMotion();
-    l3_noteTrigger(9, tee, approach);
-}
-"""
-        + consider
-        + "\n"
         + stop_frozen
         + "\n"
         + freeze
@@ -100,21 +81,6 @@ int freeze_incomplete(int incomplete) {
 }
 int capture_latched(void) { return gSelfTriggerLatched; }
 int freeze_stop_calls(void) { return stopCalls; }
-void reset(unsigned period) {
-    l3_clearTriggerMotion();
-    gTriggerEnabled = 1; gTriggerPower = 1000; gTriggerHits = 2;
-    gSelfTriggerLatched = 0; gFramePeriodUs = period;
-    gPreFramesCaptured = 1; gCapturePlan.preFrames = 1;
-}
-void set_history(unsigned count, unsigned required) {
-    gPreFramesCaptured = count; gCapturePlan.preFrames = required;
-}
-int step(float *row, unsigned bin, unsigned count) {
-    powers = row; gTriggerBin = bin; gFrameBinCount[0] = count;
-    gCapturePlan.preBins = count;
-    l3_considerSelfTrigger();
-    return gTriggerPhase;
-}
 """
     )
     root = tmp_path_factory.mktemp("trigger-c")
@@ -124,56 +90,7 @@ int step(float *row, unsigned bin, unsigned count) {
     subprocess.run(
         [compiler, "-shared", "-fPIC", "-O2", str(c_file), "-o", str(lib_file)], check=True
     )
-    lib = ctypes.CDLL(str(lib_file))
-    lib.reset.argtypes = [ctypes.c_uint]
-    lib.step.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.c_uint, ctypes.c_uint]
-    lib.step.restype = ctypes.c_int
-    return lib
-
-
-@pytest.mark.parametrize("period", [2000, 3000, 4000])
-@pytest.mark.parametrize("case", ["reversal", "departure", "gap", "stationary", "timeout"])
-def test_firmware_matches_replay_and_rejects_non_shots(firmware, period, case):
-    frames = [{14: 1000}, {14: 1000}, {14: 1000, 2: 1500}, {14: 1000, 6: 1500}]
-    if case == "reversal":
-        frames += [{14: 1000, 3: 1500}]
-    elif case == "departure":
-        frames += [{16: 1500}, {18: 1500}]
-    elif case == "gap":
-        frames += [{14: 1000}] * 300 + [{14: 1000, 3: 1500, 16: 1600}, {18: 1600}]
-    elif case == "stationary":
-        frames += [{16: 1500}] * 5
-    else:
-        frames += [{14: 1000, 6: 1500}] * 40 + [{16: 1500}, {18: 1500}]
-    firmware.reset(period)
-    detector = BallLeaveDetector(frame_period_s=period / 1e6)
-    phases = []
-    for i, peaks in enumerate(frames):
-        row = np.zeros(53, dtype=np.float32)
-        for bin_index, power in peaks.items():
-            row[bin_index] = power
-        phase = firmware.step(row.ctypes.data_as(ctypes.POINTER(ctypes.c_float)), 14, 53)
-        phases.append(PHASES[phase])
-        assert PHASES[phase] == detector.step(i, row, 14, 53).phase
-    assert ("fired" in phases) == (case == "departure")
-
-
-def test_firmware_waits_for_a_full_pretrigger_history(firmware):
-    firmware.reset(3000)
-    firmware.set_history(2, 9)
-    for peaks in (
-        {14: 1000},
-        {14: 1000},
-        {14: 1000, 2: 1500},
-        {14: 1000, 6: 1500},
-        {16: 1500},
-        {18: 1500},
-    ):
-        row = np.zeros(53, dtype=np.float32)
-        for bin_index, power in peaks.items():
-            row[bin_index] = power
-        phase = firmware.step(row.ctypes.data_as(ctypes.POINTER(ctypes.c_float)), 14, 53)
-        assert PHASES[phase] == "no-frame"
+    return ctypes.CDLL(str(lib_file))
 
 
 @pytest.mark.parametrize(
@@ -304,3 +221,125 @@ def test_rf_stop_is_idempotent(rf_stop, running, result, status, calls, still_ru
     assert rf_stop.mmwave_stop_calls() == calls
     assert rf_stop.front_end_running() == still_running
     assert rf_stop.capture_active() == active
+
+
+def test_all_capture_restart_paths_rearm_the_detector():
+    source = Path("firmware/iwr6843/l3_dump.c").read_text()
+    for signature in (
+        "int32_t l3_cli_dump(int32_t argc, char *argv[])",
+        "static int32_t l3_sparseRearm(void)",
+    ):
+        body = _function(source, signature)
+        assert "l3_trigRearm();" in body
+        assert body.index("l3_trigRearm();") < body.index("l3_startFrontEnd()")
+
+
+def test_trigger_configuration_disables_reader_before_replacing_state():
+    source = Path("firmware/iwr6843/l3_dump.c").read_text()
+    body = _function(source, "static int32_t l3_cli_triggerCfg(int32_t argc, char *argv[])")
+    assert body.index("gTriggerEnabled = 0U") < body.index("gTrigCfg = cfg")
+
+
+@pytest.fixture(scope="module")
+def integrated_detector(tmp_path_factory):
+    source = Path("firmware/iwr6843/l3_dump.c").read_text()
+    root = tmp_path_factory.mktemp("integrated-detector")
+    harness = r"""
+#include <stdint.h>
+#include <string.h>
+#include "l3_trigger.h"
+#define N_RX 4U
+#define L3_MAX_LOOPS 16U
+static uint8_t g_ring[200000];
+static uint32_t gFrameOffset[1] = {64}, gFrameBinCount[1];
+static struct { uint32_t loops, chirpsPerFrame; } gCapturePlan = {12, 36};
+static uint32_t gRingFrame, gHwaFreezeRequestFrame, gHwaFreezeTargetFrame;
+static uint32_t gPreFramesCaptured, gPostFramesCaptured, gPostFramesObserved;
+static uint32_t gPostCaptureStarted, gActiveFrameIsPost, gActiveFrameShouldKeep;
+static uint32_t gCaptureActive;
+static l3_trig_t gTrig;
+static int l3_restartCompletedHwaFrame(void) { return 0; }
+static int l3_startFrontEnd(void) { return 0; }
+static void CLI_write(const char *format, ...) { }
+"""
+    for signature in (
+        "static void l3_verticalResidual(",
+        "static void l3_trigRearm(void)",
+        "static int32_t l3_sparseRearm(void)",
+    ):
+        harness += _function(source, signature) + "\n"
+    harness += r"""
+void residual(const int16_t *samples, unsigned bins, unsigned bin, l3_trig_obs_t *out) {
+    gFrameBinCount[0] = bins;
+    memcpy(g_ring + 64, samples, 12 * 3 * 4 * bins * 4);
+    l3_verticalResidual(0, bin, out);
+}
+int rearm_fired(void) {
+    gTrig.state = L3_TRIG_STATE_FIRED;
+    gTrig.floor = 37.0f;
+    if (l3_sparseRearm() != 0 || gTrig.floor != 37.0f) return -1;
+    return gTrig.state;
+}
+"""
+    c_file = root / "integration.c"
+    c_file.write_text(harness)
+    library = root / "integration.so"
+    subprocess.run(
+        [
+            "cc",
+            "-shared",
+            "-fPIC",
+            "-O2",
+            "-I",
+            "firmware/iwr6843",
+            str(c_file),
+            "firmware/iwr6843/l3_trigger.c",
+            "-lm",
+            "-o",
+            str(library),
+        ],
+        check=True,
+    )
+    return ctypes.CDLL(str(library))
+
+
+def test_release_resets_fired_detector_without_losing_noise_floor(integrated_detector):
+    assert integrated_detector.rearm_fired() == 0
+    assert integrated_detector.rearm_fired() == 0
+
+
+def test_trigger_notification_is_deferred_out_of_capture_work():
+    source = Path("firmware/iwr6843/l3_dump.c").read_text()
+    update = _function(source, "static void l3_updateSelfTrigger(void)")
+    notice = _function(source, "static void l3_triggerNoticeTask(UArg arg0, UArg arg1)")
+    assert "CLI_write" not in update
+    assert "Semaphore_post(gTriggerNoticeSemaphore)" in update
+    assert "Semaphore_pend(gTriggerNoticeSemaphore, BIOS_WAIT_FOREVER)" in notice
+    assert 'CLI_write("Triggered\\n")' in notice
+
+
+@pytest.mark.parametrize("bins,bin_index", [(32, 0), (32, 31), (53, 25)])
+def test_compacted_iq16_residual_uses_all_loops_and_only_vertical_tx(
+    integrated_detector, bins, bin_index
+):
+    import numpy as np
+
+    class Observation(ctypes.Structure):
+        _fields_ = [(name, ctypes.c_float) for name in ("energy", "peak", "loop0", "r1Re", "r1Im")]
+
+    iq = np.random.default_rng(42).integers(-1000, 1000, (12, 3, 4, bins, 2), dtype=np.int16)
+    iq[:, 1] = 30000
+    vertical = np.take(iq, [0, 2], axis=1)
+    samples = vertical[:, :, :, bin_index, 1].astype(float) + 1j * vertical[:, :, :, bin_index, 0]
+    residual = samples - samples.mean(axis=0)
+    power = np.sum(abs(residual) ** 2, axis=(1, 2))
+    correlation = np.sum(residual[1:] * residual[:-1].conj())
+    result = Observation()
+    integrated_detector.residual(
+        iq.ctypes.data_as(ctypes.POINTER(ctypes.c_int16)), bins, bin_index, ctypes.byref(result)
+    )
+    assert result.energy == pytest.approx(power.sum(), rel=1e-5)
+    assert result.peak == pytest.approx(power.max(), rel=1e-5)
+    assert result.loop0 == pytest.approx(power[0], rel=1e-5)
+    assert result.r1Re == pytest.approx(correlation.real, rel=1e-5)
+    assert result.r1Im == pytest.approx(correlation.imag, rel=1e-5)

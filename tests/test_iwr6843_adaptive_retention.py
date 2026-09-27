@@ -129,6 +129,12 @@ def hardware_check():
     return module
 
 
+def test_combined_frame_work_must_fit_the_period(hardware_check):
+    hardware_check._check_timing({"frame_work_max_us": 1999}, 2000, True)
+    with pytest.raises(RuntimeError, match="combined frame work"):
+        hardware_check._check_timing({"frame_work_max_us": 2000}, 2000, True)
+
+
 def test_flight_frames_kept_counts_only_selector_controlled_frames(hardware_check):
     config = str(ROOT / "config/iwr6843_l3dump_adaptive_36f2ms_iq16.cfg")
     static_raw, *_ = _capture(reason="track_lost", frames=20)
@@ -194,6 +200,7 @@ def test_expect_no_flight_frames_fails_a_static_scene_that_kept_any(hardware_che
         capture_dir=None,
         shadow=True,
         expect_no_flight_frames=True,
+        self_trigger_tee_m=None,
     )
     with pytest.raises(RuntimeError, match="expected a static scene"):
         hardware_check.run(args)
@@ -235,3 +242,11 @@ def test_operator_check_rejects_processing_overrun_in_adaptive_capture(hardware_
     hardware_check._check_timing(dict(shadow_max_us=773, compact16_max_us=537), 2000, True)
     with pytest.raises(RuntimeError, match="selector plus compaction"):
         hardware_check._check_timing(dict(shadow_max_us=1500, compact16_max_us=537), 2000, True)
+
+
+def test_stats_keeps_acquisition_frames_separate_from_detector_frames(hardware_check):
+    stats = hardware_check.parse_capture_stats(
+        "frames=1500 active=1\ntrig state=idle frames=0 cand=0\nlatched=0 enabled=0\n"
+    )
+    assert stats["frames"] == 1500
+    assert stats["trigger_frames"] == 0

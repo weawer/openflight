@@ -64,13 +64,12 @@ def test_slice_count_is_the_number_of_cells_actually_parsed():
     assert parsed < header < count
 
 
-def test_trigger_peak_tracks_bin_zero_with_an_explicit_flag():
-    consider = _function("static void l3_considerSelfTrigger(")
-
-    assert "gTriggerPeakBin != 0U" not in consider
-    assert consider.count("gTriggerHavePeak") >= 3
-    assert "gTriggerHavePeak = 0U;" in _function("static void l3_clearTriggerMotion(")
-    assert "gTriggerHavePeak = 0U;" in _function("static int32_t l3_cli_triggerCfg(")
+def test_trigger_uses_global_window_origin_and_complete_history():
+    consider = _function("static void l3_updateSelfTrigger(")
+    assert "gPreFramesCaptured < gCapturePlan.preFrames" in consider
+    assert "l3_trig_region" in consider
+    assert "gFrameBinStart[slot] + first" in consider
+    assert "l3_verticalResidual(slot, first + bin" in consider
 
 
 def test_loop_means_are_computed_once_per_bin():

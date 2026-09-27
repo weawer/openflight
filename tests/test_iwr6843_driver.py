@@ -340,23 +340,32 @@ def test_notice_received_with_dump_trailer_is_preserved():
     assert radar.wait_trigger_notice()[0]
 
 
-def test_watch_script_releases_a_trigger_in_the_arming_reply(monkeypatch):
+def test_watch_script_releases_a_trigger_notice(monkeypatch):
+    """Ported for the detector added in Cormac131/feat/iwr-calcs: the script
+    now polls wait_trigger_notice (like the monitor's own listener) instead
+    of sniffing a per-frame debug stream that no longer exists."""
     import runpy
     import sys
-    from unittest.mock import Mock, PropertyMock
+    from unittest.mock import Mock
 
     script = runpy.run_path("scripts/iwr6843/watch_trigger.py")
     main = script["main"]
     radar = Mock()
-    radar.cmd.side_effect = ["Done\n", "Done\nTriggered\n", "Done\n"]
-    type(radar.ser).in_waiting = PropertyMock(side_effect=KeyboardInterrupt)
+    radar.cmd.side_effect = ["Done\n", "trig state=fired ...\n"]
+    radar.wait_trigger_notice.side_effect = [(True, b""), KeyboardInterrupt]
     monkeypatch.setitem(main.__globals__, "IWR6843Radar", lambda **_kwargs: radar)
-    monkeypatch.setitem(main.__globals__, "tee_local_bin", lambda *_args: 14)
+    calibration = Mock()
+    calibration.load.return_value.range_bias_m = 0.075
+    monkeypatch.setitem(main.__globals__, "Calibration", calibration)
+    tee = Mock(return_value=41)
+    monkeypatch.setitem(main.__globals__, "tee_global_bin", tee)
     monkeypatch.setattr(sys, "argv", ["watch_trigger.py"])
 
     main()
 
     radar.release_sparse_freeze.assert_called_once()
+    radar.stop_sensor.assert_called_once()
+    assert tee.call_args.kwargs["range_bias_m"] == pytest.approx(0.075)
     radar.close.assert_called_once()
 
 
