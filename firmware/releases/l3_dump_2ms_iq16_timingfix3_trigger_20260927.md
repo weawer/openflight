@@ -3,8 +3,13 @@
 - Binary: `l3_dump_2ms_iq16_timingfix3_trigger_20260927.bin`
 - SHA-256: `8f539e7b802a31a0645cd6b06aebf18ac2345e50f307b0bba1d99a6ca735677e`
 - Hardware status: built, not flashed or tested on the board.
-- Validation: 637 IWR tests passed, 4 skipped; Ruff passed; TI build, link,
+- Validation: 638 IWR tests passed, 4 skipped; Ruff passed; TI build, link,
   image packaging, and CRC generation passed.
+
+The hardware checker waits for the configured pre-trigger history to refill
+after every capture/rearm before starting the next cycle. This prevents a
+back-to-back diagnostic dump from reporting a partial prebuffer merely because
+the prior UART transfer and rearm finished shortly beforehand.
 
 The `timingfix2` static test exposed a repeatable false trigger. The saved
 trigger log followed bin 38 through repeated frames and fired after a one-bin

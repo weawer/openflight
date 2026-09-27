@@ -137,6 +137,46 @@ def _check_static_health(
         raise
 
 
+def _wait_for_pretrigger_history(
+    radar,
+    output,
+    stats,
+    period_us,
+    compact_mode,
+    armed,
+    target_work_us,
+    capture_dir,
+    required_frames,
+    timeout_s=3.0,
+):
+    baseline = stats
+    deadline = time.monotonic() + timeout_s
+    while _numeric(baseline, "pre_seen") < required_frames:
+        remaining_s = deadline - time.monotonic()
+        if remaining_s <= 0:
+            error = (
+                "pre-trigger history did not refill after capture rearm: "
+                f"{_numeric(baseline, 'pre_seen')}/{required_frames} frames"
+            )
+            _write_event(output, "failure", error=error, stats=baseline)
+            raise RuntimeError(error)
+        time.sleep(min(0.05, remaining_s))
+        current = _health(radar)
+        _check_static_health(
+            radar,
+            output,
+            current,
+            baseline,
+            period_us,
+            compact_mode,
+            armed,
+            target_work_us,
+            capture_dir,
+        )
+        baseline = current
+    return baseline
+
+
 def _expected_geometry(config_path: str) -> tuple[int, int]:
     commands = {
         fields[0]: fields
@@ -220,6 +260,7 @@ def run(args: argparse.Namespace) -> None:
                 raise RuntimeError(f"self-trigger configuration rejected: {reply}")
         baseline = _health(radar)
         expected_frames, expected_period_us = _expected_geometry(args.config)
+        required_pre_frames = _phase_capture_cfg(args.config)[2]
         target_work_us = getattr(args, "target_frame_work_us", 1500)
         if not 0 < target_work_us < expected_period_us:
             raise RuntimeError(
@@ -267,6 +308,17 @@ def run(args: argparse.Namespace) -> None:
             _write_event(output, "stats", stats=current)
 
         for cycle in range(1, args.cycles + 1):
+            baseline = _wait_for_pretrigger_history(
+                radar=radar,
+                output=output,
+                stats=baseline,
+                period_us=expected_period_us,
+                compact_mode=compact_mode,
+                armed=args.self_trigger_tee_m is not None,
+                target_work_us=target_work_us,
+                capture_dir=capture_dir,
+                required_frames=required_pre_frames,
+            )
             capture_start = time.monotonic()
             if args.shadow:
                 raw, decisions = radar.read_shadow_dump()

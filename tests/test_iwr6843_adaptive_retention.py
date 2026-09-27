@@ -189,6 +189,31 @@ def test_static_trigger_failure_saves_the_frozen_capture(hardware_check, tmp_pat
     assert capture_path.read_bytes() == b"frozen IQ16 dump"
 
 
+def test_waits_for_full_pretrigger_history_after_capture_rearm(hardware_check, monkeypatch):
+    readings = iter(
+        [
+            {"pre_seen": 8, "frame_work_max_us": 1200},
+            {"pre_seen": 14, "frame_work_max_us": 1300},
+        ]
+    )
+    monkeypatch.setattr(hardware_check, "_health", lambda _radar: next(readings))
+    monkeypatch.setattr(hardware_check.time, "sleep", lambda _seconds: None)
+
+    result = hardware_check._wait_for_pretrigger_history(
+        radar=object(),
+        output=None,
+        stats={"pre_seen": 0, "frame_work_max_us": 1000},
+        period_us=2000,
+        compact_mode=True,
+        armed=False,
+        target_work_us=1500,
+        capture_dir=None,
+        required_frames=14,
+    )
+
+    assert result["pre_seen"] == 14
+
+
 def test_flight_frames_kept_counts_only_selector_controlled_frames(hardware_check):
     config = str(ROOT / "config/iwr6843_l3dump_adaptive_36f2ms_iq16.cfg")
     static_raw, *_ = _capture(reason="track_lost", frames=20)
@@ -241,7 +266,7 @@ def test_expect_no_flight_frames_fails_a_static_scene_that_kept_any(hardware_che
     monkeypatch.setattr(
         hardware_check,
         "parse_capture_stats",
-        lambda _response: {"frames": 0, "format": "adaptive16"},
+        lambda _response: {"frames": 0, "format": "adaptive16", "pre_seen": 14},
     )
     args = argparse.Namespace(
         port=None,
