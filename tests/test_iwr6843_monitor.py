@@ -935,6 +935,34 @@ def test_rejected_self_trigger_is_released(tmp_path):
     assert radar.releases == 1
 
 
+def test_rejected_self_trigger_is_released_without_l3sparse_in_adaptive_mode(tmp_path):
+    """2026-09-27 hardware crash: an unaccepted self-trigger notice arriving
+    before the monitor is armed (a normal startup race) is released with
+    release_sparse_freeze(), i.e. the firmware's l3sparse command. Adaptive16
+    explicitly rejects l3sparse (l3_sparseFreeze: "adaptive16 requires full
+    retained dump"), so release_sparse_freeze() raised RuntimeError and took
+    the whole self-trigger listener thread down. The only way to release an
+    unwanted adaptive16 freeze is a full read-and-discard (read_dump), which
+    is the same freeze/transfer/rearm path every adaptive16 capture already
+    uses successfully."""
+    radar = SelfTriggerRadar(_raw_dump())
+
+    def _reject_sparse():
+        raise RuntimeError("IWR6843 rejected l3sparse; the frozen ring was not released")
+
+    radar.release_sparse_freeze = _reject_sparse
+    monitor = _self_trigger_monitor(tmp_path, radar)
+    monitor._adaptive_retention = True
+    monitor._running = monitor._armed = True
+    monitor._last_edge_timestamp = time.time()
+    radar.notices.append(b"Triggered\n")
+
+    monitor._listen_for_self_trigger()  # must not raise
+
+    assert radar.read_started_at is not None, "adaptive16 release must read-and-discard"
+    assert not monitor._release_pending
+
+
 def test_failed_release_is_retried_without_another_notice(tmp_path):
     class RetryRadar(SelfTriggerRadar):
         def release_sparse_freeze(self):

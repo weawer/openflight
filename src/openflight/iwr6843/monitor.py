@@ -460,7 +460,16 @@ class IWR6843CaptureMonitor:
                 return
             self._release_pending = True
             logger.info("[IWR6843] Releasing an unaccepted self-trigger capture")
-        self.radar.release_sparse_freeze()
+        if self._adaptive_retention:
+            # adaptive16's l3_sparseFreeze explicitly rejects l3sparse ("adaptive16
+            # requires full retained dump"); the only way to release a frozen ring
+            # nobody wants is the same freeze/transfer/rearm every adaptive16
+            # capture already uses. Costs a full transfer just to discard it, but
+            # an unaccepted-notice race is rare, and the alternative is
+            # release_sparse_freeze() raising and taking this thread down.
+            self.radar.read_dump()
+        else:
+            self.radar.release_sparse_freeze()
         self._release_pending = False
 
     def _next_event(self):
