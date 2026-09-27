@@ -7,7 +7,7 @@ import time
 import numpy as np
 import pytest
 
-from openflight.iwr6843.driver import IWR6843Radar
+from openflight.iwr6843.driver import IWR6843Radar, parse_retention_stop
 from openflight.iwr6843.dump import TEMP_REPORT_KEYS, pack_dump
 
 
@@ -371,9 +371,14 @@ def test_watch_script_releases_a_trigger_notice(monkeypatch):
 
 def test_adaptive_header_split_keeps_shadow_decisions(monkeypatch):
     raw = pack_dump(
-        np.ones((1, 36, 4, 12), dtype=complex), n_tx=3, version=9,
-        sample_fmt=4, frame_period_us=2000, range_bin_starts=[30],
-        range_bin_counts=[12], frame_time_offsets_us=[0],
+        np.ones((1, 36, 4, 12), dtype=complex),
+        n_tx=3,
+        version=9,
+        sample_fmt=4,
+        frame_period_us=2000,
+        range_bin_starts=[30],
+        range_bin_counts=[12],
+        frame_time_offsets_us=[0],
         temperature_report={key: 40 for key in TEMP_REPORT_KEYS},
         retention=dict(reason="complete", pre_frames=1, planned_frames=1),
     )
@@ -549,3 +554,73 @@ def test_readbacks_forget_a_notice_from_the_capture_they_consume(read):
         pass
 
     assert radar.wait_trigger_notice()[0] is False
+
+
+AMBIGUOUS_STOP_LINE = b"RST r=2 f=22 cc=2 c=30,50 p=9000,8000 s=30 h=0 ok=1 a=1 co=0 n=120 w=24,12"
+
+
+def test_adaptive_dump_returns_the_selector_stop_record(monkeypatch):
+    raw = pack_dump(
+        np.ones((1, 36, 4, 12), dtype=complex),
+        n_tx=3,
+        version=9,
+        sample_fmt=4,
+        frame_period_us=2000,
+        range_bin_starts=[30],
+        range_bin_counts=[12],
+        frame_time_offsets_us=[0],
+        temperature_report={key: 40 for key in TEMP_REPORT_KEYS},
+        retention=dict(reason="ambiguous", pre_frames=1, planned_frames=36),
+    )
+    radar = _notice_radar(
+        [b"l3dump\r\n" + AMBIGUOUS_STOP_LINE + b"\r\n" + raw[:20], raw[20:] + b"Done\r\n"]
+    )
+    writes = []
+    monkeypatch.setattr(radar.ser, "reset_input_buffer", lambda: None, raising=False)
+    monkeypatch.setattr(radar.ser, "write", writes.append, raising=False)
+
+    received, stop = radar.read_adaptive_dump(timeout_s=0.1)
+
+    assert received == raw
+    assert writes == [b"l3dump\n"]
+    assert stop == {
+        "reason": "ambiguous",
+        "frame": 22,
+        "candidate_bins": [30, 50],
+        "candidate_powers": [9000, 8000],
+        "selected_bin": 30,
+        "held_bin": 0,
+        "accepted": True,
+        "ambiguous": True,
+        "coasting": False,
+        "noise": 120,
+        "proposed_start": 24,
+        "proposed_bins": 12,
+    }
+
+
+def test_retention_stop_keeps_only_reported_candidates():
+    stop = parse_retention_stop(
+        b"RST r=1 f=20 cc=0 c=0,0 p=0,0 s=41 h=0 ok=0 a=0 co=0 n=95 w=35,12\r\n"
+    )
+    assert stop["reason"] == "track_lost"
+    assert stop["candidate_bins"] == [] and stop["candidate_powers"] == []
+    assert not stop["accepted"] and not stop["coasting"]
+
+
+def test_retention_stop_is_absent_for_complete_or_old_firmware_captures():
+    assert parse_retention_stop(b"l3dump\r\nSHD f=0 c=1,2 s=1 w=0,12 q=0 n=1 ok=1 a=0\r\n") is None
+    assert parse_retention_stop(b"") is None
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        b"RST r=9 f=20 cc=0 c=0,0 p=0,0 s=41 h=0 ok=0 a=0 co=0 n=95 w=35,12",
+        b"RST r=1 f=20 cc=0 c=0,0 s=41 h=0 ok=0 a=0 co=0 n=95 w=35,12",
+        b"RST r=1 f=x cc=0 c=0,0 p=0,0 s=41 h=0 ok=0 a=0 co=0 n=95 w=35,12",
+        b"RST garbage",
+    ],
+)
+def test_malformed_retention_stop_is_dropped_without_failing(line):
+    assert parse_retention_stop(line) is None

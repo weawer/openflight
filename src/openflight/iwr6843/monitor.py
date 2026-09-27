@@ -220,6 +220,8 @@ class IWR6843Capture:
     temperature_report: dict[str, int] | None = None
     noise_power: float | None = None
     onboard_track: OnboardTrack | None = None
+    # Firmware selector record for the first frame adaptive16 did not retain.
+    retention_stop: dict | None = None
 
     @property
     def valid(self) -> bool:
@@ -518,15 +520,17 @@ class IWR6843CaptureMonitor:
                 time.sleep(_LISTENER_ERROR_BACKOFF_S)
         return _STOP
 
-    def _read_capture(self) -> tuple[bytes, float | None, OnboardTrack | None]:
+    def _read_capture(self) -> tuple[bytes, float | None, OnboardTrack | None, dict | None]:
         """Read one frozen capture, preferring the least serial traffic.
 
-        Firmware-tracked cells (``l3track``), then host-planned cells
-        (``l3sparse``), then the full ring (``l3dump``). Each step falls back
-        only when the firmware refused before streaming.
+        adaptive16 always reads the full retained dump with its stop record.
+        Otherwise: firmware-tracked cells (``l3track``), then host-planned
+        cells (``l3sparse``), then the full ring (``l3dump``). Each step falls
+        back only when the firmware refused before streaming.
         """
         if self._adaptive_retention:
-            return self.radar.read_dump(), None, None
+            raw, retention_stop = self.radar.read_adaptive_dump()
+            return raw, None, None, retention_stop
         if self.onboard_tracking:
             try:
                 tracked = self.radar.read_tracked()
@@ -544,7 +548,7 @@ class IWR6843CaptureMonitor:
                 )
                 if noise_power is not None and noise_power <= 0:
                     noise_power = None
-                return raw, noise_power, track
+                return raw, noise_power, track, None
         if self.slice_planner is not None:
             sparse = self.radar.read_sparse(self.slice_planner)
             if sparse is not None:
@@ -554,8 +558,8 @@ class IWR6843CaptureMonitor:
                         sparse.sent_cells,
                         sparse.requested_cells,
                     )
-                return sparse.raw, sparse.noise_power, None
-        return self.radar.read_dump(), None, None
+                return sparse.raw, sparse.noise_power, None, None
+        return self.radar.read_dump(), None, None, None
 
     def _capture_loop(self) -> None:
         while self._running:
@@ -596,9 +600,10 @@ class IWR6843CaptureMonitor:
         metadata = None
         noise_power = None
         onboard_track = None
+        retention_stop = None
         try:
             logger.info("[IWR6843] Trigger #%d: reading track samples", sequence)
-            raw, noise_power, onboard_track = self._read_capture()
+            raw, noise_power, onboard_track, retention_stop = self._read_capture()
             metadata = self._validate_dump(raw)
             if self.save_dumps:
                 path = self._capture_path(sequence, edge_timestamp)
@@ -624,6 +629,7 @@ class IWR6843CaptureMonitor:
             ),
             noise_power=noise_power,
             onboard_track=onboard_track,
+            retention_stop=retention_stop,
         )
         with self._condition:
             self._capture_active = False

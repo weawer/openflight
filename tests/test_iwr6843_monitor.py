@@ -32,6 +32,7 @@ class FakeRadar:
         self.closed = False
         self.read_started_at = None
         self.shutdown_events = []
+        self.retention_stop = None
 
     def send_config(self, path: str):
         self.configs.append(path)
@@ -41,6 +42,9 @@ class FakeRadar:
         if self.error is not None:
             raise self.error
         return self.raw
+
+    def read_adaptive_dump(self):
+        return self.read_dump(), self.retention_stop
 
     def close(self):
         self.shutdown_events.append("close")
@@ -836,9 +840,9 @@ def test_firmware_tracked_cells_are_read_first(tmp_path):
     radar = SparseRadar(b"full", tracked=(b"tracked", 2.5, _ONBOARD), sparse=(b"sparse", 1.0))
     monitor = _monitor(tmp_path, radar)
 
-    raw, noise, track = monitor._read_capture()  # pylint: disable=protected-access
+    raw, noise, track, stop = monitor._read_capture()  # pylint: disable=protected-access
 
-    assert (raw, noise, track) == (b"tracked", 2.5, _ONBOARD)
+    assert (raw, noise, track, stop) == (b"tracked", 2.5, _ONBOARD, None)
     assert radar.calls == ["l3track"]
 
 
@@ -849,7 +853,7 @@ def test_old_firmware_turns_onboard_tracking_off_for_the_session(tmp_path):
     first = monitor._read_capture()  # pylint: disable=protected-access
     second = monitor._read_capture()  # pylint: disable=protected-access
 
-    assert first == (b"s", 1.0, None) == second
+    assert first == (b"s", 1.0, None, None) == second
     assert monitor.onboard_tracking is False
     assert radar.calls == ["l3track", "l3sparse", "l3sparse"]
 
@@ -859,7 +863,7 @@ def test_firmware_refusal_falls_back_to_host_planned_cells(tmp_path):
     radar = SparseRadar(b"full", tracked=None, sparse=(b"s", 1.0))
     monitor = _monitor(tmp_path, radar)
 
-    assert monitor._read_capture() == (b"s", 1.0, None)  # pylint: disable=protected-access
+    assert monitor._read_capture() == (b"s", 1.0, None, None)  # pylint: disable=protected-access
     assert monitor.onboard_tracking is True
     assert radar.calls == ["l3track", "l3sparse"]
 
@@ -868,9 +872,9 @@ def test_full_dump_is_the_last_resort(tmp_path):
     radar = SparseRadar(_raw_dump(), tracked=None, sparse=None)
     monitor = _monitor(tmp_path, radar)
 
-    raw, noise, track = monitor._read_capture()  # pylint: disable=protected-access
+    raw, noise, track, stop = monitor._read_capture()  # pylint: disable=protected-access
 
-    assert raw == _raw_dump() and noise is None and track is None
+    assert raw == _raw_dump() and noise is None and track is None and stop is None
     assert radar.calls == ["l3track", "l3sparse", "l3dump"]
 
 
@@ -878,7 +882,7 @@ def test_onboard_tracking_off_skips_l3track(tmp_path):
     radar = SparseRadar(b"full", tracked=(b"t", 1.0, _ONBOARD), sparse=(b"s", 1.0))
     monitor = _monitor(tmp_path, radar, onboard=False)
 
-    assert monitor._read_capture() == (b"s", 1.0, None)  # pylint: disable=protected-access
+    assert monitor._read_capture() == (b"s", 1.0, None, None)  # pylint: disable=protected-access
     assert radar.calls == ["l3sparse"]
 
 
@@ -991,9 +995,11 @@ def test_adaptive_capture_bypasses_vertical_only_transfer(tmp_path):
         slice_planner=lambda *_: pytest.fail("adaptive capture must preserve all TX"),
     )
     monitor._adaptive_retention = True
-    raw, noise, track = monitor._read_capture()
+    radar.retention_stop = {"reason": "ambiguous", "frame": 22}
+    raw, noise, track, stop = monitor._read_capture()
     assert raw == radar.raw
     assert noise is None and track is None
+    assert stop == {"reason": "ambiguous", "frame": 22}
 
 
 def test_adaptive_early_stop_is_saved_but_reported_as_capture_error(tmp_path):
@@ -1014,11 +1020,13 @@ def test_adaptive_early_stop_is_saved_but_reported_as_capture_error(tmp_path):
         output_dir=tmp_path,
         save_dumps=True,
     )
+    monitor.radar.retention_stop = {"reason": "track_lost", "frame": 20}
     monitor._adaptive_retention = True
     monitor._capture(time.time())
     capture = monitor._captures[0]
     assert capture.raw is None
     assert capture.error == "adaptive retention stopped: track_lost"
+    assert capture.retention_stop == monitor.radar.retention_stop
     assert capture.path.read_bytes() == raw
     assert not monitor._capture_active
     assert not monitor._edge_pending

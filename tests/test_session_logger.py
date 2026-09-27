@@ -479,6 +479,41 @@ class TestLogIWR6843Capture:
         assert entry["club_path"]["path_deg"] == 2.4
         assert entry["measurement"]["track_span_s"] == 0.0334
         assert entry["temperature_report"] is None
+        assert entry["retention_stop"] is None
+
+    def test_iwr6843_capture_logs_retention_stop(self, tmp_path):
+        """The selector stop frame must be inspectable from the session log."""
+        logger = SessionLogger(log_dir=tmp_path, enabled=True)
+        logger.start_session(mode="rolling-buffer", trigger_type="sound")
+        stop = {
+            "reason": "ambiguous",
+            "frame": 22,
+            "candidate_bins": [30, 50],
+            "candidate_powers": [9000, 8000],
+            "selected_bin": 30,
+            "held_bin": 0,
+            "accepted": True,
+            "ambiguous": True,
+            "coasting": False,
+            "noise": 120,
+            "proposed_start": 24,
+            "proposed_bins": 12,
+        }
+
+        logger.log_iwr6843_capture(
+            shot_number=1,
+            shot_timestamp=100.0,
+            trigger_timestamp=100.002,
+            capture_path="/tmp/x.l3dump",
+            capture_bytes=0,
+            dump_duration_s=5.33,
+            capture_error="adaptive retention stopped: ambiguous",
+            ball_speed_mph=94.5,
+            retention_stop=stop,
+        )
+
+        entry = json.loads(logger.session_path.read_text().strip().split("\n")[-1])
+        assert entry["retention_stop"] == stop
 
     def test_iwr6843_capture_club_path_defaults_to_none(self, tmp_path):
         logger = SessionLogger(log_dir=tmp_path, enabled=True)

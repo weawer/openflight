@@ -21,7 +21,13 @@ from typing import Callable
 
 import serial
 
-from openflight.iwr6843.dump import HEADER, MAGIC, parse_header, payload_nbytes
+from openflight.iwr6843.dump import (
+    HEADER,
+    MAGIC,
+    RETENTION_REASONS,
+    parse_header,
+    payload_nbytes,
+)
 from openflight.iwr6843.sparse import (
     POWER_MAGIC,
     SLICE_MAGIC,
@@ -62,6 +68,42 @@ def _reply_verdict_at(resp: bytes) -> int:
     """Index just past the first Done/Error/not-recognized word, or -1."""
     found = [(resp.index(word) + len(word)) for word in _REPLY_VERDICTS if word in resp]
     return min(found) if found else -1
+
+
+def parse_retention_stop(prefix: bytes) -> dict | None:
+    """Parse the firmware ``RST`` line written before an adaptive16 dump.
+
+    The record describes the selector result of the first frame that was not
+    retained. A malformed record is logged and dropped: it is a diagnostic and
+    must not fail the capture it describes.
+    """
+    for line in prefix.decode(errors="replace").splitlines():
+        if not line.startswith("RST "):
+            continue
+        try:
+            fields = dict(token.split("=", 1) for token in line.split()[1:])
+            count = int(fields["cc"])
+            bins = [int(value) for value in fields["c"].split(",")]
+            powers = [int(value) for value in fields["p"].split(",")]
+            proposed_start, proposed_bins = (int(value) for value in fields["w"].split(","))
+            return {
+                "reason": RETENTION_REASONS[int(fields["r"])],
+                "frame": int(fields["f"]),
+                "candidate_bins": bins[:count],
+                "candidate_powers": powers[:count],
+                "selected_bin": int(fields["s"]),
+                "held_bin": int(fields["h"]),
+                "accepted": bool(int(fields["ok"])),
+                "ambiguous": bool(int(fields["a"])),
+                "coasting": bool(int(fields["co"])),
+                "noise": int(fields["n"]),
+                "proposed_start": proposed_start,
+                "proposed_bins": proposed_bins,
+            }
+        except (KeyError, ValueError, IndexError):
+            logger.warning("[IWR6843] Ignoring malformed retention stop record: %r", line)
+            return None
+    return None
 
 
 class UnsupportedCommand(RuntimeError):
@@ -280,18 +322,25 @@ class IWR6843Radar:
         Syncs on the ILD1 magic past the CLI echo and sizes the read from the
         dump's own header, so any firmware geometry works.
         """
-        payload, _prefix = self._read_dump_command(
-            b"l3dump\n", timeout_s, stall_tolerance_s
-        )
+        payload, _prefix = self._read_dump_command(b"l3dump\n", timeout_s, stall_tolerance_s)
         return payload
+
+    def read_adaptive_dump(
+        self, timeout_s: float = 40.0, stall_tolerance_s: float = 4.0
+    ) -> tuple[bytes, dict | None]:
+        """Return an adaptive16 dump and the selector stop record, if any.
+
+        Firmware without stop diagnostics, or a capture that retained every
+        planned frame, yields ``None`` for the record.
+        """
+        payload, prefix = self._read_dump_command(b"l3dump\n", timeout_s, stall_tolerance_s)
+        return payload, parse_retention_stop(prefix)
 
     def read_shadow_dump(
         self, timeout_s: float = 40.0, stall_tolerance_s: float = 4.0
     ) -> tuple[bytes, list[dict[str, int]]]:
         """Return a dump and shadow decisions frozen with those same frames."""
-        payload, prefix = self._read_dump_command(
-            b"l3shadow\n", timeout_s, stall_tolerance_s
-        )
+        payload, prefix = self._read_dump_command(b"l3shadow\n", timeout_s, stall_tolerance_s)
         decisions: list[dict[str, int]] = []
         for line in prefix.decode(errors="replace").splitlines():
             if not line.startswith("SHD f="):

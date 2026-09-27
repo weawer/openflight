@@ -1,6 +1,7 @@
 #include "live_selector.h"
 
 #include <stddef.h>
+#include <stdio.h>
 #include <string.h>
 
 #define L3_RETENTION_MARGIN_BINS 2U
@@ -41,6 +42,29 @@ uint16_t l3_retention_window(L3LiveSelectorResult *result, uint16_t nBins)
             high + L3_RETENTION_MARGIN_BINS + 1U - result->windowBins;
     }
     return L3_RETENTION_COMPLETE;
+}
+
+int32_t l3_format_retention_stop(uint16_t reason, uint16_t frame,
+                                 const L3LiveSelectorResult *result,
+                                 char *out, uint32_t cap)
+{
+    return snprintf(out, cap,
+                    "RST r=%u f=%u cc=%u c=%u,%u p=%lu,%lu s=%u h=%u "
+                    "ok=%u a=%u co=%u n=%lu w=%u,%u",
+                    (unsigned)reason, (unsigned)frame,
+                    (unsigned)result->candidateCount,
+                    (unsigned)result->candidateBins[0],
+                    (unsigned)result->candidateBins[1],
+                    (unsigned long)result->candidatePower[0],
+                    (unsigned long)result->candidatePower[1],
+                    (unsigned)result->selectedBin,
+                    (unsigned)result->heldBin,
+                    (unsigned)result->accepted,
+                    (unsigned)result->ambiguous,
+                    (unsigned)result->coasting,
+                    (unsigned long)result->noise,
+                    (unsigned)result->windowStart,
+                    (unsigned)result->windowBins);
 }
 
 void l3_coherent_gate(const uint32_t *rise, const uint32_t *coherent,

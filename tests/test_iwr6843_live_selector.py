@@ -10,6 +10,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from openflight.iwr6843.driver import parse_retention_stop
 from openflight.iwr6843.live_selector import (
     SelectorParams,
     SelectorResult,
@@ -770,3 +771,93 @@ def test_gate_mean_must_exclude_the_masked_out_bins():
         assert fixed_slice[42 - active_start] == 0, (
             f"frame {frame}: the correctly-scoped gate must reject this static bin"
         )
+
+
+@pytest.fixture(scope="module")
+def c_format_stop(c_select):
+    function = ctypes.CDLL(c_select.library_path).l3_format_retention_stop
+    function.argtypes = [
+        ctypes.c_uint16,
+        ctypes.c_uint16,
+        ctypes.POINTER(CResult),
+        ctypes.c_char_p,
+        ctypes.c_uint32,
+    ]
+    function.restype = ctypes.c_int32
+    return function
+
+
+@pytest.mark.parametrize(
+    "accepted,ambiguous,coasting,candidates,powers,selected,held,reason",
+    [
+        # No candidate associated and no coast budget: the track is lost.
+        (0, 0, 0, (), (), 41, 0, "track_lost"),
+        # Two candidates too far apart for one retained window.
+        (1, 1, 0, (30, 50), (9000, 8000), 30, 0, "ambiguous"),
+        # Coasting prediction too far from the held bin to fit one window.
+        (0, 0, 1, (30,), (700,), 38, 30, "track_lost"),
+    ],
+)
+def test_retention_stop_record_round_trips_to_the_host(
+    c_retention,
+    c_format_stop,
+    accepted,
+    ambiguous,
+    coasting,
+    candidates,
+    powers,
+    selected,
+    held,
+    reason,
+):
+    result = CResult()
+    result.accepted = accepted
+    result.ambiguous = ambiguous
+    result.coasting = coasting
+    result.candidate_count = len(candidates)
+    for index, (candidate, power) in enumerate(zip(candidates, powers)):
+        result.candidate_bins[index] = candidate
+        result.candidate_power[index] = power
+    result.selected_bin = selected
+    result.held_bin = held
+    result.window_start = selected - 6
+    result.window_bins = 12
+    result.noise = 120
+
+    code = c_retention(ctypes.byref(result), 128)
+    buffer = ctypes.create_string_buffer(128)
+    written = c_format_stop(code, 22, ctypes.byref(result), buffer, len(buffer))
+
+    assert 0 < written < len(buffer)
+    stop = parse_retention_stop(buffer.value)
+    assert stop == {
+        "reason": reason,
+        "frame": 22,
+        "candidate_bins": list(candidates),
+        "candidate_powers": list(powers),
+        "selected_bin": selected,
+        "held_bin": held,
+        "accepted": bool(accepted),
+        "ambiguous": bool(ambiguous),
+        "coasting": bool(coasting),
+        "noise": 120,
+        "proposed_start": selected - 6,
+        "proposed_bins": 12,
+    }
+
+
+def test_retention_stop_record_fits_the_firmware_buffer_at_field_maxima(c_format_stop):
+    result = CResult()
+    result.candidate_count = 2
+    result.candidate_bins[0] = result.candidate_bins[1] = 0xFFFF
+    result.candidate_power[0] = result.candidate_power[1] = 0xFFFFFFFF
+    result.noise = 0xFFFFFFFF
+    result.selected_bin = result.held_bin = 0xFFFF
+    result.window_start = result.window_bins = 0xFFFF
+    result.accepted = result.ambiguous = result.coasting = 1
+    buffer = ctypes.create_string_buffer(128)
+
+    written = c_format_stop(4, 0xFFFF, ctypes.byref(result), buffer, len(buffer))
+
+    # l3_cli_dump formats into a 128-byte stack buffer.
+    assert 0 < written < len(buffer)

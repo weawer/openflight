@@ -51,6 +51,14 @@ int32_t l3_live_select(const uint32_t *powers, uint16_t nBins,
 uint16_t l3_retention_window(L3LiveSelectorResult *result, uint16_t nBins);
 
 /*
+ * One "RST ..." CLI line describing the selector result that stopped adaptive
+ * retention. frame is the dump-order index of the rejected, unretained frame.
+ */
+int32_t l3_format_retention_stop(uint16_t reason, uint16_t frame,
+                                 const L3LiveSelectorResult *result,
+                                 char *out, uint32_t cap);
+
+/*
  * Suppress rise[] bins whose coherent[] difference is not well above the
  * in-window mean. See coherent_gate() in live_selector.py and
  * plans/iwr-coherent-gate.md. gateQ8 = 512 requires 2x the mean.

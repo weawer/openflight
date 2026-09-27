@@ -2622,6 +2622,9 @@ def _process_iwr6843_angle(shot: Shot) -> float | None:
                 temperature_report=(
                     getattr(capture, "temperature_report", None) if capture is not None else None
                 ),
+                retention_stop=(
+                    getattr(capture, "retention_stop", None) if capture is not None else None
+                ),
             )
 
         _check_self_trigger_latency(shot, capture)

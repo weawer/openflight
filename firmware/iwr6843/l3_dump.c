@@ -273,6 +273,9 @@ static uint8_t g_ring[L3_TOTAL_BYTES];
 static uint8_t gCaptureFormat = L3_CAPTURE_FORMAT_IQ16;
 static uint16_t gRetentionReason;
 static uint32_t gRetentionPostFrames;
+/* Set when the live selector (not the dump) ended retention; gShadowLast then
+ * holds that stopping frame's result because later frames skip the selector. */
+static uint8_t gRetentionStopRecorded;
 #define g_iq16FrameScratch \
     (*((int16_t (*)[2][L3_IQ16_SCRATCH_WORDS])(void *)&g_ring[L3_IQ8_CAPTURE_BYTES]))
 #endif
@@ -2214,7 +2217,10 @@ static void l3_storeCompletedScratchFrame(uint32_t slot, uint8_t scratch)
              * a confirmed track through a bounded number of misses. */
             gRetentionReason = l3_retention_window(&gShadowLast, N_SAMPLES);
             if (gRetentionReason != 0U)
+            {
+                gRetentionStopRecorded = 1U;
                 return;
+            }
             gFrameBinStart[slot] = (uint8_t)gShadowLast.windowStart;
             gShadowWindowStart[slot] = (uint8_t)gShadowLast.windowStart;
         }
@@ -3167,6 +3173,16 @@ int32_t l3_cli_dump(int32_t argc, char *argv[])
                       (unsigned)gShadowCoastingFrame[slot]);
         }
     }
+    if (l3_captureUsesAdaptiveIq16() && gRetentionStopRecorded)
+    {
+        char stopText[128];
+
+        (void)l3_format_retention_stop(gRetentionReason,
+                                       (uint16_t)(actualPre + actualPost),
+                                       &gShadowLast, stopText,
+                                       sizeof(stopText));
+        CLI_write("%s\n", stopText);
+    }
 #endif
     l3_fill_header(&h, (uint16_t)(actualPre + actualPost), 0U);
 #else
@@ -3342,6 +3358,7 @@ int32_t l3_cli_dump(int32_t argc, char *argv[])
 #ifdef L3_RING_IQ8
     gRetentionReason = 0U;
     gRetentionPostFrames = 0U;
+    gRetentionStopRecorded = 0U;
     if (l3_captureUsesAdaptiveIq16())
     {
         memset(&gShadowState, 0, sizeof(gShadowState));
@@ -3918,6 +3935,7 @@ static int32_t l3_sparseRearm(void)
 #ifdef L3_RING_IQ8
     gRetentionReason = 0U;
     gRetentionPostFrames = 0U;
+    gRetentionStopRecorded = 0U;
     if (l3_captureUsesAdaptiveIq16())
     {
         memset(&gShadowState, 0, sizeof(gShadowState));
@@ -5173,6 +5191,7 @@ static int32_t l3_cli_sensorStart(int32_t argc, char *argv[])
 #ifdef L3_RING_IQ8
     gRetentionReason = 0U;
     gRetentionPostFrames = 0U;
+    gRetentionStopRecorded = 0U;
     if (l3_captureUsesAdaptiveIq16())
     {
         memset(&gShadowState, 0, sizeof(gShadowState));
