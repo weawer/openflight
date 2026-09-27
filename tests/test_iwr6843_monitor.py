@@ -935,31 +935,24 @@ def test_rejected_self_trigger_is_released(tmp_path):
     assert radar.releases == 1
 
 
-def test_rejected_self_trigger_is_released_without_l3sparse_in_adaptive_mode(tmp_path):
-    """2026-09-27 hardware crash: an unaccepted self-trigger notice arriving
-    before the monitor is armed (a normal startup race) is released with
-    release_sparse_freeze(), i.e. the firmware's l3sparse command. Adaptive16
-    explicitly rejects l3sparse (l3_sparseFreeze: "adaptive16 requires full
-    retained dump"), so release_sparse_freeze() raised RuntimeError and took
-    the whole self-trigger listener thread down. The only way to release an
-    unwanted adaptive16 freeze is a full read-and-discard (read_dump), which
-    is the same freeze/transfer/rearm path every adaptive16 capture already
-    uses successfully."""
+def test_rejected_self_trigger_is_released_by_l3release_in_adaptive_mode(tmp_path):
+    """2026-09-27 hardware crash: releasing an unaccepted notice sent l3sparse,
+    which adaptive16 rejects. eb8e895 then released by reading and discarding
+    the whole dump (~5.3 s), which still failed on the board because RF was
+    never stopped. The firmware now has l3release (ported from feat/iwr-calcs),
+    which stops RF and rearms without streaming for every capture format, so
+    adaptive16 releases the same way as the others and never reads the dump."""
     radar = SelfTriggerRadar(_raw_dump())
-
-    def _reject_sparse():
-        raise RuntimeError("IWR6843 rejected l3sparse; the frozen ring was not released")
-
-    radar.release_sparse_freeze = _reject_sparse
+    radar.read_dump = lambda: pytest.fail("a release must not stream the dump")
     monitor = _self_trigger_monitor(tmp_path, radar)
     monitor._adaptive_retention = True
     monitor._running = monitor._armed = True
     monitor._last_edge_timestamp = time.time()
     radar.notices.append(b"Triggered\n")
 
-    monitor._listen_for_self_trigger()  # must not raise
+    monitor._listen_for_self_trigger()
 
-    assert radar.read_started_at is not None, "adaptive16 release must read-and-discard"
+    assert radar.releases == 1
     assert not monitor._release_pending
 
 

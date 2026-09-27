@@ -46,10 +46,22 @@ from openflight.iwr6843.sparse import (
 BAUD = 1_041_667
 # Firmware CLI line written when the self-trigger freezes the ring.
 TRIGGER_NOTICE = b"Triggered"
+# The firmware CLI prompt, written after every reply (l3_dump.c cliPrompt).
+CLI_PROMPT = b"l3dump:/>"
+_REPLY_VERDICTS = (b"Done", b"Error", b"not recognized")
+# A reply whose prompt never comes is complete once its bytes stop for this
+# long after the verdict (the firmware writes a reply without pauses).
+_REPLY_QUIET_S = 0.1
 _NOTICE_TAIL_BYTES = len(TRIGGER_NOTICE) - 1
 _PORT_GLOBS = ("/dev/ttyUSB*", "/dev/tty.SLAB_USBtoUART*")
 
 logger = logging.getLogger(__name__)
+
+
+def _reply_verdict_at(resp: bytes) -> int:
+    """Index just past the first Done/Error/not-recognized word, or -1."""
+    found = [(resp.index(word) + len(word)) for word in _REPLY_VERDICTS if word in resp]
+    return min(found) if found else -1
 
 
 class UnsupportedCommand(RuntimeError):
@@ -124,19 +136,60 @@ class IWR6843Radar:
             TRIGGER_NOTICE if TRIGGER_NOTICE in pending else pending[-_NOTICE_TAIL_BYTES:]
         )
 
+    def _discard_before_readback(self) -> None:
+        """Drop stale input before reading the frozen capture out.
+
+        A notice pending here belongs to the capture this readback consumes,
+        so keeping it would fire a phantom capture once the ring rearms.
+        """
+        self.ser.reset_input_buffer()
+        self._trigger_pending = b""
+
     def cmd(self, line: str, window: float = 1.5) -> str:
-        """Send one CLI line; collect the response until Done/Error/timeout."""
+        """Send one CLI line; collect the reply through the prompt that ends it.
+
+        The reply is complete at the CLI prompt that follows its Done, Error
+        or "not recognized" line, not at the first of those words: the
+        firmware writes a reply byte by byte, so a read can return
+        ``Error: stop the senso`` and the rest would otherwise arrive as the
+        next command's reply. Without a prompt the reply ends once its bytes
+        stop, bounded by the window. Stale bytes are dropped rather than taken
+        as the reply, except a ``Triggered`` notice among them, which is kept
+        for the listener. Ported from feat/iwr-calcs (294fdbf).
+        """
         waiting = self.ser.in_waiting
         if waiting:
             self._remember_trigger_notice(self.ser.read(waiting))
         self.ser.write((line + "\n").encode())
         resp = b""
+        verdict_at = -1
+        reply_end = -1
         deadline = time.time() + window
+        last_byte_at = time.time()
         while time.time() < deadline:
-            resp += self.ser.read(512)
-            if b"Done" in resp or b"Error" in resp:
+            # in_waiting-sized reads, else read(1): read(512) would wait out
+            # the port timeout for every reply shorter than 512 bytes.
+            waiting = self.ser.in_waiting
+            chunk = self.ser.read(waiting if waiting else 1)
+            if chunk:
+                resp += chunk
+                last_byte_at = time.time()
+            if verdict_at < 0:
+                verdict_at = _reply_verdict_at(resp)
+            if verdict_at < 0:
+                continue
+            if CLI_PROMPT in resp[verdict_at:]:
+                reply_end = resp.index(CLI_PROMPT, verdict_at) + len(CLI_PROMPT)
                 break
+            if time.time() - last_byte_at >= _REPLY_QUIET_S:
+                break
+        # The whole read is scanned for a notice, split or not; only the reply
+        # is returned. Bytes after the prompt are the start of whatever
+        # streams next (a debug line, a notice), and a partial debug line
+        # handed back here would parse as one with fields missing.
         self._remember_trigger_notice(resp)
+        if reply_end >= 0:
+            resp = resp[:reply_end]
         return resp.decode(errors="replace")
 
     def drain_stale_output(
@@ -267,7 +320,7 @@ class IWR6843Radar:
     def _read_dump_command(
         self, command: bytes, timeout_s: float, stall_tolerance_s: float
     ) -> tuple[bytes, bytes]:
-        self.ser.reset_input_buffer()
+        self._discard_before_readback()
         self.ser.write(command)
         buf = bytearray()
         prefix = b""
@@ -331,13 +384,24 @@ class IWR6843Radar:
         return assemble_capture(summary, slice_packet, plan, requested_cells=requested)
 
     def release_sparse_freeze(self, timeout_s: float = 8.0) -> None:
-        """Request no cells, so a self-triggered freeze nobody wants re-arms."""
-        try:
-            exchange = self._sparse_exchange(lambda _summary: SparsePlan(cells=()), timeout_s)
-        except UnsupportedCommand:
-            exchange = None
-        if exchange is None:
-            raise RuntimeError("IWR6843 rejected l3sparse; the frozen ring was not released")
+        """Rearm a self-triggered freeze nobody wants, without streaming it.
+
+        ``l3release`` stops RF and rearms in one command, for every capture
+        format. The previous release (``l3sparse`` asking for no cells) is
+        rejected by adaptive16 and streamed the whole power map first; older
+        images also never stopped RF after a self-triggered freeze, so their
+        rearm failed anyway -- there is nothing worth falling back to.
+        Ported from feat/iwr-calcs (006525f).
+        """
+        self._discard_before_readback()
+        reply = self.cmd("l3release", timeout_s)
+        if "not recognized" in reply:
+            raise RuntimeError(
+                "IWR6843 has no l3release; flash the current firmware to clear a self-trigger"
+            )
+        if "Error" in reply or "Done" not in reply:
+            detail = reply.strip() or "no acknowledgement"
+            raise RuntimeError(f"IWR6843 did not release the frozen ring: {detail}")
 
     def read_tracked(self, timeout_s: float = 8.0) -> tuple[bytes, float, OnboardTrack] | None:
         """Freeze and read the cells the firmware tracker chose (``l3track``).
@@ -349,7 +413,7 @@ class IWR6843Radar:
         RuntimeError when the stream breaks after it starts: the ring has
         already been rearmed, so a fallback would capture the wrong window.
         """
-        self.ser.reset_input_buffer()
+        self._discard_before_readback()
         self.ser.write(b"l3track\n")
         try:
             read = self._read_packet(TRACK_MAGIC, track_packet_size, timeout_s)
@@ -385,7 +449,7 @@ class IWR6843Radar:
         timeout_s: float,
     ) -> tuple[PowerSummary, SparsePlan, int, bytes] | None:
         """Run one l3sparse round trip. None when rejected before the freeze."""
-        self.ser.reset_input_buffer()
+        self._discard_before_readback()
         self.ser.write(b"l3sparse\n")
         read = self._read_packet(POWER_MAGIC, power_packet_size, timeout_s)
         if read is None:

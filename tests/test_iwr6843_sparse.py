@@ -432,22 +432,17 @@ def test_oversized_plan_is_trimmed_and_reported():
     assert capture.truncated
 
 
-def test_release_requests_no_cells():
+def test_release_does_not_go_through_l3sparse():
+    """Releases use l3release (see test_iwr6843_driver.py). l3sparse asking for
+    no cells streamed the whole power map first and is rejected by
+    adaptive16, so it must not be the fallback either."""
     cube = _cube(n_tx=2)
     serial = FakeSparseSerial(cube=cube, n_tx=2, summary=vertical_loop_power(cube, n_tx=2))
 
-    _radar(serial).release_sparse_freeze()
+    with pytest.raises(RuntimeError):
+        _radar(serial).release_sparse_freeze(timeout_s=0.3)
 
-    assert serial.written == [b"l3sparse\n", b"cells 0\n"]
-
-
-def test_release_on_firmware_without_sparse_raises():
-    serial = FakeSparseSerial(
-        cube=None, n_tx=2, summary=None, before_power=b"'l3sparse' is not recognized\n"
-    )
-
-    with pytest.raises(RuntimeError, match="not released"):
-        _radar(serial).release_sparse_freeze(timeout_s=0.5)
+    assert serial.written == [b"l3release\n"]
 
 
 # --- runtime planner ---------------------------------------------------------------

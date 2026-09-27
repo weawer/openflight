@@ -32,7 +32,9 @@ def firmware(tmp_path_factory):
         pytest.skip("C compiler unavailable")
     source = Path("firmware/iwr6843/l3_dump.c").read_text()
     globals_ = "\n".join(re.findall(r"^static volatile[^\n]*\bgTrigger\w*[^\n]*;", source, re.M))
+    stop_frozen = _function(source, "static int32_t l3_stopFrozenRing(void)")
     freeze = _function(source, "static int32_t l3_freezeCapture(void)")
+    release = _function(source, "static int32_t l3_cli_release(int32_t argc, char *argv[])")
     clear = _function(source, "static void l3_clearTriggerMotion(void)")
     consider = _function(source, "static void l3_considerSelfTrigger(void)")
     harness = (
@@ -47,11 +49,12 @@ static struct { uint32_t preFrames, loops, preBins; } gCapturePlan = {1, 12, 53}
 static const float *powers;
 static uint8_t gCaptureActive, gCaptureIncomplete;
 static void *gHwaFreezeSemaphore = (void *)1;
-static int permit, stopCalls, rfStopCalls, rfStopResult;
+static int permit, stopCalls, rfStopCalls, rfStopResult, rearmCalls;
 static int Semaphore_pend(void *semaphore, unsigned timeout) { return permit; }
 static void CLI_write(const char *format, ...) { }
 static int l3_stopCaptureAtBoundary(void) { stopCalls++; return 0; }
 static int l3_finishCaptureStop(void) { rfStopCalls++; return rfStopResult; }
+static int l3_sparseRearm(void) { rearmCalls++; return 0; }
 static float l3_verticalPowerAt(uint32_t slot, uint32_t bin) { return powers[bin]; }
 """
         + globals_
@@ -67,7 +70,11 @@ static void l3_latchSelfTrigger(float tee, float approach) {
 """
         + consider
         + "\n"
+        + stop_frozen
+        + "\n"
         + freeze
+        + "\n"
+        + release
         + """
 int freeze_capture_rf(int active, int latched, int allow, int rf_result) {
     gCaptureActive = active; gSelfTriggerLatched = latched; permit = allow; stopCalls = 0;
@@ -78,6 +85,19 @@ int freeze_capture(int active, int latched, int allow) {
     return freeze_capture_rf(active, latched, allow, 0);
 }
 int freeze_rf_stop_calls(void) { return rfStopCalls; }
+int release_ring(int active, int latched, int allow, int rf_result, int incomplete) {
+    gCaptureActive = active; gSelfTriggerLatched = latched; permit = allow;
+    stopCalls = 0; rfStopCalls = 0; rfStopResult = rf_result; rearmCalls = 0;
+    gCaptureIncomplete = incomplete;
+    return l3_cli_release(0, NULL);
+}
+int release_rearm_calls(void) { return rearmCalls; }
+int capture_incomplete(void) { return gCaptureIncomplete; }
+int freeze_incomplete(int incomplete) {
+    gCaptureActive = 1; gSelfTriggerLatched = 0; permit = 1; stopCalls = 0;
+    gCaptureIncomplete = incomplete;
+    return l3_freezeCapture();
+}
 int capture_latched(void) { return gSelfTriggerLatched; }
 int freeze_stop_calls(void) { return stopCalls; }
 void reset(unsigned period) {
@@ -189,3 +209,35 @@ def test_failed_rf_stop_keeps_the_latch_so_a_retry_stops_rf_again(firmware):
     assert firmware.freeze_capture_rf(0, 1, 1, 0) == 0
     assert firmware.capture_latched() == 0
     assert firmware.freeze_rf_stop_calls() == 1
+
+
+@pytest.mark.parametrize(
+    "active,latched,allow,rf_result,incomplete,result,rearms,rf_stops",
+    [
+        # Unwanted self-trigger: stop RF, rearm, nothing streamed.
+        (0, 1, 1, 0, 0, 0, 1, 1),
+        # A discarded capture that overran is still rearmed.
+        (0, 1, 1, 0, 1, 0, 1, 1),
+        # RF did not stop: rearming would fail with "RF restart failed".
+        (0, 1, 1, -1, 0, -1, 0, 1),
+        # Freeze timed out: nothing stopped, nothing rearmed, latch kept.
+        (1, 1, 0, 0, 0, -1, 0, 0),
+        # No self-trigger: stop at the next boundary and rearm.
+        (1, 0, 1, 0, 0, 0, 1, 0),
+    ],
+)
+def test_release_stops_rf_then_rearms_and_discards_an_incomplete_capture(
+    firmware, active, latched, allow, rf_result, incomplete, result, rearms, rf_stops
+):
+    """Ported from feat/iwr-calcs (006525f), on this branch's stop step."""
+    assert firmware.release_ring(active, latched, allow, rf_result, incomplete) == result
+    assert firmware.release_rearm_calls() == rearms
+    assert firmware.freeze_rf_stop_calls() == rf_stops
+    if result == 0:
+        assert firmware.capture_incomplete() == 0
+        assert firmware.capture_latched() == 0
+
+
+def test_a_readback_still_refuses_an_incomplete_capture(firmware):
+    assert firmware.freeze_incomplete(0) == 0
+    assert firmware.freeze_incomplete(1) == -1

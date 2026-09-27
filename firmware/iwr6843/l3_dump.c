@@ -514,6 +514,7 @@ static int32_t l3_cli_stats(int32_t argc, char *argv[]);
 #ifdef CONFIGURABLE_CAPTURE
 static int32_t l3_cli_captureCfg(int32_t argc, char *argv[]);
 static int32_t l3_freezeCapture(void);
+static int32_t l3_cli_release(int32_t argc, char *argv[]);
 static int32_t l3_cli_phaseCaptureCfg(int32_t argc, char *argv[]);
 #ifdef L3_RING_IQ8
 static int32_t l3_cli_captureFormat(int32_t argc, char *argv[]);
@@ -3387,7 +3388,10 @@ static int32_t l3_sparseFreeze(void)
     return l3_freezeCapture();
 }
 
-static int32_t l3_freezeCapture(void)
+/* Take the frozen ring with RF stopped: wait for a self-trigger freeze, or
+ * stop at the next frame boundary. Does not stream and does not judge the
+ * captured data; l3_freezeCapture and l3release build on it. */
+static int32_t l3_stopFrozenRing(void)
 {
     if (!gCaptureActive && !gSelfTriggerLatched) {
         return -1;
@@ -3410,6 +3414,15 @@ static int32_t l3_freezeCapture(void)
         }
         gSelfTriggerLatched = 0U;
     } else if (l3_stopCaptureAtBoundary() != 0) {
+        return -1;
+    }
+    return 0;
+}
+
+/* Freeze for a readback: a capture that overran cannot be read out. */
+static int32_t l3_freezeCapture(void)
+{
+    if (l3_stopFrozenRing() != 0) {
         return -1;
     }
     if (gCaptureIncomplete) {
@@ -3537,6 +3550,21 @@ static int32_t l3_sparseRearm(void)
         return -1;
     }
     return 0;
+}
+
+/* CLI "l3release": rearm after a self-trigger nobody wants, without
+ * streaming anything. Works for every capture format, including adaptive16,
+ * which rejects l3sparse. The capture is discarded, so one that overran does
+ * not block the rearm. Ported from feat/iwr-calcs. */
+static int32_t l3_cli_release(int32_t argc, char *argv[])
+{
+    (void)argc;
+    (void)argv;
+    if (l3_stopFrozenRing() != 0) {
+        return -1;
+    }
+    gCaptureIncomplete = 0U;
+    return l3_sparseRearm();
 }
 #endif
 
@@ -4819,6 +4847,11 @@ static void l3_initTask(UArg arg0, UArg arg1)
     cliCfg.tableEntry[16].cmd           = "l3shadow";
     cliCfg.tableEntry[16].helpString    = "Freeze and stream shadow decisions plus reference";
     cliCfg.tableEntry[16].cmdHandlerFxn = l3_cli_shadowDump;
+#endif
+#ifdef CONFIGURABLE_CAPTURE
+    cliCfg.tableEntry[17].cmd           = "l3release";
+    cliCfg.tableEntry[17].helpString    = "Rearm a frozen ring without streaming it";
+    cliCfg.tableEntry[17].cmdHandlerFxn = l3_cli_release;
 #endif
     CLI_open(&cliCfg);
 }

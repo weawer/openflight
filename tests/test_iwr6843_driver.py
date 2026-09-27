@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 import numpy as np
 import pytest
 
@@ -374,3 +376,167 @@ def test_adaptive_header_split_keeps_shadow_decisions(monkeypatch):
     assert received == raw
     assert len(decisions) == 1
     assert decisions[0]["selected"] == 31
+
+
+class _ChunkedReplySerial:
+    """Delivers the reply one chunk per read, like a byte-by-byte firmware write."""
+
+    def __init__(self, chunks: list[bytes]):
+        self.pending = [bytearray(chunk) for chunk in chunks]
+        self.chunks: list[bytearray] = []
+        self.writes = []
+
+    @property
+    def in_waiting(self):
+        return len(self.chunks[0]) if self.chunks else 0
+
+    def reset_input_buffer(self):
+        self.chunks.clear()
+
+    def write(self, data: bytes):
+        self.writes.append(data)
+        # The reply exists only once the command has been sent.
+        self.chunks.extend(self.pending)
+        self.pending = []
+
+    def read(self, nbytes: int):
+        if not self.chunks:
+            return b""
+        chunk = self.chunks[0]
+        out = bytes(chunk[:nbytes])
+        del chunk[:nbytes]
+        if not chunk:
+            self.chunks.pop(0)
+        return out
+
+
+def _chunked_radar(chunks: list[bytes]) -> IWR6843Radar:
+    radar = IWR6843Radar.__new__(IWR6843Radar)
+    radar.ser = _ChunkedReplySerial(chunks)
+    return radar
+
+
+# --- cmd() reads through the prompt (ported from feat/iwr-calcs 294fdbf) ---
+
+
+def test_reply_split_inside_the_error_line_is_read_through_to_the_prompt():
+    """'Error: stop the senso' must not end the reply: the rest is not the next command's."""
+    radar = _chunked_radar(
+        [
+            b"captureFormat iq8\nError: stop the senso",
+            b"r before captureFormat\nError -1\nl3dump:/>",
+        ]
+    )
+
+    reply = radar.cmd("captureFormat iq8", 0.5)
+
+    assert reply.endswith("Error -1\nl3dump:/>")
+    assert "stop the sensor before captureFormat" in reply
+    assert radar.ser.in_waiting == 0
+
+
+def test_bytes_after_the_prompt_are_not_part_of_the_reply():
+    """A debug line streaming right behind the prompt must not be returned half-arrived."""
+    radar = _chunked_radar(
+        [b"debugCfg 1\ntrig phase=watching tee=1 bin=14\nDone\nl3dump:/>trig phase=track"]
+    )
+
+    reply = radar.cmd("debugCfg 1", 0.5)
+
+    assert reply.endswith("l3dump:/>")
+    assert "phase=track" not in reply
+
+
+def test_notice_behind_the_prompt_is_still_remembered_for_the_listener():
+    radar = _chunked_radar([b"stats\nactive=1\nDone\nl3dump:/>Triggered\n"])
+
+    reply = radar.cmd("stats", 0.5)
+
+    assert "Triggered" not in reply
+    assert radar.wait_trigger_notice()[0] is True
+
+
+def test_reply_ends_at_the_prompt_after_done_not_at_a_prompt_before_it():
+    radar = _chunked_radar([b"stats\nframes=1 active=1\nDone\n", b"l3dump:/>"])
+
+    reply = radar.cmd("stats", 0.5)
+
+    assert reply == "stats\nframes=1 active=1\nDone\nl3dump:/>"
+
+
+def test_debug_line_between_done_and_the_prompt_stays_in_the_reply():
+    radar = _chunked_radar(
+        [b"debugCfg 1\ntrig phase=watching tee=1 bin=14 latched=0\nDone\n", b"l3dump:/>"]
+    )
+
+    reply = radar.cmd("debugCfg 1", 0.5)
+
+    assert "trig phase=watching" in reply
+    assert reply.endswith("l3dump:/>")
+
+
+def test_reply_without_a_prompt_returns_after_a_quiet_period_not_the_window():
+    radar = _chunked_radar([b"'19' is not recognized as a CLI command\n"])
+    started = time.monotonic()
+
+    reply = radar.cmd("stats", 2.0)
+
+    assert "not recognized" in reply
+    assert 0.08 < time.monotonic() - started < 0.6
+
+
+# --- release through l3release (ported from feat/iwr-calcs 006525f) --------
+
+
+def test_release_is_one_l3release_command_and_forgets_the_released_notice():
+    """The notice belongs to the freeze being released; keeping it would make
+    the listener capture the freshly rearmed ring."""
+    radar = _chunked_radar([b"l3release\nDone\nl3dump:/>"])
+    radar._trigger_pending = b"Triggered"
+
+    radar.release_sparse_freeze(timeout_s=0.5)
+
+    assert radar.ser.writes == [b"l3release\n"]
+    assert radar.wait_trigger_notice()[0] is False
+
+
+@pytest.mark.parametrize(
+    ("reply", "message"),
+    [
+        (b"'l3release' is not recognized as a CLI command\n", "flash"),
+        (b"l3release\nError: RF restart failed\nError -1\nl3dump:/>", "RF restart failed"),
+    ],
+)
+def test_release_failures_are_reported(reply, message):
+    radar = _chunked_radar([reply])
+
+    with pytest.raises(RuntimeError, match=message):
+        radar.release_sparse_freeze(timeout_s=0.3)
+
+
+# --- a readback consumes its capture's notice (feat/iwr-calcs) --------------
+
+
+@pytest.mark.parametrize(
+    "read",
+    [
+        lambda radar: radar.read_dump(timeout_s=0.1, stall_tolerance_s=0.05),
+        lambda radar: radar.read_shadow_dump(timeout_s=0.1, stall_tolerance_s=0.05),
+        lambda radar: radar.read_tracked(timeout_s=0.1),
+        lambda radar: radar.read_sparse(lambda _summary: None, timeout_s=0.1),
+    ],
+)
+def test_readbacks_forget_a_notice_from_the_capture_they_consume(read):
+    """A 'Triggered' remembered before a readback belongs to the capture that
+    readback freezes and reads; keeping it fires a phantom capture of the
+    ring the readback just rearmed."""
+    radar = IWR6843Radar.__new__(IWR6843Radar)
+    radar.ser = FakeSerial(b"Error: nothing frozen\nl3dump:/>")
+    radar._trigger_pending = b"Triggered"
+
+    try:
+        read(radar)
+    except Exception:  # pylint: disable=broad-exception-caught
+        pass
+
+    assert radar.wait_trigger_notice()[0] is False

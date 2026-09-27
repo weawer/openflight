@@ -528,7 +528,7 @@ def test_self_triggered_freeze_stops_rf_before_any_rearm():
     a sensor that was still running. The latched branch must stop RF too."""
     source = FIRMWARE.read_text(encoding="utf-8")
     freeze = _function_source(
-        source, "static int32_t l3_freezeCapture(void)\n{", "static void l3_sparseWindow"
+        source, "static int32_t l3_stopFrozenRing(void)\n{", "static int32_t l3_freezeCapture"
     )
     latched = freeze[freeze.index("if (gSelfTriggerLatched) {") : freeze.index("} else if")]
 
@@ -554,3 +554,29 @@ def test_sensor_stop_stops_rf_left_running_by_an_unconsumed_self_trigger():
     assert latched.index("l3_finishCaptureStop()") < stop.index("MMWave_close") - stop.index(
         "gSelfTriggerLatched"
     )
+
+
+def test_release_rearms_a_frozen_ring_without_streaming():
+    """Ported from feat/iwr-calcs (006525f): "l3release" rearms after a
+    self-trigger nobody wants in one command. The host previously released
+    through l3sparse (which adaptive16 rejects) or by reading a whole
+    ~550 KB dump and discarding it. The capture is being thrown away, so an
+    incomplete one must not block the rearm."""
+    source = FIRMWARE.read_text(encoding="utf-8")
+    release = _function_source(
+        source,
+        "static int32_t l3_cli_release(int32_t argc, char *argv[])\n{",
+        "int32_t l3_cli_sparse(",
+    )
+    freeze = _function_source(
+        source, "static int32_t l3_freezeCapture(void)\n{", "static void l3_sparseWindow"
+    )
+
+    assert "UART_writePolling" not in release
+    assert "l3_readLine" not in release
+    stop = release.index("l3_stopFrozenRing()")
+    assert stop < release.index("gCaptureIncomplete = 0U") < release.index("l3_sparseRearm()")
+    assert "l3_stopFrozenRing()" in freeze
+    assert freeze.index("l3_stopFrozenRing()") < freeze.index("gCaptureIncomplete")
+    assert 'tableEntry[17].cmd           = "l3release"' in source
+    assert "static int32_t l3_cli_release(int32_t argc, char *argv[]);" in source
