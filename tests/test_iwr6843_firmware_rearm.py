@@ -401,6 +401,40 @@ def test_live_selector_scan_is_bounded_below_full_cube_work():
     assert "chirp < gCapturePlan.chirpsPerFrame" not in store
 
 
+def test_frame_work_max_reports_stages_from_the_same_frame():
+    source = FIRMWARE.read_text(encoding="utf-8")
+
+    assert "workmax_frame=%u" in source
+    assert "workmax_total_us=%u" in source
+    assert "gFrameWorkMaxRearmUs = gHwaRearmLastUs;" in source
+    assert "gFrameWorkMaxShadowUs = gShadowLastUs;" in source
+    assert "gFrameWorkMaxCompactUs = gCompactIq16LastUs;" in source
+    assert "gFrameWorkMaxTriggerUs = gTriggerLastUs;" in source
+
+
+def test_adaptive_pretrigger_seeds_impact_baseline_without_running_selector():
+    source = FIRMWARE.read_text(encoding="utf-8")
+    store = _function_source(
+        source,
+        "static void l3_storeCompletedScratchFrame",
+        "static uint32_t l3_snapshotBinStart",
+    )
+
+    assert "l3_seedShadowPretriggerFrame(scratch);" in store
+    assert "slot < gCapturePlan.preFrames" in store
+    assert "l3_live_select(" in store
+    assert store.index("l3_seedShadowPretriggerFrame(scratch);") < store.index("l3_live_select(")
+
+
+def test_trigger_trace_has_an_explicit_cli_toggle():
+    source = FIRMWARE.read_text(encoding="utf-8")
+
+    assert 'strcmp(argv[2], "on")' in source
+    assert 'strcmp(argv[2], "off")' in source
+    assert "l3_trig_trace_enable(&gTrig, enabled);" in source
+    assert 'triggerLog trace <on|off>' in source
+
+
 def test_track_limits_match_the_capture_limits():
     """The tracker's fixed buffers must hold any capture the ring can freeze."""
     firmware = FIRMWARE.read_text(encoding="utf-8")

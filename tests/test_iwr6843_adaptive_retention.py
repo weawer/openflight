@@ -135,6 +135,60 @@ def test_combined_frame_work_must_fit_the_period(hardware_check):
         hardware_check._check_timing({"frame_work_max_us": 2000}, 2000, True)
 
 
+def test_combined_frame_work_target_is_stricter_than_the_hard_deadline(hardware_check):
+    hardware_check._check_timing(
+        {"frame_work_max_us": 1500}, 2000, True, target_work_us=1500
+    )
+    with pytest.raises(RuntimeError, match="engineering target"):
+        hardware_check._check_timing(
+            {"frame_work_max_us": 1501}, 2000, True, target_work_us=1500
+        )
+
+
+@pytest.mark.parametrize("latched", [0, 1])
+def test_static_soak_failure_preserves_stats_and_trigger_log(hardware_check, latched):
+    import io
+    import json
+
+    class Radar:
+        def cmd(self, command):
+            assert command == "triggerLog"
+            return "frame=2 why=fired bin=40\nDone"
+
+    output = io.StringIO()
+    stats = {"latched": latched, "frame_work_max_us": 3224}
+    with pytest.raises(RuntimeError):
+        hardware_check._check_static_health(Radar(), output, stats, {}, 2000, True, True)
+    event = json.loads(output.getvalue())
+    assert event["event"] == "failure"
+    assert event["stats"] == stats
+    assert "why=fired" in event["trigger_log"]
+
+
+def test_static_trigger_failure_saves_the_frozen_capture(hardware_check, tmp_path):
+    import io
+    import json
+
+    class Radar:
+        def cmd(self, command):
+            assert command == "triggerLog"
+            return "frame=2 why=fired bin=40\nDone"
+
+        def read_dump(self):
+            return b"frozen IQ16 dump"
+
+    output = io.StringIO()
+    stats = {"latched": 1, "frame_work_max_us": 1200}
+    with pytest.raises(RuntimeError):
+        hardware_check._check_static_health(
+            Radar(), output, stats, {}, 2000, True, True, capture_dir=tmp_path
+        )
+    event = json.loads(output.getvalue())
+    capture_path = Path(event["capture_path"])
+    assert capture_path.parent == tmp_path
+    assert capture_path.read_bytes() == b"frozen IQ16 dump"
+
+
 def test_flight_frames_kept_counts_only_selector_controlled_frames(hardware_check):
     config = str(ROOT / "config/iwr6843_l3dump_adaptive_36f2ms_iq16.cfg")
     static_raw, *_ = _capture(reason="track_lost", frames=20)
@@ -238,15 +292,23 @@ def test_operator_check_accepts_coasting_flight_frames_but_not_untracked_ones(ha
         hardware_check._check_retention_layout(metadata, decisions, str(config))
 
 
-def test_operator_check_rejects_processing_overrun_in_adaptive_capture(hardware_check):
-    hardware_check._check_timing(dict(shadow_max_us=773, compact16_max_us=537), 2000, True)
-    with pytest.raises(RuntimeError, match="selector plus compaction"):
-        hardware_check._check_timing(dict(shadow_max_us=1500, compact16_max_us=537), 2000, True)
+def test_operator_check_uses_combined_work_not_unrelated_stage_maxima(hardware_check):
+    hardware_check._check_timing(
+        dict(frame_work_max_us=1499, shadow_max_us=1500, compact16_max_us=537),
+        2000,
+        True,
+    )
 
 
 def test_stats_keeps_acquisition_frames_separate_from_detector_frames(hardware_check):
     stats = hardware_check.parse_capture_stats(
-        "frames=1500 active=1\ntrig state=idle frames=0 cand=0\nlatched=0 enabled=0\n"
+        "frames=1500 active=1\n"
+        "workmax_frame=847 workmax_rearm_us=39 workmax_shadow_us=412 "
+        "workmax_compact_us=311 workmax_trigger_us=228 workmax_total_us=1041\n"
+        "trig state=idle frames=0 cand=0\nlatched=0 enabled=0\n"
     )
     assert stats["frames"] == 1500
+    assert stats["workmax_frame"] == 847
+    assert stats["workmax_shadow_us"] == 412
+    assert stats["workmax_total_us"] == 1041
     assert stats["trigger_frames"] == 0

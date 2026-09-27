@@ -74,23 +74,13 @@ def _check_errors(stats: dict[str, int | str], baseline: dict[str, int | str]) -
         raise RuntimeError(f"capture error counters changed: {changed}")
 
 
-def _check_timing(current, expected_period_us, compact_mode):
+def _check_timing(current, expected_period_us, compact_mode, target_work_us=None):
     if _numeric(current, "frame_work_max_us") >= expected_period_us:
         raise RuntimeError("combined frame work exceeded the frame period")
-    if compact_mode and _numeric(current, "compact16_max_us") >= expected_period_us:
+    if target_work_us is not None and _numeric(current, "frame_work_max_us") > target_work_us:
         raise RuntimeError(
-            "compaction exceeded the frame period: "
-            f"{_numeric(current, 'compact16_max_us')} >= {expected_period_us} us"
-        )
-    if compact_mode and (
-        _numeric(current, "shadow_max_us") + _numeric(current, "compact16_max_us")
-        >= expected_period_us
-    ):
-        raise RuntimeError(
-            "selector plus compaction exceeded the frame period: "
-            f"{_numeric(current, 'shadow_max_us')} + "
-            f"{_numeric(current, 'compact16_max_us')} >= "
-            f"{expected_period_us} us"
+            "combined frame work exceeded the engineering target: "
+            f"{_numeric(current, 'frame_work_max_us')} > {target_work_us} us"
         )
 
 
@@ -99,6 +89,52 @@ def _write_event(output, event: str, **fields) -> None:
         return
     output.write(json.dumps({"event": event, "ts": time.time(), **fields}) + "\n")
     output.flush()
+
+
+def _check_static_health(
+    radar,
+    output,
+    stats,
+    baseline,
+    period_us,
+    compact_mode,
+    armed,
+    target_work_us=None,
+    capture_dir=None,
+):
+    try:
+        if armed and _numeric(stats, "latched"):
+            raise RuntimeError("unexpected self-trigger during the static soak")
+        _check_errors(stats, baseline)
+        _check_timing(stats, period_us, compact_mode, target_work_us)
+    except RuntimeError as error:
+        trigger_log = None
+        capture_path = None
+        capture_error = None
+        if armed:
+            try:
+                trigger_log = radar.cmd("triggerLog")
+            except Exception as diagnostic_error:
+                trigger_log = f"triggerLog unavailable: {diagnostic_error}"
+        if armed and _numeric(stats, "latched") and capture_dir is not None:
+            try:
+                capture_dir.mkdir(parents=True, exist_ok=True)
+                raw = radar.read_dump()
+                path = capture_dir / f"static-trigger-{time.time_ns()}.l3dump"
+                path.write_bytes(raw)
+                capture_path = str(path)
+            except Exception as diagnostic_error:
+                capture_error = f"frozen capture unavailable: {diagnostic_error}"
+        _write_event(
+            output,
+            "failure",
+            error=str(error),
+            stats=stats,
+            trigger_log=trigger_log,
+            capture_path=capture_path,
+            capture_error=capture_error,
+        )
+        raise
 
 
 def _expected_geometry(config_path: str) -> tuple[int, int]:
@@ -184,18 +220,41 @@ def run(args: argparse.Namespace) -> None:
                 raise RuntimeError(f"self-trigger configuration rejected: {reply}")
         baseline = _health(radar)
         expected_frames, expected_period_us = _expected_geometry(args.config)
+        target_work_us = getattr(args, "target_frame_work_us", 1500)
+        if not 0 < target_work_us < expected_period_us:
+            raise RuntimeError(
+                "target frame work must be positive and below the configured frame period"
+            )
         compact_mode = baseline.get("format") in ("compact16", "adaptive16")
         start_frames = _numeric(baseline, "frames")
         target = start_frames + args.soak_frames
         _write_event(output, "start", config=args.config, stats=baseline)
+        _check_static_health(
+            radar,
+            output,
+            baseline,
+            {},
+            expected_period_us,
+            compact_mode,
+            args.self_trigger_tee_m is not None,
+            target_work_us,
+            capture_dir,
+        )
 
         while _numeric(baseline, "frames") < target:
             time.sleep(min(args.poll_s, 60.0))
             current = _health(radar)
-            if args.self_trigger_tee_m is not None and _numeric(current, "latched"):
-                raise RuntimeError("unexpected self-trigger during the static soak")
-            _check_errors(current, baseline)
-            _check_timing(current, expected_period_us, compact_mode)
+            _check_static_health(
+                radar,
+                output,
+                current,
+                baseline,
+                expected_period_us,
+                compact_mode,
+                args.self_trigger_tee_m is not None,
+                target_work_us,
+                capture_dir,
+            )
             baseline = current
             done = _numeric(current, "frames") - start_frames
             print(
@@ -269,10 +328,17 @@ def run(args: argparse.Namespace) -> None:
             ):
                 raise RuntimeError(f"cycle {cycle}: explicit frame gap in {offsets}")
             current = _health(radar)
-            if args.self_trigger_tee_m is not None and _numeric(current, "latched"):
-                raise RuntimeError("unexpected self-trigger during the static soak")
-            _check_errors(current, baseline)
-            _check_timing(current, expected_period_us, compact_mode)
+            _check_static_health(
+                radar,
+                output,
+                current,
+                baseline,
+                expected_period_us,
+                compact_mode,
+                args.self_trigger_tee_m is not None,
+                target_work_us,
+                capture_dir,
+            )
             baseline = current
             outcome = f"early stop: {retention['reason']}" if stopped else "complete"
             print(
@@ -323,6 +389,12 @@ def main() -> int:
     parser.add_argument("--soak-frames", type=int, default=100_000)
     parser.add_argument("--cycles", type=int, default=0)
     parser.add_argument("--poll-s", type=float, default=10.0)
+    parser.add_argument(
+        "--target-frame-work-us",
+        type=int,
+        default=1500,
+        help="engineering target for combined per-frame work (hard limit is the frame period)",
+    )
     parser.add_argument("--output")
     parser.add_argument(
         "--allow-early-stop",

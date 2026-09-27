@@ -11,6 +11,30 @@
 
 ## Implemented detector slice
 
+**Hardware follow-up (2026-09-27):** the static smoke test failed. Its initial
+stats already show `latched=1`, firing after two detector observations,
+`frame_work_max_us=3224`, and `hwa_missed=1`. The 2 ms timing acceptance is
+therefore blocked. Native regression tests reproduced an approach-rate
+bypass when a strong return stays at the same bin or moves backward inside
+the gate; that bypass is fixed. The original log has no frame records, so
+this is not proof of the exact return that caused the hardware trigger.
+The test now preserves failure stats and `triggerLog`, including failures
+already present at its initial baseline. Performance work on the combined
+selector/detector path is a separate remaining change; do not accept this
+release for 2 ms operation based solely on the gate fix.
+
+**Timing follow-up (2026-09-27):** the new diagnostic image records stage costs
+from the same frame that sets `frame_work_max_us`. Adaptive pre-trigger frames
+now seed only the impact-window baseline instead of running the full shadow
+selector whose decisions are discarded before capture. Raw detector trace is
+opt-in (`triggerLog trace on|off`); candidate/event records and health counters
+remain enabled. The hardware checker uses the combined same-frame total, not a
+sum of independent stage maxima, with a 1,500 us engineering target and the
+frame period as the hard limit. On a false latch, it saves the frozen dump when
+`--capture-dir` is supplied. Build artifact and operator command:
+[`l3_dump_2ms_iq16_timingfix_20260927.md`](../firmware/releases/l3_dump_2ms_iq16_timingfix_20260927.md).
+This build is not yet hardware-validated.
+
 The donor `l3_trigger.c/h` detector now consumes all-loop vertical-TX residuals
 from compacted IQ16 frames. Host configuration uses global bins with the
 existing range calibration. Adaptive16 retention and RF-stop retry behavior

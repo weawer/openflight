@@ -26,78 +26,82 @@
 #include <stdint.h>
 
 /* Watch-region and gate limits. The region is at most one capture window. */
-#define L3_TRIG_MAX_BINS          64U
+#define L3_TRIG_MAX_BINS 64U
 /* Flight-recorder depth: frames with a candidate or an active track. Idle
  * frames only count toward the next record's gap, so a missed swing stays
  * readable for as long as the player takes to ask for it. */
-#define L3_TRIG_LOG_DEPTH         128U
+#define L3_TRIG_LOG_DEPTH 128U
 /* Raw-input trace: the region's strongest bin, every frame it reaches
  * L3_TRIG_TRACE_RATIO times the floor (well under any snr worth arming
  * with), with its energy, strongest loop and loop-0 power. Answers "did the
  * radar see anything at all" when the log stays empty. */
-#define L3_TRIG_TRACE_DEPTH       64U
-#define L3_TRIG_TRACE_RATIO       2.0F
+#define L3_TRIG_TRACE_DEPTH 64U
+#define L3_TRIG_TRACE_RATIO 2.0F
 /* A track survives this many frames without a candidate. */
-#define L3_TRIG_MAX_MISSES        1U
+#define L3_TRIG_MAX_MISSES 1U
 /* A candidate up to this many bins short of the last one still continues
  * the track (scatterer wander, a slow backswing); more is a retreat and
  * restarts the track. The approach rate is measured from the track's
  * nearest point to the radar, so a tolerated retreat does not count
  * against the downswing that follows it. */
-#define L3_TRIG_JITTER_BINS       2U
+#define L3_TRIG_JITTER_BINS 2U
 /* A candidate more than this many bins ahead of the last one is a jump
  * (another scatterer), not the same target: 8 bins/frame is 125 m/s at
  * 4.7 cm bins and 3 ms frames. */
-#define L3_TRIG_MAX_STEP_BINS     8U
+#define L3_TRIG_MAX_STEP_BINS 8U
 /* Noise-floor smoothing: floor += (median - floor) / 2^shift each frame. */
-#define L3_TRIG_FLOOR_SHIFT       3U
+#define L3_TRIG_FLOOR_SHIFT 3U
 /* Residual-energy floor never falls below this, so snr stays finite. */
-#define L3_TRIG_FLOOR_MIN         1.0F
+#define L3_TRIG_FLOOR_MIN 1.0F
 /* Carrier wavelength for the reported Doppler velocity. The 60 GHz profiles
  * sweep 60.3-63.8 GHz; 62 GHz is close enough for a diagnostic. */
-#define L3_TRIG_WAVELENGTH_M      0.00484F
+#define L3_TRIG_WAVELENGTH_M 0.00484F
 
 /* Defaults for the optional triggerCfg parameters. */
-#define L3_TRIG_DEFAULT_APPROACH_BINS 12U   /* ~0.56 m short of the tee */
-#define L3_TRIG_DEFAULT_GATE_BINS     3U    /* ~0.14 m either side of it */
-#define L3_TRIG_DEFAULT_MIN_COHERENCE 0.0F  /* off until measured */
-#define L3_TRIG_DEFAULT_MIN_STEP_BINS 1.0F  /* ~15 m/s radial at 3 ms */
-#define L3_TRIG_DEFAULT_MIN_SPEED_MPS 0.0F  /* Doppler gate off until measured */
-#define L3_TRIG_DEFAULT_STAT          L3_TRIG_STAT_PEAK
+#define L3_TRIG_DEFAULT_APPROACH_BINS 12U  /* ~0.56 m short of the tee */
+#define L3_TRIG_DEFAULT_GATE_BINS 3U       /* ~0.14 m either side of it */
+#define L3_TRIG_DEFAULT_MIN_COHERENCE 0.0F /* off until measured */
+#define L3_TRIG_DEFAULT_MIN_STEP_BINS 1.0F /* ~15 m/s radial at 3 ms */
+#define L3_TRIG_DEFAULT_MIN_SPEED_MPS 0.0F /* Doppler gate off until measured */
+#define L3_TRIG_DEFAULT_STAT L3_TRIG_STAT_PEAK
 
 /* Which per-bin statistic the floor and the candidate threshold use. A fast
  * clubhead can be in a bin for only part of a frame, so the strongest single
  * loop is the sensitive choice for finding out whether the club is seen at
  * all; the energy over every loop is the steadier one once it is. */
-enum {
+enum
+{
     L3_TRIG_STAT_ENERGY = 0,
     L3_TRIG_STAT_PEAK = 1
 };
 
-enum {
+enum
+{
     L3_TRIG_STATE_IDLE = 0,
     L3_TRIG_STATE_TRACKING = 1,
     L3_TRIG_STATE_FIRED = 2
 };
 
 /* Why a frame was logged. QUIET frames are never logged. */
-enum {
+enum
+{
     L3_TRIG_WHY_QUIET = 0,
-    L3_TRIG_WHY_ACQUIRED,       /* new track started at the candidate */
-    L3_TRIG_WHY_ADVANCED,       /* candidate continued the track */
-    L3_TRIG_WHY_JUMPED,         /* candidate broke continuity; track restarted */
-    L3_TRIG_WHY_MISSED,         /* no candidate; track kept for now */
-    L3_TRIG_WHY_LOST,           /* no candidate too many times; track dropped */
-    L3_TRIG_WHY_LOW_COHERENCE,  /* strongest bin above floor but not coherent */
-    L3_TRIG_WHY_LOW_DOPPLER,    /* strongest bin above floor but too slow in Doppler */
-    L3_TRIG_WHY_TOO_YOUNG,      /* in the gate before trackFrames observations */
-    L3_TRIG_WHY_TOO_SLOW,       /* in the gate but approaching under minStep */
+    L3_TRIG_WHY_ACQUIRED,      /* new track started at the candidate */
+    L3_TRIG_WHY_ADVANCED,      /* candidate continued the track */
+    L3_TRIG_WHY_JUMPED,        /* candidate broke continuity; track restarted */
+    L3_TRIG_WHY_MISSED,        /* no candidate; track kept for now */
+    L3_TRIG_WHY_LOST,          /* no candidate too many times; track dropped */
+    L3_TRIG_WHY_LOW_COHERENCE, /* strongest bin above floor but not coherent */
+    L3_TRIG_WHY_LOW_DOPPLER,   /* strongest bin above floor but too slow in Doppler */
+    L3_TRIG_WHY_TOO_YOUNG,     /* in the gate before trackFrames observations */
+    L3_TRIG_WHY_TOO_SLOW,      /* in the gate but approaching under minStep */
     L3_TRIG_WHY_FIRED,
     L3_TRIG_WHY_COUNT
 };
 
 /* Counters reported by the summary line, in this order. */
-enum {
+enum
+{
     L3_TRIG_COUNT_FRAMES = 0,
     L3_TRIG_COUNT_CANDIDATES,
     L3_TRIG_COUNT_ACQUIRED,
@@ -113,89 +117,95 @@ enum {
     L3_TRIG_COUNT_TOTAL
 };
 
-typedef struct {
-    uint32_t teeBin;        /* global range bin of the tee (default destination) */
-    float    snr;           /* candidate threshold = floor * snr (>= 1) */
-    uint32_t trackFrames;   /* observations a track needs before it can fire */
-    uint32_t approachBins;  /* watch this many bins short of the tee */
-    uint32_t gateBins;      /* impact gate half-width around the tee */
-    float    minCoherence;  /* 0..1; 0 disables the Doppler coherence test */
-    float    minStepBins;   /* minimum mean approach rate, bins per frame */
-    uint32_t stat;          /* L3_TRIG_STAT_ENERGY or L3_TRIG_STAT_PEAK */
+typedef struct
+{
+    uint32_t teeBin;       /* global range bin of the tee (default destination) */
+    float snr;             /* candidate threshold = floor * snr (>= 1) */
+    uint32_t trackFrames;  /* observations a track needs before it can fire */
+    uint32_t approachBins; /* watch this many bins short of the tee */
+    uint32_t gateBins;     /* impact gate half-width around the tee */
+    float minCoherence;    /* 0..1; 0 disables the Doppler coherence test */
+    float minStepBins;     /* minimum mean approach rate, bins per frame */
+    uint32_t stat;         /* L3_TRIG_STAT_ENERGY or L3_TRIG_STAT_PEAK */
     /* Minimum apparent Doppler speed of a candidate, m/s; 0 disables. A body
      * in the lane moves under 1 m/s and reads as such; a clubhead aliases
      * across the +/- lambda/(4T) span and reads as |v| uniformly over it, so
      * a gate of v rejects a club frame with probability v / span (~1.5/9),
      * which one bridged miss mostly absorbs. */
-    float    minSpeedMps;
+    float minSpeedMps;
 } l3_trig_cfg_t;
 
 /* One range bin of one frame, summed over the vertical TX pair and all RX:
  * residual energy over every loop, the strongest single loop's residual
  * power, and the lag-1 residual autocorrelation. */
-typedef struct {
+typedef struct
+{
     float energy;
     float peak;
-    float loop0;            /* loop 0 alone: the probe the first detector used */
+    float loop0; /* loop 0 alone: the probe the first detector used */
     float r1Re;
     float r1Im;
 } l3_trig_obs_t;
 
 /* One traced frame: the region's strongest bin by the configured statistic. */
-typedef struct {
+typedef struct
+{
     uint32_t frame;
-    uint16_t gap;           /* untraced frames since the previous entry */
-    uint8_t  bin;           /* strongest global bin */
-    uint8_t  state;         /* detector state after the frame */
-    float    energy;
-    float    peak;
-    float    loop0;
-    float    floor;         /* in the configured statistic's units */
-    float    threshold;     /* floor x snr in force this frame */
-    uint8_t  coherencePct;  /* |lag-1 autocorrelation| / energy */
-    uint8_t  dest;          /* destination global bin; dist = dest - bin */
+    uint16_t gap;  /* untraced frames since the previous entry */
+    uint8_t bin;   /* strongest global bin */
+    uint8_t state; /* detector state after the frame */
+    float energy;
+    float peak;
+    float loop0;
+    float floor;          /* in the configured statistic's units */
+    float threshold;      /* floor x snr in force this frame */
+    uint8_t coherencePct; /* |lag-1 autocorrelation| / energy */
+    uint8_t dest;         /* destination global bin; dist = dest - bin */
 } l3_trig_trace_t;
 
-typedef struct {
+typedef struct
+{
     uint32_t frame;
-    uint16_t gap;           /* quiet frames since the previous record */
-    uint8_t  state;         /* after this frame */
-    uint8_t  why;
-    uint8_t  bin;           /* candidate global bin; 0xFF when none */
-    uint8_t  age;
-    int16_t  velocityCms;   /* apparent (aliased) Doppler velocity */
-    float    energy;
-    float    peak;
-    float    floor;         /* in the configured statistic's units */
-    uint8_t  coherencePct;
-    uint8_t  dest;          /* destination (tee or locked ball) global bin */
+    uint16_t gap;  /* quiet frames since the previous record */
+    uint8_t state; /* after this frame */
+    uint8_t why;
+    uint8_t bin; /* candidate global bin; 0xFF when none */
+    uint8_t age;
+    int16_t velocityCms; /* apparent (aliased) Doppler velocity */
+    float energy;
+    float peak;
+    float floor; /* in the configured statistic's units */
+    uint8_t coherencePct;
+    uint8_t dest; /* destination (tee or locked ball) global bin */
 } l3_trig_record_t;
 
-typedef struct {
+typedef struct
+{
     l3_trig_cfg_t cfg;
-    uint8_t  state;
-    float    floor;
-    float    loopPeriodS;   /* for the velocity readout; 0 disables it */
+    uint8_t state;
+    uint8_t traceEnabled;
+    float floor;
+    float loopPeriodS; /* for the velocity readout; 0 disables it */
     /* Track. */
-    uint8_t  trackBin;
-    uint8_t  trackStartBin;  /* nearest bin to the radar the track has held */
-    uint8_t  trackAge;
-    uint8_t  trackMisses;
+    uint8_t trackBin;
+    uint8_t trackStartBin; /* nearest bin to the radar the track has held */
+    uint8_t trackAge;
+    uint8_t trackMisses;
     uint32_t trackStartFrame;
     /* Flight recorder. */
     uint32_t counters[L3_TRIG_COUNT_TOTAL];
-    uint32_t quietSince;    /* quiet frames since the last record */
-    uint32_t logNext;       /* ring write index */
-    uint32_t logCount;      /* records held, at most L3_TRIG_LOG_DEPTH */
+    uint32_t quietSince; /* quiet frames since the last record */
+    uint32_t logNext;    /* ring write index */
+    uint32_t logCount;   /* records held, at most L3_TRIG_LOG_DEPTH */
     l3_trig_record_t log[L3_TRIG_LOG_DEPTH];
     /* Raw-input trace and per-bin maximum since arming or the last clear. */
     uint32_t traceQuiet;
     uint32_t traceNext;
     uint32_t traceCount;
     l3_trig_trace_t trace[L3_TRIG_TRACE_DEPTH];
-    uint32_t maxFirstBin;   /* region start the max-hold indices refer to */
+    uint32_t maxFirstBin; /* region start the max-hold indices refer to */
     uint32_t maxBins;
-    float    maxStat[L3_TRIG_MAX_BINS];
+    float maxStat[L3_TRIG_MAX_BINS];
     uint32_t maxFrame[L3_TRIG_MAX_BINS];
 } l3_trig_t;
 
@@ -205,6 +215,8 @@ void l3_trig_cfg_defaults(l3_trig_cfg_t *cfg);
 int32_t l3_trig_cfg_check(const l3_trig_cfg_t *cfg);
 /* Reset state, floor, track, counters and the log. */
 void l3_trig_init(l3_trig_t *trig, const l3_trig_cfg_t *cfg, float loopPeriodS);
+/* Raw per-frame trace/max-hold is opt-in; counters and candidate logs remain enabled. */
+void l3_trig_trace_enable(l3_trig_t *trig, uint8_t enabled);
 /* The capture ring was re-armed for the next shot: drop the track and any
  * fired state so the detector can fire again. The floor, counters and log
  * survive, so a shot's log is still readable after its ring was read. */

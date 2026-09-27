@@ -145,6 +145,7 @@ class Trig(ctypes.Structure):
     _fields_ = [
         ("cfg", Cfg),
         ("state", ctypes.c_uint8),
+        ("traceEnabled", ctypes.c_uint8),
         ("floor", ctypes.c_float),
         ("loopPeriodS", ctypes.c_float),
         ("trackBin", ctypes.c_uint8),
@@ -236,6 +237,8 @@ def lib(tmp_path_factory):
     library.l3_trig_why_name.argtypes = [ctypes.c_uint8]
     library.l3_trig_why_name.restype = ctypes.c_char_p
     library.l3_trig_trace_clear.argtypes = [ctypes.POINTER(Trig)]
+    library.l3_trig_trace_enable.argtypes = [ctypes.POINTER(Trig), ctypes.c_uint8]
+    library.l3_trig_trace_enable.restype = None
     library.l3_trig_trace_count.argtypes = [ctypes.POINTER(Trig)]
     library.l3_trig_trace_count.restype = ctypes.c_uint32
     library.l3_trig_trace_get.argtypes = [
@@ -299,6 +302,7 @@ class Detector:
         loop_period_s: float = LOOP_PERIOD_S,
         window_start: int = 0,
         tee: int | None = None,
+        trace_enabled: bool = True,
     ):
         self.lib = lib
         self.cfg = cfg
@@ -306,6 +310,8 @@ class Detector:
         self.window_start = window_start
         self.trig = Trig()
         lib.l3_trig_init(ctypes.byref(self.trig), ctypes.byref(cfg), loop_period_s)
+        if trace_enabled:
+            lib.l3_trig_trace_enable(ctypes.byref(self.trig), 1)
         first = ctypes.c_uint32()
         count = ctypes.c_uint32()
         assert (
@@ -602,6 +608,14 @@ def test_club_first_seen_inside_the_gate_waits_one_frame_then_fires(lib):
     assert det.feed({18: CLUB}) is False
     assert det.whys() == ["young"]
     assert det.feed({21: CLUB}) is True
+
+
+@pytest.mark.parametrize("bins", [[18] * 10, [21, 20, 19, 18, 17]])
+def test_stationary_or_receding_gate_return_cannot_bypass_approach_rate(lib, bins):
+    det = detector(lib)
+    for bin_index in bins:
+        assert det.feed({bin_index: CLUB}) is False
+    assert det.counter("slow") > 0
 
 
 def test_track_frames_of_one_fires_on_first_sight_in_the_gate(lib):
@@ -1029,6 +1043,21 @@ def test_max_hold_keeps_the_largest_statistic_per_bin_with_its_frame(lib):
         line
         == f"trigmax 12:{4.0 * NOISE * PEAK_FRACTION:.0f}@6 13:{2.6 * NOISE * PEAK_FRACTION:.0f}@7"
     )
+
+
+def test_trace_is_opt_in_and_can_be_disabled_without_changing_detection(lib):
+    det = Detector(lib, make_cfg(lib), trace_enabled=False)
+    assert det.feed({12: CLUB}) is False
+    assert det.traces() == []
+    assert det.trig.maxBins == 0
+
+    lib.l3_trig_trace_enable(ctypes.byref(det.trig), 1)
+    assert det.feed({15: CLUB}) is False
+    assert [entry.bin for entry in det.traces()] == [15]
+
+    lib.l3_trig_trace_enable(ctypes.byref(det.trig), 0)
+    assert det.feed({18: CLUB}) is True
+    assert [entry.bin for entry in det.traces()] == [15]
 
 
 def test_trace_clear_empties_trace_and_maxima_but_keeps_the_log_and_arm(lib):
