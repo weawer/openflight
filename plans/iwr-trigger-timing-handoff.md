@@ -59,9 +59,9 @@ flight data.
 
 ## Hardware Evidence
 
-The following results were supplied by the user from the Pi. They are
-operator-reported hardware runs; raw timingfix4 artifacts are not currently
-present in the local `openflight_sessions` directory.
+The following results were supplied by the user from the Pi. Static timingfix4
+results are operator-reported. The latest range-session JSONL, raw OPS log,
+and one rejected IWR dump have since been synced into `openflight_sessions/`.
 
 - Earlier timingfix images exposed real false triggers: repeated bin 38 then
   bin 39, followed by a separate `39 -> missed -> 38 -> 39` sequence. Both
@@ -82,6 +82,52 @@ present in the local `openflight_sessions` directory.
   successful triggering on a moving club, impact timing, ball-flight
   selection, or angle accuracy.
 
+### Range Session Artifact Review
+
+Session `openflight_sessions/session_20260927_130535_range.jsonl` and raw log
+`openflight_sessions/radar_raw_20260927_130535.log` show two accepted OPS
+captures. The first produced mode-based estimates of 25.0 mph ball and 18.2
+mph club, but its IWR dump was 2,034 bytes short (439,314 received versus
+441,348 expected). The second produced 53.2 mph ball and 43.1 mph club; a
+78.9 mph outbound reading was treated as an outlier. About 29.83% of the OPS
+I/Q samples were repaired for clipping, and its 7,910 RPM spin result had
+evidence 0.72 and was labelled experimental/low confidence. Camera capture
+was disabled in this session.
+
+The second IWR dump is present at
+[`openflight_sessions/iwr6843_20260927_131018_934_002.l3dump`](../openflight_sessions/iwr6843_20260927_131018_934_002.l3dump),
+SHA-256 `6c660e5ffb10e943964613bbd27a71549124a5707ff6c28661139bb45b6abf9f`.
+It parses as version 9, timed IQ16, 36 chirps/frame, 3 TX x 4 RX, 2 ms frame
+period, and retention reason `ambiguous`: 14 pre-trigger frames, 6 impact
+frames, and 2 tracked flight frames (22 frames total). The recorded IWR
+temperatures were about 59-64 C.
+
+Important timestamp correction: the session reports the IWR trigger at
+`1790507418.934044` and the OPS `shot_timestamp` at `1790507419.396846`, a
+delta of -462.802 ms. This does **not** establish that the IWR triggered 463
+ms before physical impact. In
+`src/openflight/rolling_buffer/monitor.py`, `shot.impact_timestamp` is assigned
+the OPS capture trigger epoch. The OPS impact estimator for this capture fell
+back to the capture trigger (`sound_trigger`, reason `speed_delta_below_threshold`),
+so there is no independent contact-time estimate in this session. The observed
+delta is between the IWR firmware-trigger notice and the OPS onboard ST event.
+The server message `Self-trigger impact -> S!` consequently has a misleading
+label in this OPS-ST/SM configuration: the value is relative to that OPS
+trigger epoch, and ST/SM mode suppresses the actual IWR-to-OPS `S!` relay.
+
+The dump ends after two compact flight frames. The selector decision that
+caused the `ambiguous` stop is not stored in the dump, so the precise competing
+bins cannot be recovered from this artifact. The offline selector replay can
+inspect retained frames but cannot reconstruct the rejected next frame's full
+128-bin candidate set. Do not infer an exact ambiguity cause or tune selector
+thresholds from the retained frames alone.
+
+The first capture's `capture_path` is null in the session event, so its short
+binary was not saved under the configured IWR output directory. The second
+capture dump was saved even though runtime validation rejected it for
+`ambiguous` retention; session `capture_bytes: 0` means it was not accepted as
+a valid measurement, not that the file is empty.
+
 The release note
 [`l3_dump_2ms_iq16_timingfix4_trigger_20260927.md`](../firmware/releases/l3_dump_2ms_iq16_timingfix4_trigger_20260927.md)
 predates the reported successful hardware runs; use this handoff for the
@@ -89,28 +135,37 @@ current status.
 
 ## Next Steps
 
-1. **At the range, test real swings with current settings unchanged.** Use the
-   normal session workflow so OPS, IWR, camera, and trigger evidence are
-   retained. Do not use `scripts/iwr6843/watch_trigger.py` for acceptance; it
-   discards captures.
-2. **Collect a small representative batch first.** Include several ordinary
-   shots and any relevant practice swings/waggles. Save the session JSONL,
-   IWR dumps, shadow decisions, and camera evidence under a uniquely named
-   directory and sync them into `openflight_sessions/` for analysis.
-3. **Check behavior, not just trigger count.** For each shot determine whether
-   the detector fired, when it fired relative to the observed swing/impact,
-   whether the capture contains impact and ball flight, and whether the
-   adaptive selector's stored windows contain the moving return.
-4. **Check runtime health in the same run.** Require combined work below
+1. **Improve IWR failure observability before tuning.** Preserve selector
+  candidate bins/powers and retention reason for the frame that rejects
+  adaptive retention, or provide an equivalent diagnostic capture of that
+  frame. The current dump excludes the rejected frame, which blocks root-cause
+  analysis of ambiguity.
+2. **Correct the timing log terminology.** The current `Self-trigger impact ->
+  S!` log compares IWR notification time with `shot.impact_timestamp`, which
+  is populated from the OPS trigger epoch in rolling-buffer mode. Rename or
+  compute this against a genuine impact estimate; do not call the current
+  delta impact-to-trigger latency. In ST/SM mode it also does not mean `S!`
+  was sent.
+3. **Collect a small representative real-shot batch.** Keep trigger and
+  selector parameters unchanged until the ambiguous frame is observable. Use
+  the normal session workflow so OPS, IWR, camera, and trigger evidence are
+  retained. Do not use `scripts/iwr6843/watch_trigger.py` for acceptance; it
+  discards captures. Note that camera capture was disabled in the reviewed
+  session; enable it if testing the full camera/IWR path.
+4. **Analyze per-shot evidence.** Separate OPS trigger time, IWR trigger
+  notice time, inferred physical impact time, and notification/dump times.
+  Inspect clipping, detector flight-recorder entries, selector candidate
+  bins, retained frame windows, and whether impact/ball-flight data survived.
+5. **Check runtime health in the same run.** Require combined work below
    2,000 us, no missed HWA frames, no rearm errors, and successful repeated
    captures. Treat per-stage maxima as diagnostics unless they are the
    same-frame `workmax_*` tuple.
-5. **Tune only from evidence.** If real swings fail or false-trigger, inspect
+6. **Tune only from evidence.** If real swings fail or false-trigger, inspect
    the saved detector log and raw capture, add a native regression for the
    observed pattern, then adjust one qualification rule at a time. Do not
    change SNR, range gate, minimum approach, coherence, or Doppler thresholds
    based only on the stationary runs.
-6. **After any firmware change**, run the native trigger tests and full IWR
+7. **After any firmware change**, run the native trigger tests and full IWR
    tests, build a distinctly named TI image, record its SHA-256, and ask the
    user to flash and run the corresponding hardware check. Do not claim
    hardware validation from simulation or host tests.
@@ -122,11 +177,12 @@ current status.
 - Start with `git status --short --branch` and inspect the current diff,
   especially `firmware/iwr6843/l3_trigger.c`. The existing indentation-only
   edit is user/formatter work; do not discard or rewrite it casually.
-- Treat the user-reported timingfix4 static results above as hardware
-  evidence, while noting that the raw timingfix4 artifacts have not been
-  synced locally and the output does not prove the flashed binary checksum.
-- The next validation gap is real-swing trigger and capture quality, not
-  further static soak repetition unless new evidence indicates a problem.
+- Treat the timingfix4 static results as user-reported hardware evidence; the
+  logs do not prove the flashed binary checksum.
+- The range-session files are synced. The next gap is diagnostic visibility
+  into the rejected adaptive frame and correct event-time semantics, followed
+  by repeatable real-swing capture quality, not another static soak absent new
+  evidence.
 - Do not lower/raise detector thresholds or change the two-bin guard without
   reviewing real-shot artifacts and adding a regression that reproduces the
   observed failure.
