@@ -47,10 +47,11 @@ static struct { uint32_t preFrames, loops, preBins; } gCapturePlan = {1, 12, 53}
 static const float *powers;
 static uint8_t gCaptureActive, gCaptureIncomplete;
 static void *gHwaFreezeSemaphore = (void *)1;
-static int permit, stopCalls;
+static int permit, stopCalls, rfStopCalls, rfStopResult;
 static int Semaphore_pend(void *semaphore, unsigned timeout) { return permit; }
 static void CLI_write(const char *format, ...) { }
 static int l3_stopCaptureAtBoundary(void) { stopCalls++; return 0; }
+static int l3_finishCaptureStop(void) { rfStopCalls++; return rfStopResult; }
 static float l3_verticalPowerAt(uint32_t slot, uint32_t bin) { return powers[bin]; }
 """
         + globals_
@@ -68,10 +69,15 @@ static void l3_latchSelfTrigger(float tee, float approach) {
         + "\n"
         + freeze
         + """
-int freeze_capture(int active, int latched, int allow) {
+int freeze_capture_rf(int active, int latched, int allow, int rf_result) {
     gCaptureActive = active; gSelfTriggerLatched = latched; permit = allow; stopCalls = 0;
+    rfStopCalls = 0; rfStopResult = rf_result;
     return l3_freezeCapture();
 }
+int freeze_capture(int active, int latched, int allow) {
+    return freeze_capture_rf(active, latched, allow, 0);
+}
+int freeze_rf_stop_calls(void) { return rfStopCalls; }
 int capture_latched(void) { return gSelfTriggerLatched; }
 int freeze_stop_calls(void) { return stopCalls; }
 void reset(unsigned period) {
@@ -151,18 +157,35 @@ def test_firmware_waits_for_a_full_pretrigger_history(firmware):
 
 
 @pytest.mark.parametrize(
-    "active,latched,allow,result,still_latched,stops",
+    "active,latched,allow,result,still_latched,stops,rf_stops",
     [
-        (0, 1, 1, 0, 0, 0),
-        (1, 1, 1, 0, 0, 0),
-        (1, 1, 0, -1, 1, 0),
-        (1, 0, 1, 0, 0, 1),
-        (0, 0, 1, -1, 0, 0),
+        # Self-triggered freeze already complete: stop RF, consume the latch.
+        (0, 1, 1, 0, 0, 0, 1),
+        # Self-triggered freeze still finishing: wait, stop RF, consume.
+        (1, 1, 1, 0, 0, 0, 1),
+        # Freeze timed out: RF untouched, latch kept for a retry.
+        (1, 1, 0, -1, 1, 0, 0),
+        # Host-requested dump: the boundary stop owns MMWave_stop.
+        (1, 0, 1, 0, 0, 1, 0),
+        (0, 0, 1, -1, 0, 0, 0),
     ],
 )
 def test_freeze_reuses_the_shot_and_preserves_latch_on_timeout(
-    firmware, active, latched, allow, result, still_latched, stops
+    firmware, active, latched, allow, result, still_latched, stops, rf_stops
 ):
+    """2026-09-27 hardware: a self-triggered freeze never stopped RF, so the
+    rearm's MMWave_start failed with "RF restart failed"."""
     assert firmware.freeze_capture(active, latched, allow) == result
     assert firmware.capture_latched() == still_latched
     assert firmware.freeze_stop_calls() == stops
+    assert firmware.freeze_rf_stop_calls() == rf_stops
+
+
+def test_failed_rf_stop_keeps_the_latch_so_a_retry_stops_rf_again(firmware):
+    """Clearing the latch first would send the retry down the unlatched path,
+    which returns early once gCaptureActive is 0 and never stops RF."""
+    assert firmware.freeze_capture_rf(0, 1, 1, -1) == -1
+    assert firmware.capture_latched() == 1
+    assert firmware.freeze_capture_rf(0, 1, 1, 0) == 0
+    assert firmware.capture_latched() == 0
+    assert firmware.freeze_rf_stop_calls() == 1

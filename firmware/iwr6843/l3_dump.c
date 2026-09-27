@@ -3398,6 +3398,16 @@ static int32_t l3_freezeCapture(void)
             CLI_write("Error: self-trigger freeze timed out\n");
             return -1;
         }
+        /* The firmware's own freeze only stops re-arming the HWA; the RF
+         * frames keep running. Stop them exactly as a host-requested dump
+         * does (l3_stopCaptureAtBoundary), or the rearm's MMWave_start
+         * fails with "RF restart failed". Keep the latch until RF is
+         * stopped: a retry then repeats this stop (the freeze is already
+         * complete, so the pend above is skipped) instead of taking the
+         * unlatched path, which returns early once gCaptureActive is 0. */
+        if (l3_finishCaptureStop() != 0) {
+            return -1;
+        }
         gSelfTriggerLatched = 0U;
     } else if (l3_stopCaptureAtBoundary() != 0) {
         return -1;
@@ -4557,6 +4567,14 @@ static int32_t l3_cli_sensorStop(int32_t argc, char *argv[])
         gRawFrameReadyMask = 0U;
 #endif
         status = l3_stopCaptureForShutdown();
+    } else if (gSelfTriggerLatched) {
+        /* A self-triggered freeze nobody consumed: the HWA ring is frozen
+         * (gCaptureActive = 0) but RF is still running. Stop it before
+         * closing mmWave, as l3_freezeCapture would have. */
+        status = l3_finishCaptureStop();
+        if (status == 0) {
+            gSelfTriggerLatched = 0U;
+        }
     }
     /* MMWave_config is refused while the BSS still holds the last profile
      * (-3110 subsys 83). Closing here lets the next sensorStart reopen and

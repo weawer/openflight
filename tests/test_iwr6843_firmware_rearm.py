@@ -514,3 +514,43 @@ def test_sensor_start_discards_the_previous_self_trigger_latch():
     )
     assert start.index("gSelfTriggerLatched = 0U") < start.index("l3_armCapture()")
     assert start.index("gTriggerEnabled = 0U") < start.index("l3_armCapture()")
+
+
+def test_self_triggered_freeze_stops_rf_before_any_rearm():
+    """2026-09-27 hardware failure: "IWR6843 dump completed but firmware restart
+    failed: Error: RF restart failed" on the first self-trigger release.
+
+    A host-requested dump freezes the HWA ring and then calls
+    l3_finishCaptureStop() (MMWave_stop) via l3_stopCaptureAtBoundary(). The
+    self-trigger path in l3_freezeCapture() only waited for the firmware's own
+    freeze and cleared the latch -- RF was never stopped, so every rearm after
+    a self-triggered freeze (l3dump, l3sparse or l3track) called MMWave_start on
+    a sensor that was still running. The latched branch must stop RF too."""
+    source = FIRMWARE.read_text(encoding="utf-8")
+    freeze = _function_source(
+        source, "static int32_t l3_freezeCapture(void)\n{", "static void l3_sparseWindow"
+    )
+    latched = freeze[freeze.index("if (gSelfTriggerLatched) {") : freeze.index("} else if")]
+
+    assert "l3_finishCaptureStop()" in latched
+    # The latch is only consumed once the freeze has actually completed.
+    assert latched.index("Semaphore_pend") < latched.index("l3_finishCaptureStop()")
+
+
+def test_sensor_stop_stops_rf_left_running_by_an_unconsumed_self_trigger():
+    """A self-triggered freeze sets gCaptureActive = 0 while RF keeps running.
+    sensorStop only stopped RF when gCaptureActive was set, so a shutdown
+    after an unconsumed self-trigger closed mmWave on a live sensor -- the
+    2026-09-27 run then needed a hardware reset ("no IWR6843 CLI found")."""
+    source = FIRMWARE.read_text(encoding="utf-8")
+    stop = _function_source(
+        source,
+        "static int32_t l3_cli_sensorStop(int32_t argc, char *argv[])\n{",
+        "static void l3_initTask",
+    )
+    latched = stop[stop.index("gSelfTriggerLatched") :]
+
+    assert "l3_finishCaptureStop()" in latched
+    assert latched.index("l3_finishCaptureStop()") < stop.index("MMWave_close") - stop.index(
+        "gSelfTriggerLatched"
+    )
