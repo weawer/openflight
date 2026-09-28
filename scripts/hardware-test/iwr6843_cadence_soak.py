@@ -3,12 +3,20 @@
 
 Runs the sensor for a fixed number of frames and fails if the firmware
 reports dropped frame starts (`hwa_missed`), IQ8 pack overruns
-(`iq8_overrun`), or EDMA errors (`iq8_edma_err`) above the stated bound.
+(`iq8_overrun`), EDMA errors (`iq8_edma_err`), or a detect-task frame drop
+(`scratch_stale`, compact16/adaptive16 only) above the stated bound.
 This is the acceptance gate for moving the IQ16 scratch buffer out of L3
 into DATA_RAM — memory the CPU also uses — proving the relocation did not
 blow the ~380 us inter-frame budget on real silicon. Nothing else in this
 plan validates that on hardware; a failure here means revert to the L3
 fallback rather than tuning around it.
+
+scratch_stale specifically is the ball tracker / club track / trigger's
+detect task losing the race against the HWA reusing its scratch buffer
+(l3_dump.c, l3_detectFrameStale) — the risk this whole pipeline carries at
+a shorter frame period, since it is unmeasured even at 3 ms. A nonzero
+count here is not a timing near-miss to tune around; it means frames were
+silently dropped from tracking.
 
 Usage:
     uv run python scripts/hardware-test/iwr6843_cadence_soak.py \\
@@ -85,6 +93,63 @@ def frame_period_s(cfg_path: str) -> float:
     raise ValueError(f"no frameCfg line found in {cfg_path}")
 
 
+def evaluate(
+    stats: dict[str, int],
+    *,
+    args_frames: int,
+    period_s: float = 0.0,
+    rate_cap: float = MAX_MISS_RATE,
+    coverage_min: float = MIN_FRAME_COVERAGE,
+) -> tuple[bool, list[str]]:
+    """Pass/fail verdict and report lines from one soak's parsed ``stats``.
+
+    Pure, so the gating logic is testable without hardware. ``stats`` must
+    already have passed the ``REQUIRED_STAT_FIELDS`` presence check in
+    ``main`` -- this only reports the optional ``rearm_*``/``scratch_stale``
+    fields when present. ``period_s`` is only used to express rearm_max_us
+    as a share of the frame period; omit it (or the rearm fields) and that
+    line just says latency wasn't reported.
+    """
+    lines: list[str] = []
+    frames = stats["hwa_frames"]
+    missed = stats["hwa_missed"]
+    rate = missed / frames if frames else 1.0
+    lines.append(
+        f"frames={frames} missed={missed} rate={rate:.6%} "
+        f"iq8_overrun={stats['iq8_overrun']} iq8_edma_err={stats['iq8_edma_err']}"
+    )
+
+    lines.append(rearm_summary(stats, period_s) or "rearm latency: not reported by this firmware")
+
+    if "scratch_stale" in stats:
+        lines.append(f"scratch_stale={stats['scratch_stale']}")
+    else:
+        lines.append("scratch_stale: not reported (not a compact16/adaptive16 profile)")
+
+    ok = True
+    if frames < args_frames * coverage_min:
+        lines.append(f"FAIL: only {frames} frames captured, expected ~{args_frames}")
+        ok = False
+    if rate > rate_cap:
+        lines.append(f"FAIL: miss rate {rate:.6%} exceeds {rate_cap:.6%}")
+        ok = False
+    if stats["iq8_overrun"]:
+        lines.append(f"FAIL: {stats['iq8_overrun']} IQ8 pack overrun(s)")
+        ok = False
+    if stats["iq8_edma_err"]:
+        lines.append(f"FAIL: {stats['iq8_edma_err']} IQ8 EDMA error(s)")
+        ok = False
+    if stats.get("scratch_stale"):
+        lines.append(
+            f"FAIL: {stats['scratch_stale']} detect-task frame(s) dropped "
+            "(scratch reused before the ball tracker / trigger read it)"
+        )
+        ok = False
+
+    lines.append("PASS" if ok else "FAILURES ABOVE")
+    return ok, lines
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 2)[1])
     parser.add_argument("--config", required=True, help="path to an IWR6843 .cfg profile")
@@ -113,32 +178,9 @@ def main() -> int:
             print(f"FAIL: firmware stats did not report {field!r}: {stats_text.strip()!r}")
             return 1
 
-    frames = stats["hwa_frames"]
-    missed = stats["hwa_missed"]
-    rate = missed / frames if frames else 1.0
-    print(
-        f"frames={frames} missed={missed} rate={rate:.6%} "
-        f"iq8_overrun={stats['iq8_overrun']} iq8_edma_err={stats['iq8_edma_err']}"
-    )
-
-    rearm = rearm_summary(stats, period_s)
-    print(rearm or "rearm latency: not reported by this firmware")
-
-    ok = True
-    if frames < args.frames * MIN_FRAME_COVERAGE:
-        print(f"FAIL: only {frames} frames captured, expected ~{args.frames}")
-        ok = False
-    if rate > MAX_MISS_RATE:
-        print(f"FAIL: miss rate {rate:.6%} exceeds {MAX_MISS_RATE:.6%}")
-        ok = False
-    if stats["iq8_overrun"]:
-        print(f"FAIL: {stats['iq8_overrun']} IQ8 pack overrun(s)")
-        ok = False
-    if stats["iq8_edma_err"]:
-        print(f"FAIL: {stats['iq8_edma_err']} IQ8 EDMA error(s)")
-        ok = False
-
-    print("PASS" if ok else "FAILURES ABOVE")
+    ok, lines = evaluate(stats, args_frames=args.frames, period_s=period_s)
+    for line in lines:
+        print(line)
     return 0 if ok else 1
 
 
