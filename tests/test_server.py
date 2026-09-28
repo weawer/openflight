@@ -5070,6 +5070,7 @@ def _self_trigger_args(**overrides):
         "iwr6843_self_trigger_snr": None,
         "iwr6843_self_trigger_frames": None,
         "iwr6843_tee_m": 1.575,
+        "iwr6843_cal": "config/iwr6843_calibration_reference.json",
         "iwr6843_config": "config/iwr6843_l3dump_wide_24f3ms_53bin_iq16.cfg",
         "sound_pre_trigger": None,
     }
@@ -5098,8 +5099,8 @@ class TestSelfTriggerCli:
     def test_switch_alone_takes_the_bin_from_the_tee_and_the_defaults(self):
         config = server_module._self_trigger_config(_self_trigger_args(iwr6843_self_trigger=True))
 
-        assert (config.tee_bin, config.snr, config.track_frames) == (34, 6.0, 2)
-        assert config.command == "triggerCfg 34 6.0 2"
+        assert (config.tee_bin, config.snr, config.track_frames) == (35, 6.0, 2)
+        assert config.command == "triggerCfg 35 6.0 2"
 
     def test_explicit_tuning_wins(self):
         config = server_module._self_trigger_config(

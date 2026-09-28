@@ -2,6 +2,48 @@
 
 Updated: 2026-09-28
 
+## Review corrections and next hardware run
+
+The earlier cadence soaks did **not** arm the self-trigger. `sensorStart`
+disables it, and the original soak only loaded the config. Those runs validate
+capture cadence; they do not validate club-detection or post-impact tracking
+workload. No armed-pipeline hardware validation has been performed by the agent.
+
+The host tools now use SNR ratios consistently. `swing_trigger.py` previously
+passed an absolute floor-times-SNR threshold as the SNR argument, defaulted
+to the old 3 ms profile, and replayed the retired ball-leave detector. It now
+defaults to the 2 ms adaptive profile, saves `triggerLog`, trace and performance
+reports, and saves self-triggered raw dumps without that obsolete PASS/FAIL
+judgment. Automatic tee-bin selection in the server and live diagnostic tools
+adds the selected calibration's range bias; an explicit server bin remains
+an override. No firmware or trigger thresholds changed for these fixes.
+
+Keep the soak-tested `l3_dump_pipeline_wip.bin` on the board. Stop the kiosk,
+keep the scene still, and replace 1.845 below with the measured antenna-to-tee
+slant distance. Run this short **armed pre-trigger** test first:
+
+```bash
+uv run python scripts/hardware-test/iwr6843_cadence_soak.py \
+  --config config/iwr6843_l3dump_adaptive_47f2ms_53bin_a16.cfg \
+  --self-trigger-tee-m 1.845 --frames 1000 \
+  --output openflight_sessions/iwr-armed-soak/run.jsonl
+```
+
+It verifies enable/latch state and detection queue/scratch counters, recording
+raw stats and final trigger diagnostics. If successful, repeat with 50,000
+frames. This still does not exercise post-impact tracking; that needs a real
+trigger and capture. Then run:
+
+```bash
+uv run python scripts/iwr6843/swing_trigger.py --tee-m 1.845 \
+  --capture-dir openflight_sessions/iwr-trigger
+```
+
+Both tools accept `--cal` for the same calibration used by the app. Share the
+JSONL and any dumps, including when no trigger fires. The viewer firmware is
+still untested. The historical results and investigation context below remain
+useful subject to these corrections.
+
 ## Goal
 
 Converge on Cormac's firmware pipeline (trigger, club track, ball track,
@@ -57,11 +99,10 @@ branch (`feat/iwr-2ms-trigger-merge`, kept as-is and pushed for reference).
    the UART stall-tolerance bump (4.0s -> 8.0s) with a warning log, and the
    OPS `wait_for_hardware_trigger` blocking-read fix (was sleep-polling,
    adding latency/jitter to `trigger_delta_ms`).
-4. **Cadence soak passed clean at both 3 ms and 2 ms** (see Hardware
-   Evidence) -- `scratch_stale=0` both times, meaning the detect task
-   (trigger + ball/club tracking, one CPU) is not losing frames to the HWA
-   reusing its scratch buffer, the specific risk this architecture carries
-   at a shorter frame period. Added the `scratch_stale` check itself to
+4. **Unarmed cadence soak passed clean at both 3 ms and 2 ms** (see Hardware
+   Evidence) -- `scratch_stale=0` both times. The self-trigger was disabled;
+   these runs do not establish timing for active detection or post-impact
+   tracking. Added the `scratch_stale` check itself to
    `iwr6843_cadence_soak.py` (it wasn't gated on before) and extracted its
    pass/fail logic into a tested `evaluate()` function (`855d283`).
 5. **Pulled the dump viewer** (`00e75c10`) from Cormac's branch
@@ -126,9 +167,8 @@ branch (`feat/iwr-2ms-trigger-merge`, kept as-is and pushed for reference).
 1. **Diagnose the zero-trigger real-swing session.** Run
    `uv run python scripts/iwr6843/swing_trigger.py --tee-m 1.845` (stop the
    kiosk first, it owns the UART) against a few real swings and read what
-   it prints. This is Cormac's own tool (present at `776c266`, unmodified
-   by us beyond a doc pointer), built exactly for this: arms `triggerCfg`,
-   prints the detector's phase as it changes, shows `Triggered` or not.
+   it prints. The corrected tool described above arms `triggerCfg` with an
+   SNR ratio, saves detector logs, and saves the raw dump when triggered.
    Three distinguishable outcomes:
    - Nothing ever changes: the detector sees no moving return in its watch
      region at all. Check tee-bin/geometry first (is 1.845 m still correct
