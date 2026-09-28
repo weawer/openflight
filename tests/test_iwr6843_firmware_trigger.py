@@ -841,7 +841,7 @@ def test_log_keeps_the_newest_frames_when_full(lib):
     assert len(records) == LOG_DEPTH
     assert records[0].frame == 21
     assert records[-1].frame == LOG_DEPTH + 20
-    assert "records=128" in det.summary()
+    assert f"records={LOG_DEPTH}" in det.summary()
 
 
 def test_record_carries_energy_floor_state_and_age(lib):

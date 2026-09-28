@@ -2784,6 +2784,7 @@ int32_t l3_cli_dump(int32_t argc, char *argv[])
     return 0;
 }
 
+#ifdef L3_SPARSE_READBACK /* only l3sparse / l3track use this */
 /* CLI "l3sparse": freeze, stream vertical residual power, then the complex
  * cells the host names. The host falls back to l3dump when this command
  * returns an error before the freeze. */
@@ -2795,7 +2796,9 @@ static void l3_writeU16(uint16_t value)
     bytes[1] = (uint8_t)(value >> 8U);
     UART_writePolling(gDataUart, bytes, sizeof(bytes));
 }
+#endif
 
+#ifdef L3_SPARSE_READBACK /* only l3sparse / l3track use this */
 static void l3_writeF32(float value)
 {
     uint32_t bits;
@@ -2808,6 +2811,7 @@ static void l3_writeF32(float value)
     bytes[3] = (uint8_t)((bits >> 24U) & 0xFFU);
     UART_writePolling(gDataUart, bytes, sizeof(bytes));
 }
+#endif
 
 /* Read one CLI line into buf through the UART driver's interrupt receive.
  * Returns 0 on a line, -1 on timeout, -3 on an empty line, and -2 when the
@@ -2825,6 +2829,7 @@ static void l3_writeF32(float value)
  * the CLI baud, far past any real request. */
 #define L3_READLINE_DRAIN_MAX (64U * L3_SPARSE_REQUEST_MAX)
 
+#ifdef L3_SPARSE_READBACK /* only l3sparse / l3track use this */
 static int32_t l3_readLine(char *buf, uint32_t cap)
 {
     UART_Config *uartConfig = (UART_Config *)gCliUart;
@@ -2876,7 +2881,9 @@ static int32_t l3_readLine(char *buf, uint32_t cap)
     driver->params.readTimeout = savedTimeout;
     return status;
 }
+#endif
 
+#ifdef L3_SPARSE_READBACK /* only l3sparse / l3track use this */
 static const int16_t *l3_iq16Sample(
     uint32_t slot, uint32_t chirp, uint32_t rx, uint32_t localBin)
 {
@@ -2886,6 +2893,7 @@ static const int16_t *l3_iq16Sample(
 
     return &frame[index * 2U];
 }
+#endif
 
 /* Samples for the detect path: int16 (Im, Re) pairs in IQ16, int8 pairs
  * times the frame's scale in IQ8 (see gFrameIq8Scale), so the trigger, the
@@ -3100,6 +3108,7 @@ static void l3_verticalResidual(const l3_detect_frame_t *source, uint32_t localB
     }
 }
 
+#ifdef L3_SPARSE_READBACK /* only l3sparse / l3track use this */
 /* l3sparse's per-loop residual power rows. */
 /* Per-loop residual power of a FROZEN ring slot, for the l3sparse power map
  * and the l3track cell selection: always the retained window in the ring,
@@ -3110,6 +3119,7 @@ static void l3_verticalPowerLoops(uint32_t slot, uint32_t localBin, float *out)
 
     l3_verticalResidual(&frame, localBin, out, NULL);
 }
+#endif
 
 /* Static (non-MTI) power of one bin: mean |I + jQ|^2 per complex sample over
  * every loopStep-th loop of the vertical TX pair and all RX. The residual above removes
@@ -3553,7 +3563,7 @@ static void l3_considerBallTrack(uint32_t slot)
     uint32_t count = frame.binCount;
     uint32_t found;
     uint32_t bin;
-    uint32_t frame;
+    uint32_t shotFrame;
     uint32_t ticks;
 
     if (!gBallTrack.armed || gCapturePlan.loops == 0U) {
@@ -3564,7 +3574,7 @@ static void l3_considerBallTrack(uint32_t slot)
     }
     gPostTimestampUs += gFrameDeltaUs[slot];
     gPostFramesScored++;
-    frame = gPreFramesCaptured + gPostFramesScored;
+    shotFrame = gPreFramesCaptured + gPostFramesScored;
     gTrigBusy = 1U;
     ticks = Cycleprofiler_getTimeStamp();
     for (bin = 0U; bin < count; bin++) {
@@ -3580,9 +3590,9 @@ static void l3_considerBallTrack(uint32_t slot)
     params.loopPeriodS = gTrigLoopPeriodS;
     params.subBin = gObsSubBin;
     l3_obs_floor_update(&gBallFloor, gTrigCfg.stat, obs, count, L3_TRIG_FLOOR_SHIFT);
-    found = l3_obs_extract(&params, frame, gPostTimestampUs, frame.binStart, obs, count,
+    found = l3_obs_extract(&params, shotFrame, gPostTimestampUs, frame.binStart, obs, count,
                            gBallFloor, targets, L3_OBS_MAX_TARGETS);
-    if (l3_ball_track_update(&gBallTrack, targets, found, frame, gPostTimestampUs) &&
+    if (l3_ball_track_update(&gBallTrack, targets, found, shotFrame, gPostTimestampUs) &&
         gBallTrack.lastTargetIndex < found && gBallTrack.core.count > 1U &&
         l3_track_point(&gBallTrack.core, gBallTrack.core.count - 1U, &newest)) {
         const l3_target_obs_t *hit = &targets[gBallTrack.lastTargetIndex];
@@ -3619,9 +3629,9 @@ static void l3_considerBallTrack(uint32_t slot)
     in.ballTrackDone = gBallTrack.done;
     in.delivery = &gDelivery;
     in.club = &gClubTrack;
-    if (l3_shot_update(&gShot, &in, frame) == L3_SHOT_SOLVE) {
+    if (l3_shot_update(&gShot, &in, shotFrame) == L3_SHOT_SOLVE) {
         in.solved = 1U;
-        (void)l3_shot_update(&gShot, &in, frame);
+        (void)l3_shot_update(&gShot, &in, shotFrame);
     }
     if (gShot.state == L3_SHOT_RESULT && !gShotResultReady) {
         l3_result_build(&gShot, &gBallTrack, &gLaunch, ++gShotId, gTrigDestBall, &gShotResult);
@@ -3896,6 +3906,7 @@ static void l3_sparseWindow(l3_sparse_window_t *window)
     }
 }
 
+#ifdef L3_SPARSE_READBACK /* only l3sparse / l3track use this */
 /* ILP1/ILT1 header and per-frame window table (sparse.CaptureLayout). */
 static void l3_sparseWriteHeader(const char *magic, const l3_sparse_window_t *window)
 {
@@ -3919,7 +3930,9 @@ static void l3_sparseWriteHeader(const char *magic, const l3_sparse_window_t *wi
         UART_writePolling(gDataUart, pair, sizeof(pair));
     }
 }
+#endif
 
+#ifdef L3_SPARSE_READBACK /* only l3sparse / l3track use this */
 /* One ILS1 cell: (frame, local bin) then the vertical TX pair's samples. */
 static void l3_sparseWriteCell(const l3_sparse_window_t *window,
                                uint32_t frameIndex, uint32_t localBin)
@@ -3949,6 +3962,7 @@ static void l3_sparseWriteCell(const l3_sparse_window_t *window,
         }
     }
 }
+#endif
 
 /* Clear the capture state and restart the ring after a sparse command. */
 static int32_t l3_sparseRearm(void)
@@ -3990,6 +4004,21 @@ static int32_t l3_cli_release(int32_t argc, char *argv[])
     return l3_sparseRearm();
 }
 
+/* Sparse readback (l3sparse, l3track): freeze the ring and stream chosen
+ * cells instead of the whole capture. Off by default: its buffers cost
+ * ~22 KB of DATA_RAM (gTrackWorkspace alone is 17 KB), and adaptive16
+ * captures are read whole with l3dump. The stubs answer "Error:", which
+ * the host treats as a refusal before freezing and falls back to l3dump.
+ * Build with --define=L3_SPARSE_READBACK=1 to restore them. */
+#ifndef L3_SPARSE_READBACK
+int32_t l3_cli_sparse(int32_t argc, char *argv[])
+{
+    (void)argc;
+    (void)argv;
+    CLI_write("Error: l3sparse is not in this build (L3_SPARSE_READBACK)\n");
+    return -1;
+}
+#else
 int32_t l3_cli_sparse(int32_t argc, char *argv[])
 {
     l3_sparse_window_t window;
@@ -4080,7 +4109,17 @@ int32_t l3_cli_sparse(int32_t argc, char *argv[])
     }
     return l3_sparseRearm();
 }
+#endif
 
+#ifndef L3_SPARSE_READBACK
+int32_t l3_cli_track(int32_t argc, char *argv[])
+{
+    (void)argc;
+    (void)argv;
+    CLI_write("Error: l3track is not in this build (L3_SPARSE_READBACK)\n");
+    return -1;
+}
+#else
 /* Firmware ball tracker (track_select.c). trackCfg supplies the rig limits;
  * the algorithm constants live in l3track_default_params. */
 static L3TrackWorkspace gTrackWorkspace;
@@ -4160,6 +4199,7 @@ int32_t l3_cli_track(int32_t argc, char *argv[])
     }
     return l3_sparseRearm();
 }
+#endif
 
 /* Parse count floats from argv[first..], any value; 0 on success. */
 static int32_t l3_parseFloats(int32_t argc, char *argv[], int32_t first, uint32_t count,
@@ -4301,13 +4341,15 @@ static int32_t l3_cli_trackCfg(int32_t argc, char *argv[])
         CLI_write("Error: trackCfg period and resolution must be positive\n");
         return -1;
     }
+    gTrackRangeResM = values[1];
+#ifdef L3_SPARSE_READBACK
     l3track_default_params(&gTrackParams);
     gTrackLoopPeriodS = values[0];
-    gTrackRangeResM = values[1];
     gTrackParams.maxRangeM = values[2];
     gTrackParams.clubGate.loM = values[3];
     gTrackParams.clubGate.hiM = values[4];
     gTrackConfigured = 1U;
+#endif
     CLI_write("Done\n");
     return 0;
 }

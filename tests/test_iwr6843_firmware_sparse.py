@@ -541,7 +541,12 @@ def test_ball_tracker_runs_the_whole_post_window_against_the_trigger_floor():
 
     assert "if (!gBallTrack.armed || gCapturePlan.loops == 0U)" in consider
     assert "gPostTimestampUs += gFrameDeltaUs[slot];" in consider
-    assert "frame = gPreFramesCaptured + gPostFramesScored;" in consider
+    # The frame index has its own name: an earlier "uint32_t frame" shadowed the
+    # detect frame struct in the same scope, which armcl rejects outright.
+    assert "uint32_t shotFrame;" in consider
+    assert "uint32_t frame;" not in consider
+    assert "shotFrame = gPreFramesCaptured + gPostFramesScored;" in consider
+    assert "l3_obs_extract(&params, shotFrame, gPostTimestampUs, frame.binStart," in consider
     assert "l3_verticalResidual(&frame, bin, NULL, &obs[bin]);" in consider
     assert "gBallFloor, targets, L3_OBS_MAX_TARGETS);" in consider
     assert (
@@ -550,14 +555,16 @@ def test_ball_tracker_runs_the_whole_post_window_against_the_trigger_floor():
     )
     assert "params.snr = gBallTrackCfg.snr;" in consider, "the ball is a weaker return"
     assert "gBallFloor = 0.0F;" in _function("static void l3_trigRearm(")
-    assert "l3_ball_track_update(&gBallTrack, targets, found, frame, gPostTimestampUs)" in consider
+    assert (
+        "l3_ball_track_update(&gBallTrack, targets, found, shotFrame, gPostTimestampUs)" in consider
+    )
     assert "gBallTrack.core.count > 1U" in consider, "angles once the flight has a range rate"
     assert "const l3_target_obs_t *hit = &targets[gBallTrack.lastTargetIndex];" in consider
     assert "l3_ball_track_set_angles(&gBallTrack, angle.azimuthRad," in consider
     assert "(void)l3_ball_track_launch(&gBallTrack, &gLaunch);" in consider
     assert "in.postFrame = 1U;" in consider
     assert "in.ballTrackDone = gBallTrack.done;" in consider
-    assert "if (l3_shot_update(&gShot, &in, frame) == L3_SHOT_SOLVE) {" in consider
+    assert "if (l3_shot_update(&gShot, &in, shotFrame) == L3_SHOT_SOLVE) {" in consider
     assert "in.solved = 1U;" in consider
 
 
