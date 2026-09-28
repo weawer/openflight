@@ -10,7 +10,7 @@ from __future__ import annotations
 import argparse
 import time
 
-from openflight.iwr6843.calibration import DEFAULT_TEE_RANGE_M
+from openflight.iwr6843.calibration import DEFAULT_CAL_PATH, DEFAULT_TEE_RANGE_M, Calibration
 from openflight.iwr6843.driver import TRIGGER_NOTICE, IWR6843Radar
 from openflight.iwr6843.monitor import (
     SELF_TRIGGER_DEFAULT_SNR,
@@ -26,6 +26,7 @@ def main() -> None:
     parser.add_argument("--port", default=None)
     parser.add_argument("--config", default=_DEFAULT_CFG)
     parser.add_argument("--tee-m", type=float, default=DEFAULT_TEE_RANGE_M)
+    parser.add_argument("--cal", default=DEFAULT_CAL_PATH)
     parser.add_argument(
         "--snr",
         type=float,
@@ -37,7 +38,9 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    tee_bin = tee_global_bin(args.tee_m, args.config)
+    tee_bin = tee_global_bin(
+        args.tee_m, args.config, range_bias_m=Calibration.load(args.cal).range_bias_m
+    )
     radar = IWR6843Radar(port=args.port)
     try:
         radar.send_config(args.config)

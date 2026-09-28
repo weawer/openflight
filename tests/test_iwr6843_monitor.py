@@ -1196,3 +1196,8 @@ def test_tracker_configuration_precedes_trigger_and_listener(tmp_path):
     ]
     assert all(thread == threading.current_thread().name for _, thread in radar.commands)
     assert monitor.onboard_tracking
+
+
+def test_tee_global_bin_applies_measured_range_bias(tmp_path):
+    path = _cfg(tmp_path, "phaseCaptureCfg 20 53 24 32 53 7 47 53 47 16 1")
+    assert tee_global_bin(1.845, path, range_bias_m=0.075) == 41

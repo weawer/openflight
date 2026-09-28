@@ -1132,7 +1132,13 @@ def _self_trigger_config(args) -> "SelfTriggerConfig | None":
         return None
     bin_index = args.iwr6843_self_trigger_bin
     if bin_index is None:
-        bin_index = tee_global_bin(args.iwr6843_tee_m, args.iwr6843_config)
+        from .iwr6843.calibration import Calibration
+
+        bin_index = tee_global_bin(
+            args.iwr6843_tee_m,
+            args.iwr6843_config,
+            range_bias_m=Calibration.load(args.iwr6843_cal).range_bias_m,
+        )
     snr = args.iwr6843_self_trigger_snr
     frames = args.iwr6843_self_trigger_frames
     return SelfTriggerConfig(

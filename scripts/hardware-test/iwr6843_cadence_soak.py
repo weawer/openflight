@@ -30,13 +30,17 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import time
+from pathlib import Path
 
 sys.path.insert(0, "src")
 
+from openflight.iwr6843.calibration import DEFAULT_CAL_PATH, Calibration  # noqa: E402
 from openflight.iwr6843.driver import IWR6843Radar  # noqa: E402
 from openflight.iwr6843.firmware_checks import parse_stats  # noqa: E402
+from openflight.iwr6843.monitor import SelfTriggerConfig, tee_global_bin  # noqa: E402
 
 # Recorded baseline for the shipped wide/iq16 profile: a 0.0089% HWA
 # miss rate over a long run. The relocation must not make this materially
@@ -100,6 +104,7 @@ def evaluate(
     period_s: float = 0.0,
     rate_cap: float = MAX_MISS_RATE,
     coverage_min: float = MIN_FRAME_COVERAGE,
+    armed: bool = False,
 ) -> tuple[bool, list[str]]:
     """Pass/fail verdict and report lines from one soak's parsed ``stats``.
 
@@ -113,7 +118,7 @@ def evaluate(
     lines: list[str] = []
     frames = stats["hwa_frames"]
     missed = stats["hwa_missed"]
-    rate = missed / frames if frames else 1.0
+    rate = missed / frames if frames else (0.0 if args_frames == 0 and missed == 0 else 1.0)
     lines.append(
         f"frames={frames} missed={missed} rate={rate:.6%} "
         f"iq8_overrun={stats['iq8_overrun']} iq8_edma_err={stats['iq8_edma_err']}"
@@ -127,6 +132,22 @@ def evaluate(
         lines.append("scratch_stale: not reported (not a compact16/adaptive16 profile)")
 
     ok = True
+    if armed:
+        required = {
+            "enabled": 1,
+            "active": 1,
+            "latched": 0,
+            "scratch_stale": 0,
+            "dropped": 0,
+            "stale": 0,
+            "hwa_rearm_err": 0,
+            "rf_faults": 0,
+            "freeze_to": 0,
+        }
+        for field, expected in required.items():
+            if stats.get(field) != expected:
+                lines.append(f"FAIL: armed soak needs {field}={expected}; got {stats.get(field)}")
+                ok = False
     if frames < args_frames * coverage_min:
         lines.append(f"FAIL: only {frames} frames captured, expected ~{args_frames}")
         ok = False
@@ -155,7 +176,19 @@ def main() -> int:
     parser.add_argument("--config", required=True, help="path to an IWR6843 .cfg profile")
     parser.add_argument("--frames", type=int, default=50_000, help="frames to soak")
     parser.add_argument("--port", default=None, help="serial port (default: auto-detect)")
+    parser.add_argument(
+        "--self-trigger-tee-m",
+        type=float,
+        help="arm the detector at this measured tee distance; keep the scene still",
+    )
+    parser.add_argument("--cal", default=DEFAULT_CAL_PATH)
+    parser.add_argument("--poll-s", type=float, default=2.0)
+    parser.add_argument(
+        "--output", type=Path, default=Path("openflight_sessions/iwr-armed-soak/run.jsonl")
+    )
     args = parser.parse_args()
+    if args.frames <= 0 or args.poll_s <= 0:
+        parser.error("--frames and --poll-s must be positive")
 
     period_s = frame_period_s(args.config)
     target_s = args.frames * period_s
@@ -164,24 +197,83 @@ def main() -> int:
         f"({period_s * 1000:.1f} ms/frame, ~{target_s:.0f}s)"
     )
 
-    with IWR6843Radar(port=args.port) as radar:
-        print(f"IWR6843 on {radar.port}")
-        radar.send_config(args.config)
-        time.sleep(target_s)
-        stats_text = radar.stats()
-        radar.stop_sensor()
-
-    stats = parse_stats(stats_text)
-
-    for field in REQUIRED_STAT_FIELDS:
-        if field not in stats:
-            print(f"FAIL: firmware stats did not report {field!r}: {stats_text.strip()!r}")
-            return 1
-
-    ok, lines = evaluate(stats, args_frames=args.frames, period_s=period_s)
-    for line in lines:
-        print(line)
-    return 0 if ok else 1
+    armed = args.self_trigger_tee_m is not None
+    command = None
+    if armed:
+        tee_bin = tee_global_bin(
+            args.self_trigger_tee_m,
+            args.config,
+            range_bias_m=Calibration.load(args.cal).range_bias_m,
+        )
+        command = SelfTriggerConfig(tee_bin, 6.0, 2).command
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    with args.output.open("a", encoding="utf-8") as output:
+        with IWR6843Radar(port=args.port) as radar:
+            try:
+                print(f"IWR6843 on {radar.port}")
+                radar.send_config(args.config)
+                if command:
+                    reply = radar.cmd(command)
+                    if "Done" not in reply or "Error" in reply:
+                        raise RuntimeError(f"triggerCfg rejected: {reply.strip()}")
+                output.write(
+                    json.dumps(
+                        {
+                            "event": "start",
+                            "ts": time.time(),
+                            "config": args.config,
+                            "trigger_command": command,
+                            "cal": args.cal,
+                        }
+                    )
+                    + "\n"
+                )
+                deadline = time.monotonic() + target_s
+                while True:
+                    stats_text = radar.stats()
+                    if "Done" not in stats_text or "Error" in stats_text:
+                        raise RuntimeError(f"stats failed: {stats_text.strip()}")
+                    stats = parse_stats(stats_text)
+                    output.write(
+                        json.dumps({"event": "stats", "ts": time.time(), "raw": stats_text}) + "\n"
+                    )
+                    output.flush()
+                    missing = [key for key in REQUIRED_STAT_FIELDS if key not in stats]
+                    if missing:
+                        raise RuntimeError(f"stats missing required counters: {missing}")
+                    ok, lines = evaluate(stats, args_frames=0, period_s=period_s, armed=armed)
+                    if not ok or time.monotonic() >= deadline:
+                        ok, lines = evaluate(
+                            stats, args_frames=args.frames, period_s=period_s, armed=armed
+                        )
+                        if armed:
+                            logs = {
+                                cmd: radar.cmd(cmd)
+                                for cmd in ("triggerLog", "triggerLog trace", "triggerLog perf")
+                            }
+                            output.write(
+                                json.dumps(
+                                    {"event": "diagnostics", "ts": time.time(), "logs": logs}
+                                )
+                                + "\n"
+                            )
+                        output.write(
+                            json.dumps(
+                                {
+                                    "event": "result",
+                                    "ts": time.time(),
+                                    "passed": ok,
+                                    "report": lines,
+                                }
+                            )
+                            + "\n"
+                        )
+                        output.flush()
+                        print("\n".join(lines))
+                        return 0 if ok else 1
+                    time.sleep(min(args.poll_s, 60.0, max(0, deadline - time.monotonic())))
+            finally:
+                radar.stop_sensor()
 
 
 if __name__ == "__main__":

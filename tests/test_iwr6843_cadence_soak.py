@@ -78,3 +78,80 @@ class TestScratchStaleGate:
 
         assert not ok
         assert sum(line.startswith("FAIL:") for line in lines) == 2
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"enabled": 0},
+        {"latched": 1},
+        {"scratch_stale": None},
+        {"dropped": 1},
+        {"stale": 1},
+        {"active": 0},
+    ],
+)
+def test_armed_soak_requires_running_detector_and_complete_clean_counters(fields):
+    stats = _stats(enabled=1, latched=0, active=1, scratch_stale=0, dropped=0, stale=0)
+    stats.update(fields)
+    ok, _ = soak.evaluate(stats, args_frames=50000, armed=True)
+    assert not ok
+
+
+def test_armed_soak_clean_state_passes():
+    ok, _ = soak.evaluate(
+        _stats(
+            enabled=1,
+            latched=0,
+            active=1,
+            scratch_stale=0,
+            dropped=0,
+            stale=0,
+            hwa_rearm_err=0,
+            rf_faults=0,
+            freeze_to=0,
+        ),
+        args_frames=50000,
+        armed=True,
+    )
+    assert ok
+
+
+def test_main_arms_with_calibrated_tee_and_saves_failure_evidence(monkeypatch, tmp_path):
+    import json
+    from unittest.mock import Mock
+
+    radar = Mock()
+    radar.__enter__ = Mock(return_value=radar)
+    radar.__exit__ = Mock(return_value=False)
+    radar.cmd.return_value = "Done"
+    radar.stats.return_value = (
+        "hwa_frames=1000 hwa_missed=0 iq8_overrun=0 iq8_edma_err=0 "
+        "enabled=1 latched=1 active=0 scratch_stale=0 dropped=0 stale=0 "
+        "hwa_rearm_err=0 rf_faults=0 freeze_to=0\nDone"
+    )
+    monkeypatch.setattr(soak, "IWR6843Radar", Mock(return_value=radar))
+    monkeypatch.setattr(soak.Calibration, "load", Mock(return_value=Mock(range_bias_m=0.075)))
+    output = tmp_path / "run.jsonl"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "soak",
+            "--config",
+            "config/iwr6843_l3dump_adaptive_47f2ms_53bin_a16.cfg",
+            "--self-trigger-tee-m",
+            "1.845",
+            "--frames",
+            "1000",
+            "--output",
+            str(output),
+        ],
+    )
+    assert soak.main() == 1
+    assert radar.cmd.call_args_list[0].args == ("triggerCfg 41 6.0 2",)
+    radar.stop_sensor.assert_called_once()
+    events = [json.loads(line) for line in output.read_text().splitlines()]
+    assert events[0]["trigger_command"] == "triggerCfg 41 6.0 2"
+    assert "triggerLog perf" in events[-2]["logs"]
+    assert events[-1]["passed"] is False

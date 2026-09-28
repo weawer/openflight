@@ -106,7 +106,13 @@ def tx_order_from_config(config_path: str | Path) -> str:
     raise ValueError(f"IWR6843 config must contain chirp TX masks 1/4, 4/1, or 1/2/4, got {masks}")
 
 
-def tee_global_bin(tee_range_m: float, config_path: str | Path, fft_size: int = 128) -> int:
+def tee_global_bin(
+    tee_range_m: float,
+    config_path: str | Path,
+    fft_size: int = 128,
+    *,
+    range_bias_m: float = 0.0,
+) -> int:
     """The tee's global range-FFT bin, checked to lie in the cfg's first window.
 
     The firmware speaks global bins everywhere (bin 34 is 1.59 m on a
@@ -116,7 +122,9 @@ def tee_global_bin(tee_range_m: float, config_path: str | Path, fft_size: int = 
     summary = read_capture_config(config_path)
     if summary.first_window_start is None or summary.first_window_bins is None:
         raise ValueError(f"{config_path} has no phaseCaptureCfg")
-    absolute = int(round(tee_range_m / (RANGE_SPAN_M / fft_size)))
+    if not math.isfinite(tee_range_m) or tee_range_m <= 0 or not math.isfinite(range_bias_m):
+        raise ValueError("tee distance must be positive and range bias finite")
+    absolute = int(round((tee_range_m + range_bias_m) / (RANGE_SPAN_M / fft_size)))
     if (
         not summary.first_window_start
         <= absolute
