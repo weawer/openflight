@@ -153,5 +153,44 @@ def test_main_arms_with_calibrated_tee_and_saves_failure_evidence(monkeypatch, t
     radar.stop_sensor.assert_called_once()
     events = [json.loads(line) for line in output.read_text().splitlines()]
     assert events[0]["trigger_command"] == "triggerCfg 41 6.0 2"
-    assert "triggerLog perf" in events[-2]["logs"]
+    diagnostic = next(event for event in events if event["event"] == "diagnostics")
+    assert "triggerLog perf" in diagnostic["logs"]
     assert events[-1]["passed"] is False
+
+
+def test_diagnostic_output_cannot_turn_a_stale_frame_into_a_pass(monkeypatch, tmp_path):
+    import json
+    from unittest.mock import Mock
+
+    radar = Mock()
+    radar.__enter__ = Mock(return_value=radar)
+    radar.__exit__ = Mock(return_value=False)
+    radar.cmd.return_value = "Done"
+    clean = (
+        "hwa_frames=1000 hwa_missed=0 iq8_overrun=0 iq8_edma_err=0 "
+        "enabled=1 latched=0 active=1 scratch_stale=0 dropped=0 stale=0 "
+        "hwa_rearm_err=0 rf_faults=0 freeze_to=0\nDone"
+    )
+    radar.stats.side_effect = [clean, clean.replace("scratch_stale=0", "scratch_stale=9")]
+    monkeypatch.setattr(soak, "IWR6843Radar", Mock(return_value=radar))
+    monkeypatch.setattr(soak.time, "monotonic", Mock(side_effect=[0.0, 10.0]))
+    output = tmp_path / "run.jsonl"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "soak",
+            "--config",
+            "config/iwr6843_l3dump_adaptive_47f2ms_53bin_a16.cfg",
+            "--self-trigger-tee-m",
+            "1.845",
+            "--frames",
+            "1000",
+            "--output",
+            str(output),
+        ],
+    )
+    assert soak.main() == 1
+    events = [json.loads(line) for line in output.read_text().splitlines()]
+    assert events[-1]["passed"] is False
+    assert any(e["event"] == "post_diagnostics_stats" for e in events)

@@ -4,6 +4,24 @@ Updated: 2026-09-28
 
 ## Review corrections and next hardware run
 
+The armed run in `openflight_sessions/iwr-armed-soak/run.jsonl` subsequently
+failed with nine stale scratch reads and no HWA misses. CLI/notice output
+outranked detection while using polled UART writes; the residual wall-time
+maximum reached about 99 ms during diagnostic output. Scheduling now orders
+control > rearm > detection > CLI/notice. Performance counters reset at
+sensor start, and the soak rechecks health after its final diagnostic output.
+See `firmware/releases/l3_dump_pipeline_wip_cli_fix_20260928.md` for the
+WIP-based test image; it still requires hardware validation.
+
+Frame-rate equivalence is a separate open issue: `minStepBins=1` requires
+15.625 m/s radial progress at 3 ms but 23.4375 m/s at 2 ms. The eight-bin
+continuation limit and frame-count timeouts likewise change their physical
+meaning. Ball limits expressed in m/s and timestamp-based fits retain their
+units. Chirp/loop timing is unchanged. Normalize the frame-based rules to
+elapsed time and replay identical physical trajectories at both cadences
+before claiming equivalent detection behavior; no gates are changed by the
+scheduling fix.
+
 The earlier cadence soaks did **not** arm the self-trigger. `sensorStart`
 disables it, and the original soak only loaded the config. Those runs validate
 capture cadence; they do not validate club-detection or post-impact tracking

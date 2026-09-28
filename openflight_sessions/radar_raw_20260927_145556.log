@@ -1,0 +1,50 @@
+14:55:56.785 - [OPS] Clock sync: method=integer_rollover offset=1790510249.779s best_read_latency=1.1ms spread=988.8ms rollover_uncertainty=11.2ms (12/12 valid)
+14:56:19.414 - [OPS] Hardware trigger: first byte after 22.6s
+14:56:21.185 - [OPS] Hardware trigger: 41035 bytes in 24.4s
+14:56:21.393 - [OPS] Re-arm drain: 0 bytes in 0.2s
+14:56:21.765 - [OPS] Rolling buffer re-armed (S#24)
+14:56:37.840 - [OPS] Hardware trigger: first byte after 16.1s
+14:56:39.608 - [OPS] Hardware trigger: 41035 bytes in 17.8s
+14:56:40.016 - [OPS] Clock sync: method=integer_rollover offset=1790510249.773s best_read_latency=1.2ms spread=988.6ms rollover_uncertainty=11.4ms (36/36 valid)
+14:56:40.217 - [OPS] Re-arm drain: 0 bytes in 0.2s
+14:56:40.589 - [OPS] Rolling buffer re-armed (S#24)
+14:56:51.115 - [OPS] Hardware trigger: first byte after 10.5s
+14:56:52.889 - [OPS] Hardware trigger: 41035 bytes in 12.2s
+14:56:53.785 - [OPS] Clock sync: method=integer_rollover offset=1790510249.779s best_read_latency=1.1ms spread=988.6ms rollover_uncertainty=11.4ms (79/79 valid)
+14:56:53.986 - [OPS] Re-arm drain: 0 bytes in 0.2s
+14:56:54.361 - [OPS] Rolling buffer re-armed (S#24)
+14:57:05.515 - [OPS] Hardware trigger: first byte after 11.1s
+14:57:07.300 - [OPS] Hardware trigger: 41035 bytes in 12.9s
+14:57:07.778 - [OPS] Clock sync: method=integer_rollover offset=1790510249.772s best_read_latency=1.2ms spread=988.6ms rollover_uncertainty=11.4ms (42/42 valid)
+14:57:07.979 - [OPS] Re-arm drain: 0 bytes in 0.2s
+14:57:08.357 - [OPS] Rolling buffer re-armed (S#24)
+14:57:22.563 - [OPS] Hardware trigger: first byte after 14.1s
+14:57:24.337 - [OPS] Hardware trigger: 41035 bytes in 15.9s
+14:57:24.780 - [OPS] Clock sync: method=integer_rollover offset=1790510249.774s best_read_latency=1.2ms spread=988.6ms rollover_uncertainty=11.4ms (39/39 valid)
+14:57:24.981 - [OPS] Re-arm drain: 0 bytes in 0.2s
+14:57:25.353 - [OPS] Rolling buffer re-armed (S#24)
+14:57:40.439 - [OPS] Hardware trigger: first byte after 15.0s
+14:57:42.223 - [OPS] Hardware trigger: 41035 bytes in 16.8s
+14:57:42.780 - [OPS] Clock sync: method=integer_rollover offset=1790510249.774s best_read_latency=1.2ms spread=988.6ms rollover_uncertainty=11.4ms (49/49 valid)
+14:57:42.981 - [OPS] Re-arm drain: 0 bytes in 0.2s
+14:57:43.353 - [OPS] Rolling buffer re-armed (S#24)
+14:57:56.684 - [OPS] Hardware trigger: first byte after 13.3s
+14:57:58.449 - [OPS] Hardware trigger: 41035 bytes in 15.0s
+14:57:58.857 - [OPS] Clock sync: method=integer_rollover offset=1790510249.772s best_read_latency=1.2ms spread=988.7ms rollover_uncertainty=11.3ms (36/36 valid)
+14:57:59.058 - [OPS] Re-arm drain: 0 bytes in 0.2s
+14:57:59.429 - [OPS] Rolling buffer re-armed (S#24)
+14:58:11.758 - [OPS] Hardware trigger: first byte after 12.3s
+14:58:13.543 - [OPS] Hardware trigger: 41035 bytes in 14.1s
+14:58:13.951 - [OPS] Clock sync: method=integer_rollover offset=1790510249.764s best_read_latency=1.2ms spread=988.7ms rollover_uncertainty=11.3ms (36/36 valid)
+14:58:14.152 - [OPS] Re-arm drain: 0 bytes in 0.2s
+14:58:14.529 - [OPS] Rolling buffer re-armed (S#24)
+14:58:26.374 - [OPS] Hardware trigger: first byte after 11.8s
+14:58:28.138 - [OPS] Hardware trigger: 41035 bytes in 13.5s
+14:58:28.775 - [OPS] Clock sync: method=integer_rollover offset=1790510249.769s best_read_latency=1.2ms spread=988.6ms rollover_uncertainty=11.4ms (56/56 valid)
+14:58:28.976 - [OPS] Re-arm drain: 0 bytes in 0.2s
+14:58:29.349 - [OPS] Rolling buffer re-armed (S#24)
+14:58:41.132 - [OPS] Hardware trigger: first byte after 11.7s
+14:58:42.906 - [OPS] Hardware trigger: 41035 bytes in 13.5s
+14:58:43.772 - [OPS] Clock sync: method=integer_rollover offset=1790510249.766s best_read_latency=1.1ms spread=988.6ms rollover_uncertainty=11.4ms (76/76 valid)
+14:58:43.973 - [OPS] Re-arm drain: 0 bytes in 0.2s
+14:58:44.345 - [OPS] Rolling buffer re-armed (S#24)

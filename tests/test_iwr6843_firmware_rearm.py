@@ -599,4 +599,18 @@ def test_rearm_task_outranks_the_cli():
     inter-frame gap; the 2 ms profiles leave about 380 us after the chirps."""
     source = FIRMWARE.read_text(encoding="utf-8")
 
-    assert "#define L3_HWA_REARM_TASK_PRIORITY (L3_CLI_TASK_PRIORITY + 1U)" in source
+    assert "#define L3_HWA_REARM_TASK_PRIORITY (L3_DETECT_TASK_PRIORITY + 1U)" in source
+
+
+def test_detection_outranks_cli_but_not_rearm_or_control():
+    source = FIRMWARE.read_text()
+    assert "#define L3_DETECT_TASK_PRIORITY (L3_CLI_TASK_PRIORITY + 1U)" in source
+    assert "#define L3_HWA_REARM_TASK_PRIORITY (L3_DETECT_TASK_PRIORITY + 1U)" in source
+    assert "#define L3_CTRL_TASK_PRIORITY (L3_HWA_REARM_TASK_PRIORITY + 1U)" in source
+    assert "#define L3_NOTICE_TASK_PRIORITY L3_CLI_TASK_PRIORITY" in source
+
+
+def test_sensor_start_resets_performance_counters_before_capture():
+    source = FIRMWARE.read_text()
+    start = source[source.rindex("static int32_t l3_cli_sensorStart(") :]
+    assert start.index("l3_profile_reset(&gProfile)") < start.index("gHwaFrameDone      = 0U")

@@ -1,0 +1,48 @@
+diff --git a/firmware/iwr6843/l3_dump.c b/firmware/iwr6843/l3_dump.c
+index 39f78e63..174b623a 100644
+--- a/firmware/iwr6843/l3_dump.c
++++ b/firmware/iwr6843/l3_dump.c
+@@ -79,19 +79,19 @@
+ #define L3_CLI_TASK_PRIORITY   3
+ /* Above the CLI: a stats or debug write must never delay the next HWA arm
+  * past the ~380 us gap a 2 ms frame leaves after its chirps. */
+-#define L3_HWA_REARM_TASK_PRIORITY (L3_CLI_TASK_PRIORITY + 1U)
++#define L3_HWA_REARM_TASK_PRIORITY (L3_DETECT_TASK_PRIORITY + 1U)
+ /* Keep the live snapshot worker below CLI. SYS/BIOS Task_yield does not allow
+  * lower-priority tasks to run, and a priority-4 snapshot loop starved l3dump
+  * so the host only saw the echoed 7-byte "l3dump\n" command. */
+ #define L3_SNAPSHOT_TASK_PRIORITY 1
+-/* Below rearm, so a slot read runs while the next frame is captured. */
+-#define L3_DETECT_TASK_PRIORITY 1
++/* Outrank polled CLI writes so scratch reads finish before HWA reuse. */
++#define L3_DETECT_TASK_PRIORITY (L3_CLI_TASK_PRIORITY + 1U)
+ /* Writes the detect task's CLI lines. At the CLI task's own priority SYS/BIOS
+  * never preempts one for the other, so neither can splice a line into the
+  * other's; below it, a host command arriving mid-line would let the CLI
+  * task cut a "Triggered" notice or a debug line in two. */
+ #define L3_NOTICE_TASK_PRIORITY L3_CLI_TASK_PRIORITY
+-#define L3_CTRL_TASK_PRIORITY  5
++#define L3_CTRL_TASK_PRIORITY (L3_HWA_REARM_TASK_PRIORITY + 1U)
+ 
+ /* ASCII CAN is reserved as an out-of-band dump cancellation byte. The CLI
+  * task is executing l3dump synchronously, so RX interrupts are disabled and
+@@ -4462,8 +4462,7 @@ static int32_t l3_cli_triggerCfg(int32_t argc, char *argv[])
+                   (unsigned)L3_TRIG_MAX_BINS);
+         return -1;
+     }
+-    /* Stop the detector, let a frame already being scored finish (the CLI
+-     * task outranks the detect task, so sleep rather than spin), then reset.
++    /* Stop the detector, let a frame already being scored finish, then reset.
+      * Scoring takes well under a frame; the bound only guards a stalled
+      * detect task from wedging the CLI. */
+     gTriggerEnabled = 0U;
+@@ -5325,6 +5324,9 @@ static int32_t l3_cli_sensorStart(int32_t argc, char *argv[])
+     gNumFrame  = 0U;
+     gRingFrame = 0U;
+     gNumWrap   = 0U;
++    if (gProfileReady) {
++        l3_profile_reset(&gProfile);
++    }
+ #ifdef HWA_CHAINED_SNAPSHOT_RING
+     gHwaFrameDone      = 0U;
+     gHwaOutputDone     = 0U;
