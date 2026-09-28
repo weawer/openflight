@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>L3 Dump Viewer</title>
+<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"
+        integrity="sha384-cCVCZkAjYNxaYKbM8lsArLznDF/SvMFr1jcZrvOpSTCa0W40ZAdLzHCEulnUa5i7" crossorigin="anonymous"></script>
+<style>
+  :root {
+    --bg: #0e1116; --panel: #161b22; --panel2: #1c232d; --line: #2a323d;
+    --text: #d6dde6; --muted: #8b97a6; --accent: #4dabf7;
+    --gate: #ff6b6b; --py: #4dabf7; --freeze: #ffd43b; --geo: #b197fc;
+    --club: #69db7c; --ball: #ff922b; --target: #adb5bd;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .app { display: grid; grid-template-columns: 300px 1fr; height: 100vh; }
+  aside { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 12px; }
+  main { overflow-y: auto; padding: 12px 16px 40px; }
+  h1 { font-size: 15px; margin: 0 0 10px; letter-spacing: .02em; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 16px 0 6px; }
+  input[type=search], input[type=number], input[type=text], select {
+    width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--line);
+    border-radius: 4px; padding: 4px 6px; font: inherit; }
+  .files { max-height: 240px; overflow-y: auto; border: 1px solid var(--line); border-radius: 4px; margin-top: 6px; }
+  .files div { padding: 3px 6px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; }
+  .files div:hover { background: var(--panel2); }
+  .files div.sel { background: #1f3b57; color: #fff; }
+  .drop { margin-top: 6px; border: 1px dashed var(--line); border-radius: 4px; padding: 8px; text-align: center; color: var(--muted); cursor: pointer; }
+  .drop.over { border-color: var(--accent); color: var(--text); }
+  .form { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; }
+  .form label { display: flex; flex-direction: column; gap: 2px; color: var(--muted); font-size: 11.5px; }
+  .form label.chk { flex-direction: row; align-items: center; gap: 6px; color: var(--text); }
+  .row { display: flex; gap: 6px; margin-top: 8px; }
+  button { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 4px;
+    padding: 5px 10px; font: inherit; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; flex: 1; }
+  .ctx { font-size: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; }
+  .ctx div { display: flex; justify-content: space-between; gap: 8px; }
+  .ctx span:first-child { color: var(--muted); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .chip { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 3px 10px; font-size: 12px; white-space: nowrap; }
+  .chip b { font-weight: 600; }
+  .chip .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px; margin-bottom: 12px; min-width: 0; }
+  .card-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+  .card-h h3 { margin: 0; font-size: 13px; font-weight: 600; }
+  .card-h .hint { color: var(--muted); font-size: 11.5px; }
+  .grid2 { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 12px; }
+  .tabs button { padding: 3px 8px; font-size: 12px; }
+  .tabs button.on { background: #1f3b57; border-color: #1f6feb; }
+  .plot { width: 100%; }
+  .frame-bar { display: flex; align-items: center; gap: 10px; }
+  .frame-bar input[type=range] { flex: 1; }
+  .mono { font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  td, th { padding: 2px 6px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; }
+  pre { white-space: pre-wrap; margin: 0; font-size: 11.5px; max-height: 360px; overflow: auto; }
+  .err { color: var(--gate); padding: 6px; }
+  .empty { color: var(--muted); padding: 40px; text-align: center; }
+  #status { color: var(--muted); font-size: 12px; margin-left: 8px; }
+  details summary { cursor: pointer; color: var(--muted); }
+  @media (max-width: 1200px) { .grid2 { grid-template-columns: 1fr; } }
+  @media (max-width: 800px) { .app { grid-template-columns: 1fr; height: auto; } aside { border-right: 0; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <h1>L3 Dump Viewer</h1>
+    <input type="search" id="filter" placeholder="Filter captures…">
+    <div class="files" id="files"></div>
+    <div class="drop" id="drop">Drop a .l3dump here or click to open</div>
+    <input type="file" id="pick" accept=".l3dump" hidden>
+
+    <h2>Session</h2>
+    <div class="ctx" id="ctx"><span style="color:var(--muted)">No session log found for this capture</span></div>
+
+    <h2>Firmware replay (l3_*.c)</h2>
+    <div class="form">
+      <label>tee bin <input type="number" id="tee_bin" placeholder="from range"></label>
+      <label>dest bin (ball) <input type="number" id="dest_bin" placeholder="none"></label>
+      <label>snr <input type="number" id="snr" step="0.5" value="6"></label>
+      <label>track frames <input type="number" id="track_frames" value="2"></label>
+      <label>stat <select id="stat"><option>peak</option><option>energy</option></select></label>
+      <label>sub-bin <select id="subbin"><option>parabolic</option><option>centroid</option></select></label>
+      <label>post from frame <input type="number" id="post_from_frame" placeholder="gate"></label>
+      <label>pitch (deg) <input type="number" id="pitch_deg" step="0.1" value="0"></label>
+      <label class="chk"><input type="checkbox" id="impact_armed"> impact armed</label>
+      <label class="chk"><input type="checkbox" id="stop_at_fire"> stop at fire</label>
+    </div>
+    <div class="row"><button id="useFreeze" title="Treat the recorded freeze as impact so the ball tracker runs from it">post = freeze frame</button></div>
+
+    <h2>Host ball-leave trigger</h2>
+    <div class="form">
+      <label>tee range (m) <input type="number" id="tee_range_m" step="0.01" value="1.372"></label>
+      <label>level <input type="number" id="py_level" step="100" value="1000"></label>
+      <label>hits <input type="number" id="py_hits" value="2"></label>
+    </div>
+
+    <div class="row">
+      <button class="primary" id="run">Run</button>
+      <button id="reset" title="Back to the session log's values">Reset</button>
+    </div>
+    <div class="row"><label class="chk" style="display:flex;gap:6px;align-items:center;color:var(--muted)"><input type="checkbox" id="auto" checked> re-run on change</label></div>
+  </aside>
+
+  <main>
+    <div style="display:flex;align-items:baseline;gap:4px;margin-bottom:8px">
+      <h1 id="title" style="margin:0">Pick a capture</h1><span id="status"></span>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div id="content" class="empty">Choose a .l3dump on the left.</div>
+    <div id="panels" hidden>
+      <div class="grid2">
+        <div class="card">
+          <div class="card-h"><h3>3D</h3>
+            <div class="tabs" id="tabs3d">
+              <button data-v="mti" class="on">MTI surface</button>
+              <button data-v="static">Static surface</button>
+              <button data-v="traj">Trajectory (golf frame)</button>
+            </div>
+          </div>
+          <div id="p3d" class="plot" style="height:520px"></div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3>Range × time</h3>
+            <div class="tabs" id="tabsMap">
+              <button data-v="mti_db" class="on">MTI</button>
+              <button data-v="static_db">Static</button>
+              <button data-v="velocity_mps">Lag-1 velocity</button>
+            </div>
+          </div>
+          <div id="pmap" class="plot" style="height:520px"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h3>Trigger timeline</h3><span class="hint">click to inspect a frame · stats in dB of linear power</span></div>
+        <div id="ptime" class="plot" style="height:300px"></div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h3>State lanes</h3><span class="hint">firmware state machines and the host detector's phase, per frame</span></div>
+        <div id="plane" class="plot" style="height:230px"></div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h3>Frame inspector</h3>
+          <div class="frame-bar" style="flex:1;max-width:640px">
+            <button id="prev">◀</button><button id="play">▶ play</button><button id="next">▶</button>
+            <input type="range" id="slider" min="0" max="0" value="0">
+            <span class="mono" id="frameLabel"></span>
+          </div>
+        </div>
+        <div class="grid2">
+          <div id="pprof" class="plot" style="height:320px"></div>
+          <div id="prd" class="plot" style="height:320px"></div>
+        </div>
+        <div id="frameDetails" style="margin-top:8px"></div>
+      </div>
+      <div class="card">
+        <details><summary>Firmware report (format_report)</summary><pre id="report" class="mono"></pre></details>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const C = {};
+["gate", "py", "freeze", "geo", "club", "ball", "target", "text", "muted", "line", "panel", "bg"]
+  .forEach((k) => (C[k] = css("--" + k)));
+const OPTS = ["tee_bin", "dest_bin", "snr", "track_frames", "stat", "subbin", "post_from_frame",
+  "pitch_deg", "impact_armed", "stop_at_fire", "tee_range_m", "py_level", "py_hits"];
+const FORM_DEFAULTS = {};
+OPTS.forEach((k) => { const el = $("#" + k); FORM_DEFAULTS[k] = el.type === "checkbox" ? el.checked : el.value; });
+
+let files = [], current = null, upload = null, D = null, ctx = null, frame = 0, playing = null;
+let view3d = "mti", viewMap = "mti_db";
+const base = {};  // per-plot shapes without the frame cursor
+
+const PLOT_CFG = { responsive: true, displaylogo: false, modeBarButtonsToRemove: ["lasso2d", "select2d"] };
+function layout(extra) {
+  return Object.assign({
+    paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)",
+    font: { color: C.text, size: 11 }, margin: { l: 55, r: 15, t: 10, b: 40 },
+    legend: { orientation: "h", y: -0.18, font: { size: 11 } }, hovermode: "closest",
+  }, extra);
+}
+const axis = (title, extra) => Object.assign({ title: { text: title }, gridcolor: C.line, zerolinecolor: C.line }, extra);
+const db = (v) => (v == null || v <= 0 ? null : 10 * Math.log10(v));
+const fmt = (v, d = 1) => (v == null ? "–" : Number(v).toFixed(d));
+
+// ---------- files ----------
+async function loadFiles() {
+  const r = await fetch("/api/files").then((r) => r.json());
+  files = r.files;
+  renderFiles();
+  openFromHash();
+}
+function openFromHash() {
+  const want = decodeURIComponent(location.hash.slice(1));
+  const hit = files.find((f) => f.path === want) || files.find((f) => f.name === want);
+  if (hit && hit.path !== current) selectFile(hit.path);
+}
+window.addEventListener("hashchange", openFromHash);
+function renderFiles() {
+  const q = $("#filter").value.toLowerCase();
+  const box = $("#files");
+  box.innerHTML = "";
+  files.filter((f) => f.path.toLowerCase().includes(q)).forEach((f) => {
+    const d = document.createElement("div");
+    d.textContent = f.path;
+    d.title = `${f.path} (${(f.bytes / 1024).toFixed(0)} KB)`;
+    if (f.path === current) d.className = "sel";
+    d.onclick = () => selectFile(f.path);
+    box.appendChild(d);
+  });
+}
+function selectFile(path) {
+  current = path; upload = null;
+  history.replaceState(null, "", "#" + encodeURIComponent(path));
+  renderFiles();
+  resetForm();
+  run(true);
+}
+function resetForm() {
+  OPTS.forEach((k) => { const el = $("#" + k); if (el.type === "checkbox") el.checked = FORM_DEFAULTS[k]; else el.value = FORM_DEFAULTS[k]; });
+}
+function applyDefaults(defaults) {
+  Object.entries(defaults || {}).forEach(([k, v]) => { const el = $("#" + k); if (el) el.value = v; });
+}
+function readForm() {
+  const o = {};
+  OPTS.forEach((k) => { const el = $("#" + k); o[k] = el.type === "checkbox" ? el.checked : el.value; });
+  return o;
+}
+
+// ---------- run ----------
+async function run(fresh) {
+  if (!current && !upload) return;
+  $("#status").textContent = "running…";
+  let res;
+  try {
+    if (upload) {
+      const fd = new FormData();
+      fd.append("file", upload);
+      fd.append("options", JSON.stringify(readForm()));
+      res = await fetch("/api/analyze", { method: "POST", body: fd });
+    } else {
+      if (fresh) {
+        ctx = await fetch("/api/context?path=" + encodeURIComponent(current)).then((r) => r.json());
+        if (ctx) applyDefaults(ctx.defaults);
+      }
+      res = await fetch("/api/analyze", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: current, options: readForm() }) });
+    }
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || res.statusText);
+    D = body;
+    if (fresh) frame = D.freeze_frame != null ? Math.min(D.freeze_frame, D.n_frames - 1) : 0;
+    frame = Math.min(frame, D.n_frames - 1);
+    renderAll();
+    $("#status").textContent = "";
+  } catch (e) {
+    $("#status").innerHTML = `<span class="err">${e.message}</span>`;
+  }
+}
+
+// ---------- helpers over D ----------
+const T = (f) => D.timestamps_ms[f];
+const binM = (b) => b * D.bin_width_m;
+const col = (b) => Math.round(b) - D.maps.bin0;  // global bin -> grid column
+const xAxisM = () => [...Array(D.maps.width - D.maps.bin0).keys()].map((i) => binM(D.maps.bin0 + i));
+const fw = () => (D.firmware.ok ? D.firmware : null);
+const py = () => (D.python_trigger.ok ? D.python_trigger : null);
+function fwFrame(f) { const F = fw(); return F ? F.frames.find((x) => x.frame === f) : null; }
+function events() {
+  const ev = [];
+  if (D.freeze_frame != null) ev.push({ f: D.freeze_frame, name: "board freeze (pre/post)", color: C.freeze, dash: "solid" });
+  const F = fw();
+  if (F && F.fired_frame != null) ev.push({ f: F.fired_frame, name: "C gate fired", color: C.gate, dash: "solid" });
+  if (F && F.geometric_frame != null) ev.push({ f: F.geometric_frame, name: "geometric impact", color: C.geo, dash: "dot" });
+  const P = py();
+  if (P && P.fired_frame != null) ev.push({ f: P.fired_frame, name: "host trigger fired", color: C.py, dash: "dash" });
+  return ev;
+}
+function frameAt(t) {
+  let best = 0;
+  D.timestamps_ms.forEach((x, i) => { if (Math.abs(x - t) < Math.abs(D.timestamps_ms[best] - t)) best = i; });
+  return best;
+}
+function pyLoop0Global(f) {  // host loop-0 power (dB) on the global-bin axis
+  const P = py(); if (!P) return null;
+  const row = new Array(D.maps.width - D.maps.bin0).fill(null);
+  const s = D.maps.starts[f], n = D.maps.counts[f];
+  for (let i = 0; i < n && i < P.loop0_db[f].length; i++) row[col(s + i)] = P.loop0_db[f][i];
+  return row;
+}
+
+// ---------- render ----------
+function renderAll() {
+  $("#content").hidden = true; $("#panels").hidden = false;
+  $("#title").textContent = D.name;
+  renderCtx(); renderChips();
+  $("#slider").max = D.n_frames - 1;
+  render3d(); renderMap(); renderTimeline(); renderLanes(); setFrame(frame);
+  $("#report").textContent = D.firmware.ok ? D.firmware.report : D.firmware.error;
+}
+
+function renderCtx() {
+  const c = D.context;
+  if (!c) { $("#ctx").innerHTML = `<span style="color:var(--muted)">No session log found for this capture</span>`; return; }
+  const rows = [["log", c.session_file], ["trigger", c.trigger_type], ["cfg", (c.cfg || "").split("/").pop()],
+    ["self-trigger", c.self_trigger], ["shot #", c.shot_number], ["OPS ball", c.ball_speed_mph != null ? fmt(c.ball_speed_mph) + " mph" : "–"],
+    ["club", c.shot && c.shot.club_speed_mph != null ? fmt(c.shot.club_speed_mph) + " mph" : "–"],
+    ["trig Δ", c.trigger_delta_ms != null ? fmt(c.trigger_delta_ms) + " ms" : "–"], ["capture", c.capture_error || "ok"]];
+  $("#ctx").innerHTML = rows.map(([k, v]) => `<div><span>${k}</span><span title="${v ?? ""}">${v ?? "–"}</span></div>`).join("");
+}
+
+function chip(color, label, value) {
+  return `<span class="chip">${color ? `<span class="dot" style="background:${color}"></span>` : ""}${label} <b>${value}</b></span>`;
+}
+function renderChips() {
+  const m = D.meta, F = fw(), P = py();
+  const at = (f) => (f == null ? "no fire" : `frame ${f} · ${fmt(T(f))} ms`);
+  const out = [
+    chip(null, "v" + m.version, `fmt ${m.sample_fmt}`),
+    chip(null, "frames", `${D.n_frames} · ${m.n_tx}TX×${m.n_rx}RX · ${m.chirps_per_frame / m.n_tx} loops`),
+  ];
+  if (m.retention) out.push(chip(null, "retention", `${m.retention.reason} ${m.retention.pre_frames}/${m.retention.planned_frames}`));
+  if (D.freeze_frame != null) out.push(chip(C.freeze, "freeze", at(D.freeze_frame)));
+  out.push(F ? chip(C.gate, "C gate", at(F.fired_frame)) : chip(C.gate, "C gate", `<span class="err">${D.firmware.error}</span>`));
+  if (F && F.geometric_frame != null) out.push(chip(C.geo, "geometric", at(F.geometric_frame)));
+  out.push(P ? chip(C.py, "host trigger", at(P.fired_frame)) : chip(C.py, "host", `<span class="err">${D.python_trigger.error}</span>`));
+  if (F) {
+    out.push(chip(C.club, "club pts", `${F.points.length} · run ${F.longest_run} · ${fmt(F.speed_mps)} m/s`));
+    if (F.delivery) out.push(chip(C.club, "delivery", `${fmt(F.delivery.speed_mps)} m/s path ${fmt(F.delivery.path_deg)}° aoa ${fmt(F.delivery.attack_deg)}°`));
+    out.push(chip(C.ball, "ball pts", F.ball_points.length));
+    if (F.launch) out.push(chip(C.ball, "launch", `${fmt(F.launch.speed_mps)} m/s vla ${fmt(F.launch.vla_deg)}° hla ${fmt(F.launch.hla_deg)}°`));
+  }
+  if (m.temperature_report) out.push(chip(null, "temp", `${m.temperature_report.pm_c}°C`));
+  $("#chips").innerHTML = out.join("");
+}
+
+// ---------- 3D ----------
+function surfaceZ(key) { return D.maps[key]; }
+function zAt(key, f, bin) {
+  const row = D.maps[key][f]; if (!row) return null;
+  const b = Math.max(0, Math.min(row.length - 1, col(bin)));
+  return row[b];
+}
+function render3d() {
+  const el = $("#p3d");
+  if (view3d === "traj") return renderTraj(el);
+  const key = view3d === "mti" ? "mti_db" : "static_db";
+  const x = xAxisM();
+  const y = D.timestamps_ms;
+  const z = surfaceZ(key);
+  const flat = z.flat().filter((v) => v != null);
+  const zmax = Math.max(...flat), zmin = Math.min(...flat);
+  const traces = [{
+    type: "surface", x, y, z, colorscale: "Inferno", cmin: zmin, cmax: zmax, name: key,
+    colorbar: { title: { text: "dB" }, thickness: 12, len: 0.7 }, connectgaps: false,
+    hovertemplate: "range %{x:.3f} m<br>t %{y:.1f} ms<br>%{z:.1f} dB<extra></extra>",
+    contours: { z: { show: false } }, opacity: 0.97,
+  }];
+  const F = fw();
+  if (F) {
+    const pts = (list, name, color) => ({
+      type: "scatter3d", mode: "lines+markers", name,
+      x: list.map((p) => p.range_m), y: list.map((p) => p.timestamp_us / 1000),
+      z: list.map((p) => (zAt(key, p.frame, p.range_bin) ?? zmax) + 1.5),
+      marker: { size: 4, color }, line: { color, width: 4 },
+      hovertemplate: `${name}<br>%{x:.3f} m · %{y:.1f} ms<extra></extra>`,
+    });
+    if (F.points.length) traces.push(pts(F.points, "club track", C.club));
+    if (F.ball_points.length) traces.push(pts(F.ball_points, "ball track", C.ball));
+  }
+  events().forEach((e) => traces.push({
+    type: "scatter3d", mode: "lines", name: e.name, x: [x[0], x[x.length - 1]], y: [T(e.f), T(e.f)], z: [zmax + 2, zmax + 2],
+    line: { color: e.color, width: 6, dash: e.dash }, hoverinfo: "name",
+  }));
+  const tee = binM(D.tee_bin);
+  traces.push({ type: "scatter3d", mode: "lines", name: "tee (C)", x: [tee, tee], y: [y[0], y[y.length - 1]], z: [zmax + 2, zmax + 2], line: { color: "#ffffff", width: 3, dash: "dash" }, hoverinfo: "name" });
+  traces.push({ type: "scatter3d", mode: "lines", name: "frame", x: [x[0], x[x.length - 1]], y: [T(frame), T(frame)], z: [zmax + 3, zmax + 3], line: { color: "#ffffff", width: 2 }, hoverinfo: "skip", showlegend: false });
+  const cam = el.layout && el.layout.scene && el.layout.scene.camera;
+  Plotly.react(el, traces, layout({
+    margin: { l: 0, r: 0, t: 0, b: 0 }, legend: { orientation: "h", y: 0, font: { size: 10 } },
+    scene: {
+      xaxis: axis("range (m)", { backgroundcolor: C.bg }), yaxis: axis("time (ms)", { backgroundcolor: C.bg }),
+      zaxis: axis(key === "mti_db" ? "MTI (dB)" : "static (dB)", { backgroundcolor: C.bg }),
+      aspectmode: "manual", aspectratio: { x: 1.4, y: 1.4, z: 0.6 },
+      camera: cam || { eye: { x: -1.5, y: -1.6, z: 1.0 } },
+    },
+  }), PLOT_CFG);
+}
+function renderTraj(el) {
+  const F = fw(); const traces = [];
+  traces.push({ type: "scatter3d", mode: "markers+text", name: "radar", x: [0], y: [0], z: [0], text: ["radar"], textposition: "top center", marker: { size: 5, color: "#ffffff", symbol: "diamond" } });
+  const add = (list, name, color) => {
+    if (!list || !list.length) return;
+    traces.push({
+      type: "scatter3d", mode: "lines+markers", name,
+      x: list.map((p) => p.position && p.position[0]), y: list.map((p) => p.position && p.position[1]), z: list.map((p) => p.position && p.position[2]),
+      marker: { size: 4, color: list.map((p) => (p.angles_valid ? color : C.muted)) }, line: { color, width: 3 },
+      text: list.map((p) => `frame ${p.frame} · ${(p.timestamp_us / 1000).toFixed(1)} ms<br>bin ${p.range_bin.toFixed(2)} · v ${p.doppler_mps.toFixed(1)} m/s<br>angles ${p.angles_valid ? "valid" : "boresight"}`),
+      hovertemplate: `${name}<br>%{text}<br>x %{x:.3f} y %{y:.3f} z %{z:.3f} m<extra></extra>`,
+    });
+  };
+  if (F) { add(F.points, "club track", C.club); add(F.ball_points, "ball track", C.ball); }
+  const tee = binM(D.tee_bin);
+  traces.push({ type: "scatter3d", mode: "markers+text", name: "tee (boresight)", x: [tee], y: [0], z: [0], text: ["tee"], textposition: "top center", marker: { size: 4, color: C.freeze } });
+  Plotly.react(el, traces, layout({
+    margin: { l: 0, r: 0, t: 0, b: 0 }, legend: { orientation: "h", y: 0 },
+    annotations: F && (F.points.length || F.ball_points.length) ? [] : [{ text: "no track points to place", showarrow: false, x: 0.5, y: 0.5, xref: "paper", yref: "paper", font: { color: C.muted } }],
+    scene: { xaxis: axis("x downrange (m)", { backgroundcolor: C.bg }), yaxis: axis("y right (m)", { backgroundcolor: C.bg }), zaxis: axis("z up (m)", { backgroundcolor: C.bg }), aspectmode: "data" },
+  }), PLOT_CFG);
+}
+
+// ---------- range x time ----------
+function renderMap() {
+  const el = $("#pmap");
+  const x = xAxisM();
+  const y = D.timestamps_ms;
+  const vel = viewMap === "velocity_mps";
+  const traces = [{
+    type: "heatmap", x, y, z: D.maps[viewMap], colorscale: vel ? "RdBu" : "Inferno", zmid: vel ? 0 : undefined,
+    colorbar: { title: { text: vel ? "m/s" : "dB" }, thickness: 12 }, hoverongaps: false,
+    hovertemplate: `range %{x:.3f} m (bin %{customdata})<br>t %{y:.1f} ms<br>%{z:.1f} ${vel ? "m/s" : "dB"}<extra></extra>`,
+    customdata: y.map(() => x.map((_, i) => D.maps.bin0 + i)),
+  }];
+  const F = fw(), P = py();
+  if (F) {
+    const wx = [], wy = [];
+    F.frames.forEach((fr) => { if (fr.count > 0) { wx.push(binM(fr.first_bin), binM(fr.first_bin + fr.count - 1), null); wy.push(T(fr.frame), T(fr.frame), null); } });
+    traces.push({ type: "scatter", mode: "lines", name: "C watch region", x: wx, y: wy, line: { color: "rgba(255,255,255,.35)", width: 2 }, hoverinfo: "skip" });
+    const tx = [], ty = [], tt = [];
+    F.frames.forEach((fr) => fr.targets.forEach((t) => { tx.push(binM(t.range_bin)); ty.push(T(fr.frame)); tt.push(`snr ${t.snr.toFixed(1)} · v ${t.doppler_mps.toFixed(1)} m/s · coh ${t.coherence.toFixed(2)}`); }));
+    traces.push({ type: "scatter", mode: "markers", name: "targets", x: tx, y: ty, text: tt, marker: { symbol: "circle-open", size: 8, color: C.target },
+      hovertemplate: "target %{x:.3f} m<br>%{text}<extra></extra>" });
+    const pl = (list, name, color) => ({ type: "scatter", mode: "lines+markers", name, x: list.map((p) => binM(p.range_bin)), y: list.map((p) => p.timestamp_us / 1000),
+      marker: { size: 7, color }, line: { color, width: 2 }, hovertemplate: `${name} %{x:.3f} m @ %{y:.1f} ms<extra></extra>` });
+    if (F.points.length) traces.push(pl(F.points, "club track", C.club));
+    if (F.ball_points.length) traces.push(pl(F.ball_points, "ball track", C.ball));
+  }
+  if (P) {
+    const px = [], pyy = [];
+    P.observations.forEach((o) => { if (o.have_peak && o.phase !== "fired") { px.push(binM(D.maps.starts[o.frame] + o.peak_bin)); pyy.push(T(o.frame)); } });
+    traces.push({ type: "scatter", mode: "markers", name: "host approach peak", x: px, y: pyy, marker: { symbol: "x-thin", size: 9, line: { width: 2, color: C.py } },
+      hovertemplate: "host approach peak %{x:.3f} m<extra></extra>" });
+  }
+  const shapes = [];
+  const vline = (b, color, dash) => shapes.push({ type: "line", xref: "x", yref: "paper", x0: binM(b), x1: binM(b), y0: 0, y1: 1, line: { color, width: 1.5, dash } });
+  vline(D.tee_bin, "#ffffff", "dash");
+  if (F && F.config.dest_bin != null) vline(F.config.dest_bin, C.ball, "dash");
+  if (P && P.tee_bin !== D.tee_bin) vline(P.tee_bin, C.py, "dot");
+  events().forEach((e) => shapes.push({ type: "line", xref: "paper", yref: "y", x0: 0, x1: 1, y0: T(e.f), y1: T(e.f), line: { color: e.color, width: 2, dash: e.dash } }));
+  base.pmap = shapes;
+  Plotly.react(el, traces, layout({ xaxis: axis("range (m)"), yaxis: axis("time (ms)"), shapes, margin: { l: 55, r: 10, t: 10, b: 40 } }), PLOT_CFG);
+  if (!el._click) { el._click = true; el.on("plotly_click", (ev) => setFrame(frameAt(ev.points[0].y))); }
+}
+
+// ---------- timeline ----------
+function renderTimeline() {
+  const el = $("#ptime");
+  const F = fw(), P = py();
+  const traces = [];
+  if (F) {
+    const fr = F.frames;
+    traces.push({ type: "scatter", mode: "lines+markers", name: `C watched ${F.config.stat} (max)`, x: fr.map((f) => T(f.frame)),
+      y: F.watched_peak.map((w) => (w ? db(w.stat) : null)), line: { color: C.gate, width: 2 }, marker: { size: 5 },
+      text: F.watched_peak.map((w) => (w ? `bin ${w.bin}` : "window missed")), hovertemplate: "%{y:.1f} dB · %{text}<extra>C watched</extra>" });
+    traces.push({ type: "scatter", mode: "lines", name: `C threshold (snr ${F.config.snr} × floor)`, x: fr.map((f) => T(f.frame)),
+      y: fr.map((f) => db(f.floor * F.config.snr)), line: { color: C.gate, width: 1.5, dash: "dash" }, hovertemplate: "%{y:.1f} dB<extra>C threshold</extra>" });
+    traces.push({ type: "scatter", mode: "lines", name: "C floor", x: fr.map((f) => T(f.frame)), y: fr.map((f) => db(f.floor)),
+      line: { color: C.gate, width: 1, dash: "dot" }, opacity: 0.6, hovertemplate: "%{y:.1f} dB<extra>C floor</extra>" });
+  }
+  if (P) {
+    const ob = P.observations;
+    traces.push({ type: "scatter", mode: "lines+markers", name: "host tee loop-0", x: ob.map((o) => T(o.frame)), y: ob.map((o) => db(o.tee)),
+      line: { color: C.py, width: 2 }, marker: { size: 5 }, text: ob.map((o) => o.phase), hovertemplate: "%{y:.1f} dB · %{text}<extra>host tee</extra>" });
+    traces.push({ type: "scatter", mode: "lines+markers", name: "host approach/departure", x: ob.map((o) => T(o.frame)), y: ob.map((o) => db(o.approach)),
+      line: { color: "#74c0fc", width: 1.5 }, marker: { size: 4, symbol: "triangle-up" }, hovertemplate: "%{y:.1f} dB<extra>host approach</extra>" });
+    traces.push({ type: "scatter", mode: "lines", name: `host level ${P.level}`, x: [T(0), T(D.n_frames - 1)], y: [db(P.level), db(P.level)],
+      line: { color: C.py, width: 1.5, dash: "dash" }, hoverinfo: "name" });
+  }
+  const shapes = events().map((e) => ({ type: "line", xref: "x", yref: "paper", x0: T(e.f), x1: T(e.f), y0: 0, y1: 1, line: { color: e.color, width: 2, dash: e.dash } }));
+  const annotations = events().map((e, i) => ({ x: T(e.f), y: 1, yref: "paper", yanchor: "bottom", text: e.name, showarrow: false, font: { color: e.color, size: 10 }, yshift: (i % 2) * 11 }));
+  base.ptime = shapes;
+  Plotly.react(el, traces, layout({ xaxis: axis("time (ms)"), yaxis: axis("dB"), shapes, annotations, margin: { l: 55, r: 15, t: 26, b: 40 }, legend: { orientation: "h", y: -0.28 } }), PLOT_CFG);
+  if (!el._click) { el._click = true; el.on("plotly_click", (ev) => setFrame(frameAt(ev.points[0].x))); }
+}
+
+// ---------- state lanes ----------
+const STATE_COLORS = {
+  idle: "#3b4452", tracking: "#1c7ed6", fired: C.gate, ready: "#3b4452", waiting_for_ball: "#3b4452",
+  none: "#2a323d", acquired: "#2f9e44", associated: C.club, coasted: "#e8590c", dropped: "#c92a2a",
+  "tee-low": "#3b4452", occupying: "#5c7cfa", watching: "#1971c2", "no-approach": "#495057", toward: "#0ca678", away: "#f08c00",
+  "bin-outside": "#6c3483", impact: C.freeze, solve: C.geo,
+};
+function stateColor(s) {
+  if (STATE_COLORS[s]) return STATE_COLORS[s];
+  let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) % 360;
+  return `hsl(${h},45%,45%)`;
+}
+function renderLanes() {
+  const el = $("#plane");
+  const F = fw(), P = py();
+  const lanes = [];
+  if (F) {
+    lanes.push(["C trigger", F.frames.map((f) => [f.frame, f.fired ? "fired" : f.trig_state])]);
+    lanes.push(["club track", F.frames.map((f) => [f.frame, f.track_why])]);
+    lanes.push(["shot", F.frames.map((f) => [f.frame, f.shot_state])]);
+    lanes.push(["ball track", F.frames.map((f) => [f.frame, f.ball_why])]);
+    if (F.frames.some((f) => f.retain)) lanes.push(["retain", F.frames.map((f) => [f.frame, f.retain ? f.retain.why : "none"])]);
+  }
+  if (P) lanes.push(["host phase", P.observations.map((o) => [o.frame, o.phase])]);
+  const dt = D.n_frames > 1 ? (T(D.n_frames - 1) - T(0)) / (D.n_frames - 1) : 1;
+  const bars = {};
+  lanes.forEach(([lane, seq]) => {
+    let i = 0;
+    while (i < seq.length) {
+      let j = i; while (j + 1 < seq.length && seq[j + 1][1] === seq[i][1] && seq[j + 1][0] === seq[j][0] + 1) j++;
+      const s = seq[i][1], f0 = seq[i][0], f1 = seq[j][0];
+      const t0 = T(f0) - dt / 2, t1 = (f1 + 1 < D.n_frames ? T(f1 + 1) : T(f1) + dt) - dt / 2;
+      (bars[s] = bars[s] || { x: [], base: [], y: [], text: [] });
+      bars[s].x.push(t1 - t0); bars[s].base.push(t0); bars[s].y.push(lane); bars[s].text.push(`${s} · frames ${f0}–${f1}`);
+      i = j + 1;
+    }
+  });
+  const traces = Object.entries(bars).map(([s, b]) => ({
+    type: "bar", orientation: "h", name: s, x: b.x, base: b.base, y: b.y, text: b.x.map(() => s), hovertext: b.text,
+    textposition: "inside", insidetextanchor: "middle", textfont: { size: 10, color: "#fff" }, hovertemplate: "%{hovertext}<extra></extra>",
+    marker: { color: stateColor(s), line: { color: C.bg, width: 1 } }, showlegend: false,
+  }));
+  const shapes = events().map((e) => ({ type: "line", xref: "x", yref: "paper", x0: T(e.f), x1: T(e.f), y0: 0, y1: 1, line: { color: e.color, width: 2, dash: e.dash } }));
+  base.plane = shapes;
+  Plotly.react(el, traces, layout({ barmode: "overlay", xaxis: axis("time (ms)", { range: [T(0) - dt / 2, T(D.n_frames - 1) + dt / 2] }),
+    yaxis: { autorange: "reversed", gridcolor: C.line, categoryorder: "array", categoryarray: lanes.map((l) => l[0]) }, shapes, margin: { l: 80, r: 15, t: 5, b: 35 } }), PLOT_CFG);
+  if (!el._click) { el._click = true; el.on("plotly_click", (ev) => setFrame(frameAt(ev.points[0].base + ev.points[0].x / 2))); }
+}
+
+// ---------- frame inspector ----------
+function setFrame(f) {
+  frame = Math.max(0, Math.min(D.n_frames - 1, f));
+  $("#slider").value = frame;
+  $("#frameLabel").textContent = `frame ${frame} · ${fmt(T(frame))} ms`;
+  const t = T(frame);
+  const vcur = { type: "line", xref: "x", yref: "paper", x0: t, x1: t, y0: 0, y1: 1, line: { color: "#ffffff", width: 1 } };
+  Plotly.relayout($("#ptime"), { shapes: base.ptime.concat([vcur]) });
+  Plotly.relayout($("#plane"), { shapes: base.plane.concat([vcur]) });
+  Plotly.relayout($("#pmap"), { shapes: base.pmap.concat([{ type: "line", xref: "paper", yref: "y", x0: 0, x1: 1, y0: t, y1: t, line: { color: "#ffffff", width: 1 } }]) });
+  const p3 = $("#p3d");
+  if (view3d !== "traj" && p3.data) {
+    const i = p3.data.findIndex((d) => d.name === "frame");
+    if (i >= 0) Plotly.restyle(p3, { y: [[t, t]] }, [i]);
+  }
+  renderProfile(); renderRangeDoppler(); renderDetails();
+}
+
+function renderProfile() {
+  const el = $("#pprof");
+  const x = xAxisM();
+  const F = fw(), P = py(), fr = fwFrame(frame);
+  const traces = [
+    { type: "scatter", mode: "lines", name: "MTI energy", x, y: D.maps.mti_db[frame], line: { color: "#f76707", width: 2 }, connectgaps: false },
+    { type: "scatter", mode: "lines", name: "static", x, y: D.maps.static_db[frame], line: { color: "#868e96", width: 1.5 }, connectgaps: false },
+  ];
+  const loop0 = pyLoop0Global(frame);
+  if (loop0) traces.push({ type: "scatter", mode: "lines", name: "host loop-0", x, y: loop0, line: { color: C.py, width: 1.5 }, connectgaps: false });
+  const shapes = [{ type: "line", xref: "x", yref: "paper", x0: binM(D.tee_bin), x1: binM(D.tee_bin), y0: 0, y1: 1, line: { color: "#ffffff", dash: "dash", width: 1 } }];
+  if (fr && fr.count > 0) {
+    shapes.push({ type: "rect", xref: "x", yref: "paper", x0: binM(fr.first_bin - 0.5), x1: binM(fr.first_bin + fr.count - 0.5), y0: 0, y1: 1, fillcolor: "rgba(255,255,255,.06)", line: { width: 0 } });
+    const thr = db(fr.floor * F.config.snr);
+    traces.push({ type: "scatter", mode: "lines", name: `C threshold`, x: [binM(fr.first_bin), binM(fr.first_bin + fr.count - 1)], y: [thr, thr], line: { color: C.gate, dash: "dash", width: 1.5 } });
+    if (fr.targets.length) traces.push({ type: "scatter", mode: "markers", name: "targets", x: fr.targets.map((t) => binM(t.range_bin)),
+      y: fr.targets.map((t) => D.maps.mti_db[frame][col(t.peak_bin)]), marker: { symbol: "circle-open", size: 11, color: C.target, line: { width: 2 } },
+      text: fr.targets.map((t) => `snr ${t.snr.toFixed(1)} v ${t.doppler_mps.toFixed(1)} coh ${t.coherence.toFixed(2)}`), hovertemplate: "%{text}<extra>target</extra>" });
+    const mark = (bin, name, color) => bin != null && traces.push({ type: "scatter", mode: "markers", name, x: [binM(bin)], y: [D.maps.mti_db[frame][col(bin)]], marker: { size: 12, color, symbol: "diamond" } });
+    mark(fr.track_bin, "club point", C.club); mark(fr.ball_bin, "ball point", C.ball);
+  }
+  if (P) {
+    const lv = db(P.level);
+    traces.push({ type: "scatter", mode: "lines", name: "host level", x: [binM(P.tee_bin - P.approach_bins), binM(P.tee_bin + P.approach_bins)], y: [lv, lv], line: { color: C.py, dash: "dot", width: 1.5 } });
+  }
+  Plotly.react(el, traces, layout({ xaxis: axis("range (m)", { range: [binM(D.maps.starts[frame] - 1), binM(D.maps.starts[frame] + D.maps.counts[frame])] }),
+    yaxis: axis("dB"), shapes, legend: { orientation: "h", y: -0.25 } }), PLOT_CFG);
+}
+
+function renderRangeDoppler() {
+  const el = $("#prd");
+  const m = D.maps.range_doppler_db[frame]; // [local][dop]
+  const s = D.maps.starts[frame];
+  const x = m.map((_, i) => binM(s + i));
+  const y = D.maps.doppler_axis_mps;
+  const z = y.map((_, d) => m.map((row) => row[d]));
+  const traces = [{ type: "heatmap", x, y, z, colorscale: "Viridis", colorbar: { title: { text: "dB" }, thickness: 10 },
+    hovertemplate: "%{x:.3f} m · %{y:.2f} m/s<br>%{z:.1f} dB<extra></extra>" }];
+  const fr = fwFrame(frame);
+  if (fr && fr.targets.length) traces.push({ type: "scatter", mode: "markers", name: "targets (lag-1 v)", x: fr.targets.map((t) => binM(t.range_bin)), y: fr.targets.map((t) => t.doppler_mps),
+    marker: { symbol: "circle-open", size: 11, color: "#fff", line: { width: 2 } } });
+  Plotly.react(el, traces, layout({ xaxis: axis("range (m)"), yaxis: axis(`aliased radial v (m/s, ±${fmt(D.maps.velocity_span_mps)})`), showlegend: false, margin: { l: 60, r: 10, t: 10, b: 40 } }), PLOT_CFG);
+}
+
+function renderDetails() {
+  const fr = fwFrame(frame), P = py();
+  const o = P ? P.observations.find((x) => x.frame === frame) : null;
+  const rows = [];
+  rows.push(["window", `bins ${D.maps.starts[frame]}–${D.maps.starts[frame] + D.maps.counts[frame] - 1} (${D.maps.counts[frame]})`]);
+  if (fr) {
+    rows.push(["C trigger", `${fr.trig_state}${fr.fired ? " · FIRED" : ""} · watch ${fr.count ? `${fr.first_bin}–${fr.first_bin + fr.count - 1}` : "missed"} · floor ${fmt(db(fr.floor))} dB`]);
+    rows.push(["club / shot", `${fr.track_why}${fr.track_bin != null ? ` @ bin ${fmt(fr.track_bin, 2)}` : ""} · shot ${fr.shot_state} · impact ${fr.impact_why}`]);
+    rows.push(["ball", `${fr.ball_why}${fr.ball_bin != null ? ` @ bin ${fmt(fr.ball_bin, 2)}` : ""}`]);
+    if (fr.angle) rows.push(["angles", `az ${fmt(fr.angle.azimuth_deg)}° el ${fmt(fr.angle.elevation_deg)}° · conf ${fmt(fr.angle.confidence, 2)} · peak ratio ${fmt(fr.angle.elevation_peak_ratio)}`]);
+    if (fr.delivery) rows.push(["delivery", `${fmt(fr.delivery.speed_mps)} m/s (radial ${fmt(fr.delivery.radial_speed_mps)}) path ${fmt(fr.delivery.path_deg)}° aoa ${fmt(fr.delivery.attack_deg)}° · ${fr.delivery.points} pts`]);
+    if (fr.retain) rows.push(["retain", `${fr.retain.why} [${fr.retain.start}, ${fr.retain.start + fr.retain.bins}) ${fr.retain.priority}${fr.retain.covered === false ? " · MISSED point" : ""}`]);
+  } else if (D.firmware.ok) rows.push(["C trigger", "not replayed (stopped at fire)"]);
+  if (o) rows.push(["host", `${o.phase} · tee ${fmt(db(o.tee))} dB · approach ${fmt(db(o.approach))} dB · peak bin ${o.have_peak ? D.maps.starts[frame] + o.peak_bin : "–"}`]);
+  let html = `<table>${rows.map(([k, v]) => `<tr><th style="width:110px">${k}</th><td>${v}</td></tr>`).join("")}</table>`;
+  if (fr && fr.targets.length) {
+    html += `<table style="margin-top:6px"><tr><th>target</th><th>range bin</th><th>range m</th><th>snr</th><th>v (m/s)</th><th>coherence</th><th>confidence</th></tr>` +
+      fr.targets.map((t, i) => `<tr><td>${i}</td><td>${fmt(t.range_bin, 2)}</td><td>${fmt(binM(t.range_bin), 3)}</td><td>${fmt(t.snr)}</td><td>${fmt(t.doppler_mps, 2)}</td><td>${fmt(t.coherence, 2)}</td><td>${fmt(t.confidence, 2)}</td></tr>`).join("") + `</table>`;
+  }
+  $("#frameDetails").innerHTML = html;
+}
+
+// ---------- wiring ----------
+$("#filter").oninput = renderFiles;
+$("#run").onclick = () => run(false);
+$("#reset").onclick = () => { resetForm(); if (ctx && !upload) applyDefaults(ctx.defaults); run(false); };
+$("#useFreeze").onclick = () => { if (D && D.freeze_frame != null) { $("#post_from_frame").value = D.freeze_frame; run(false); } };
+OPTS.forEach((k) => $("#" + k).addEventListener("change", () => { if ($("#auto").checked) run(false); }));
+$("#slider").oninput = (e) => setFrame(+e.target.value);
+$("#prev").onclick = () => setFrame(frame - 1);
+$("#next").onclick = () => setFrame(frame + 1);
+$("#play").onclick = () => {
+  if (playing) { clearInterval(playing); playing = null; $("#play").textContent = "▶ play"; return; }
+  $("#play").textContent = "❚❚ pause";
+  playing = setInterval(() => setFrame(frame + 1 >= D.n_frames ? 0 : frame + 1), 350);
+};
+document.addEventListener("keydown", (e) => {
+  if (!D || ["INPUT", "SELECT"].includes(document.activeElement.tagName)) return;
+  if (e.key === "ArrowLeft") setFrame(frame - 1);
+  if (e.key === "ArrowRight") setFrame(frame + 1);
+});
+document.querySelectorAll("#tabs3d button").forEach((b) => (b.onclick = () => {
+  document.querySelectorAll("#tabs3d button").forEach((x) => x.classList.toggle("on", x === b));
+  view3d = b.dataset.v; Plotly.purge($("#p3d")); render3d();
+}));
+document.querySelectorAll("#tabsMap button").forEach((b) => (b.onclick = () => {
+  document.querySelectorAll("#tabsMap button").forEach((x) => x.classList.toggle("on", x === b));
+  viewMap = b.dataset.v; renderMap(); setFrame(frame);
+}));
+const drop = $("#drop");
+drop.onclick = () => $("#pick").click();
+$("#pick").onchange = (e) => useUpload(e.target.files[0]);
+drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
+drop.ondragleave = () => drop.classList.remove("over");
+drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("over"); useUpload(e.dataTransfer.files[0]); };
+function useUpload(file) {
+  if (!file) return;
+  upload = file; current = null; ctx = null; renderFiles(); resetForm();
+  history.replaceState(null, "", "#");
+  run(true);
+}
+loadFiles();
+</script>
+</body>
+</html>

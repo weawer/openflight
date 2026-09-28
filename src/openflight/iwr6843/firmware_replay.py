@@ -52,15 +52,14 @@ def vertical_tx_indices(n_tx: int) -> tuple[int, ...]:
     return tuple(tx for tx in range(n_tx) if not (n_tx == 3 and tx == 1))
 
 
-def bin_observations(
+def bin_observation_table(
     cube: np.ndarray, frame: int, first_local: int, count: int, n_tx: int
-) -> ctypes.Array:
+) -> np.ndarray:
     """``l3_verticalResidual`` for ``count`` bins from local bin ``first_local``.
 
     ``cube`` is a parsed dump, ``[frames, chirps, rx, bins]`` with chirp c
-    from transmitter ``c % n_tx`` of loop ``c // n_tx``. Returns a ctypes
-    array of ``count`` :class:`BinObs`, ready for ``l3_trig_update`` and
-    ``l3_obs_extract``.
+    from transmitter ``c % n_tx`` of loop ``c // n_tx``. Returns a structured
+    array with fields energy, peak, loop0, r1Re and r1Im, one row per bin.
     """
     chirps = cube.shape[1]
     if chirps % n_tx:
@@ -80,6 +79,15 @@ def bin_observations(
     table["loop0"] = loop_power[0]
     table["r1Re"] = np.real(lag1)
     table["r1Im"] = np.imag(lag1)
+    return table
+
+
+def bin_observations(
+    cube: np.ndarray, frame: int, first_local: int, count: int, n_tx: int
+) -> ctypes.Array:
+    """:func:`bin_observation_table` as a ctypes array of ``count`` :class:`BinObs`,
+    ready for ``l3_trig_update`` and ``l3_obs_extract``."""
+    table = bin_observation_table(cube, frame, first_local, count, n_tx)
     return (fw.BinObs * count).from_buffer_copy(table.tobytes())
 
 
@@ -334,6 +342,9 @@ class PointSummary:
     range_m: float
     doppler_mps: float
     confidence: float
+    # l3_track_point_t.position: the point in the calibrated radar frame, metres.
+    position: tuple[float, float, float] | None = None
+    angles_valid: bool = False
 
 
 @dataclass
@@ -530,6 +541,8 @@ def _point_summary(point: fw.TrackPoint) -> PointSummary:
         range_m=float(point.rangeM),
         doppler_mps=float(point.dopplerAliasMps),
         confidence=float(point.confidence),
+        position=(float(point.position.x), float(point.position.y), float(point.position.z)),
+        angles_valid=bool(point.anglesValid),
     )
 
 
@@ -725,6 +738,7 @@ def replay_dump(
     retain_cfg = _retain_cfg(lib, config.retain) if config.retain is not None else None
     retain_windows: dict[int, fw.RetainWindow] = {}
     post_index = 0
+    club_at_impact: tuple[float, float, float] | None = None
     for frame in range(int(meta["n_frames"])):
         ended = fired_frame is not None or (config.impact_armed and geometric_frame is not None)
         forced = config.post_from_frame is not None and frame >= config.post_from_frame
@@ -790,7 +804,11 @@ def replay_dump(
             forced_in.club = ctypes.pointer(track)
             lib.l3_shot_update(ctypes.byref(shot), ctypes.byref(forced_in), frame)
         if (ended or forced) and config.post_impact:
-            # The board's post movie: the ball tracker, not the trigger.
+            # The board's post movie: the ball tracker, not the trigger, with
+            # the club track carried on beside it. The club's speed is its
+            # approach's, read before the follow-through joins the track.
+            if club_at_impact is None:
+                club_at_impact = _club_fit(lib, track)
             frames.append(
                 _replay_post_frame(
                     lib,
@@ -811,7 +829,8 @@ def replay_dump(
                     ball_position,
                     ball_points,
                     fw.TRIG_STATE_NAMES[trig.state],
-                    fw.TRACK_WHY_NAMES[track.why],
+                    track,
+                    points,
                 )
             )
             continue
@@ -947,11 +966,7 @@ def replay_dump(
 
     if retain_cfg is not None:
         frames = _attach_retention(frames, retain_windows)
-    slope = ctypes.c_float()
-    residual = ctypes.c_float()
-    used = lib.l3_track_fit(
-        ctypes.byref(track), fw.TRACK_POINTS, ctypes.byref(slope), ctypes.byref(residual)
-    )
+    club_speed, club_slope, club_residual = club_at_impact or _club_fit(lib, track)
     return ReplayResult(
         config=config,
         frames=frames,
@@ -968,9 +983,9 @@ def replay_dump(
         ball_status=fw.c_text(lib.l3_ball_track_format_status, ctypes.byref(ball_track), cap=240),
         track_counters={name: int(track.counters[i]) for i, name in enumerate(fw.TRACK_WHY_NAMES)},
         trig_counters={name: int(trig.counters[i]) for i, name in enumerate(_TRIG_COUNTERS)},
-        speed_mps=float(lib.l3_track_speed_mps(ctypes.byref(track), fw.TRACK_POINTS)),
-        fit_slope_bins_per_s=float(slope.value) if used else 0.0,
-        fit_residual_bins=float(residual.value) if used else 0.0,
+        speed_mps=club_speed,
+        fit_slope_bins_per_s=club_slope,
+        fit_residual_bins=club_residual,
         status=fw.c_text(lib.l3_track_format_status, ctypes.byref(track), destination),
         trigger_summary=fw.c_text(lib.l3_trig_format_summary, ctypes.byref(trig), cap=400),
         trig=trig,
@@ -978,6 +993,20 @@ def replay_dump(
         impact=impact,
         shot=shot,
         ball_track=ball_track,
+    )
+
+
+def _club_fit(lib, track: fw.ClubTrack) -> tuple[float, float, float]:
+    """The club track's (speed m/s, range-rate slope bins/s, fit residual bins)."""
+    slope = ctypes.c_float()
+    residual = ctypes.c_float()
+    used = lib.l3_track_fit(
+        ctypes.byref(track), fw.TRACK_POINTS, ctypes.byref(slope), ctypes.byref(residual)
+    )
+    return (
+        float(lib.l3_track_speed_mps(ctypes.byref(track), fw.TRACK_POINTS)),
+        float(slope.value) if used else 0.0,
+        float(residual.value) if used else 0.0,
     )
 
 
@@ -1000,11 +1029,14 @@ def _replay_post_frame(  # pylint: disable=too-many-arguments,too-many-locals
     ball_position,
     ball_points,
     trig_state,
-    track_why,
+    track,
+    points,
 ) -> ReplayFrame:
     """``l3_considerBallTrack``: the whole window as targets against the post
-    window's own floor into the ball tracker, angles for the appended point,
-    the launch fit and the shot machine's post-impact transitions."""
+    window's own floor; the club track followed through them (the stronger of
+    the two tracks after impact) and the ball tracker beside it, angles for
+    the ball point, the launch fit and the shot machine's post-impact
+    transitions."""
     count = min(window_bins, fw.TRIG_MAX_BINS)
     obs = bin_observations(cube, frame, 0, count, n_tx)
     ball_params = fw.ObsParams(params.stat, ball_track.cfg.snr, params.loopPeriodS, params.subBin)
@@ -1021,6 +1053,12 @@ def _replay_post_frame(  # pylint: disable=too-many-arguments,too-many-locals
         targets,
         fw.OBS_MAX_TARGETS,
     )
+    track_bin = None
+    if lib.l3_track_follow(ctypes.byref(track), targets, found, frame, timestamp_us):
+        newest = fw.TrackPoint()
+        lib.l3_track_point(ctypes.byref(track), track.count - 1, ctypes.byref(newest))
+        points.append(_point_summary(newest))
+        track_bin = float(newest.rangeBin)
     appended = lib.l3_ball_track_update(
         ctypes.byref(ball_track), targets, found, frame, timestamp_us
     )
@@ -1074,8 +1112,8 @@ def _replay_post_frame(  # pylint: disable=too-many-arguments,too-many-locals
         trig_state,
         False,
         tuple(_target_summary(targets[i]) for i in range(found)),
-        track_why,
-        None,
+        fw.TRACK_WHY_NAMES[track.why],
+        track_bin,
         angle,
         None,
         "none",
@@ -1105,7 +1143,10 @@ class Expectation:
     range gate), ``geometric_frame`` [lo, hi], ``club_points_min``,
     ``club_direction`` ("approaching"), ``acquisitions_max``,
     ``ball_origin_bin`` [lo, hi] (the first ball point), ``ball_speed_mps``
-    [lo, hi], ``club_speed_mps`` [lo, hi], ``fires`` (true/false).
+    [lo, hi], ``club_speed_mps`` [lo, hi], ``fires`` (true/false),
+    ``club_last_bin`` [lo, hi] (the club track's last point at or before the
+    gate fired: short of the ball when the club, not a return beside the
+    ball, was tracked).
     """
 
     impact_frame: tuple[int, int] | None = None
@@ -1117,6 +1158,7 @@ class Expectation:
     ball_speed_mps: tuple[float, float] | None = None
     club_speed_mps: tuple[float, float] | None = None
     fires: bool | None = None
+    club_last_bin: tuple[float, float] | None = None
 
     @classmethod
     def from_manifest(cls, raw: dict) -> Expectation:
@@ -1131,6 +1173,7 @@ class Expectation:
             "ball_origin_bin",
             "ball_speed_mps",
             "club_speed_mps",
+            "club_last_bin",
         ):
             if key in values:
                 lo, hi = values[key]
@@ -1161,6 +1204,13 @@ class Expectation:
             )
         if self.acquisitions_max is not None and result.acquisitions > self.acquisitions_max:
             failures.append(f"acquisitions: {result.acquisitions} > {self.acquisitions_max}")
+        if self.club_last_bin is not None:
+            held = [
+                p
+                for p in result.points
+                if result.fired_frame is None or p.frame <= result.fired_frame
+            ]
+            in_range("club_last_bin", held[-1].range_bin if held else None, self.club_last_bin)
         first_ball = result.ball_points[0].range_bin if result.ball_points else None
         in_range("ball_origin_bin", first_ball, self.ball_origin_bin)
         in_range(
@@ -1351,6 +1401,7 @@ __all__ = [
     "RetainReplay",
     "RetainSummary",
     "TargetSummary",
+    "bin_observation_table",
     "bin_observations",
     "channel_snapshot",
     "format_report",

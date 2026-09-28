@@ -25,6 +25,7 @@ from openflight.iwr6843.firmware_replay import (
     RECORDINGS_DIR,
     ReplayConfig,
     RetainReplay,
+    bin_observation_table,
     bin_observations,
     channel_snapshot,
     format_report,
@@ -97,6 +98,15 @@ def test_bin_observations_match_a_line_by_line_port_of_the_firmware(n_tx):
         got = (obs[i].energy, obs[i].peak, obs[i].loop0, obs[i].r1Re, obs[i].r1Im)
         for name, e, g in zip(("energy", "peak", "loop0", "r1Re", "r1Im"), expected, got):
             assert g == pytest.approx(e, rel=1e-5, abs=1e-2), (i, name)
+
+
+def test_the_observation_table_is_the_ctypes_array_as_numpy():
+    cube = _random_cube(3, 3)
+    table = bin_observation_table(cube, 1, 2, 7, 3)
+    obs = bin_observations(cube, 1, 2, 7, 3)
+    assert table.shape == (7,)
+    assert table.tobytes() == bytes(obs)
+    assert set(table.dtype.names) == {"energy", "peak", "loop0", "r1Re", "r1Im"}
 
 
 def test_three_tx_loops_skip_the_azimuth_element_and_fewer_use_every_transmitter():
@@ -457,17 +467,31 @@ def test_the_shot_machine_walks_the_whole_sequence_on_the_replay(lib, whole_shot
 
 
 def test_the_club_delivery_is_read_from_the_pre_impact_frames_alone(lib, whole_shot):
-    """After the gate fires the club track stops (post frames feed the ball
-    tracker), so the delivery rests on the five angled approach points. The
-    synth's one-spike-per-loop club quantises the sub-bin centroid, which
-    with fewer points leaves about a metre per second of bias."""
+    """The delivery is read at impact and rests on the five angled approach
+    points; the club track carries on past impact beside the ball's (it only
+    follows then), but those points never reach the delivery. The synth's
+    one-spike-per-loop club quantises the sub-bin centroid, which with fewer
+    points leaves about a metre per second of bias."""
     result = replay_dump(whole_shot, ReplayConfig(tee_bin=TEE_BIN), lib=lib)
     assert result.delivery is not None
     assert result.delivery.points == 5
-    assert len(result.points) == result.fired_frame + 1
+    approach = [p for p in result.points if p.frame <= result.fired_frame]
+    assert len(approach) == result.fired_frame + 1
     assert result.delivery.path_deg == pytest.approx(3.0, abs=1.0)
     assert result.delivery.speed_mps == pytest.approx(CLUB_SPEED_MS, abs=1.5)
     assert result.delivery.attack_deg == pytest.approx(0.0, abs=0.3)
+
+
+def test_points_carry_their_golf_frame_position(lib, whole_shot):
+    """PointSummary.position is l3_track_point_t.position: with an identity
+    calibration its length is the point's range."""
+    result = replay_dump(whole_shot, ReplayConfig(tee_bin=TEE_BIN), lib=lib)
+    points = result.points + result.ball_points
+    assert points and any(point.angles_valid for point in points)
+    for point in points:
+        assert point.position is not None
+        assert math.dist((0.0, 0.0, 0.0), point.position) == pytest.approx(point.range_m, rel=1e-3)
+        assert point.position[0] > 0  # downrange of the radar
 
 
 def test_post_impact_can_be_disabled_to_keep_scoring_the_trigger(lib, whole_shot):

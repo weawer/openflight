@@ -69,5 +69,28 @@
         45
       ]
     }
+  },
+  "iwr6843_20260927_144341_257_013.l3dump": {
+    "tee_bin": 41,
+    "dest_bin": null,
+    "post_from_frame": null,
+    "pitch_deg": 10.4,
+    "notes": "2026-09-27 range session, adaptive 36f2ms IQ16, sound-triggered, triggerCfg 41 6.0 2 (ball actually at ~bin 46). A hand/body return beside the ball reads +3..6 m/s and was acquired on frame 2 while the club (bins 29 -> 40 at ~1.1 bins/frame) was short of the watch region; before the club track's stale-track release it held the track at 43-44 until the gate fired.",
+    "expect": {
+      "fires": true,
+      "impact_frame": [
+        12,
+        14
+      ],
+      "club_last_bin": [
+        37.0,
+        41.0
+      ],
+      "club_points_min": 8,
+      "club_speed_mps": [
+        22,
+        40
+      ]
+    }
   }
 }

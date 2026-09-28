@@ -3592,6 +3592,12 @@ static void l3_considerBallTrack(uint32_t slot)
     l3_obs_floor_update(&gBallFloor, gTrigCfg.stat, obs, count, L3_TRIG_FLOOR_SHIFT);
     found = l3_obs_extract(&params, shotFrame, gPostTimestampUs, frame.binStart, obs, count,
                            gBallFloor, targets, L3_OBS_MAX_TARGETS);
+    /* After impact two tracks are visible: the club carries on (followed by
+     * association only, the stronger return) beside the departing ball.
+     * gDelivery was read at impact and stays the approach's. The ball tracker
+     * does not use the club's claim yet: on the 2026-09-27 captures that lost
+     * more balls than it saved. */
+    (void)l3_track_follow(&gClubTrack, targets, found, shotFrame, gPostTimestampUs);
     if (l3_ball_track_update(&gBallTrack, targets, found, shotFrame, gPostTimestampUs) &&
         gBallTrack.lastTargetIndex < found && gBallTrack.core.count > 1U &&
         l3_track_point(&gBallTrack.core, gBallTrack.core.count - 1U, &newest)) {

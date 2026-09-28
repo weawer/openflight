@@ -18,8 +18,10 @@ from __future__ import annotations
 
 import ctypes
 import hashlib
+import importlib.util
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -173,7 +175,7 @@ PROFILE_STAGE_NAMES = (
 # l3_club_track.h
 TRACK_POINTS = 32
 TRACK_NO_TARGET = 0xFFFFFFFF
-TRACK_WHY_NAMES = ("none", "acquired", "associated", "coasted", "dropped", "idle")
+TRACK_WHY_NAMES = ("none", "acquired", "associated", "coasted", "dropped", "idle", "released")
 
 
 class BinObs(ctypes.Structure):
@@ -388,6 +390,8 @@ class TrackCfg(ctypes.Structure):
         ("cal", RadarCal),
         ("minAcquireDopplerMps", ctypes.c_float),
         ("maxAngleResidualM", ctypes.c_float),
+        ("ascendingOnly", ctypes.c_uint32),
+        ("maxSameBinPoints", ctypes.c_uint32),
     ]
 
 
@@ -451,6 +455,13 @@ class ClubTrack(ctypes.Structure):
         ("lastTargetIndex", ctypes.c_uint32),
         ("points", TrackPoint * TRACK_POINTS),
         ("counters", ctypes.c_uint32 * len(TRACK_WHY_NAMES)),
+        ("sameBin", ctypes.c_int32),
+        ("sameBinCount", ctypes.c_uint32),
+        ("following", ctypes.c_uint8),
+        ("followBinsPerFrame", ctypes.c_float),
+        ("releasedValid", ctypes.c_uint8),
+        ("releasedBin", ctypes.c_float),
+        ("releasedDopplerMps", ctypes.c_float),
     ]
 
 
@@ -866,6 +877,7 @@ _SIGNATURES: dict[str, tuple[list, object]] = {
     "l3_track_init": ([_P(ClubTrack), _P(TrackCfg)], None),
     "l3_track_reset": ([_P(ClubTrack)], None),
     "l3_track_update": ([_P(ClubTrack), _P(TargetObs), _U32, _U32, _U32], ctypes.c_int32),
+    "l3_track_follow": ([_P(ClubTrack), _P(TargetObs), _U32, _U32, _U32], ctypes.c_int32),
     "l3_track_set_angles": ([_P(ClubTrack), _F32, _F32, ctypes.c_uint8], ctypes.c_int32),
     "l3_track_point": ([_P(ClubTrack), _U32, _P(TrackPoint)], ctypes.c_int32),
     "l3_track_delivery": ([_P(ClubTrack), _U32, _P(Delivery)], _U32),
@@ -964,13 +976,31 @@ _SIGNATURES: dict[str, tuple[list, object]] = {
 }
 
 
-def host_compiler() -> str | None:
-    """The first host C compiler on PATH, or None."""
+def _ziglang_available() -> bool:
+    """True when the ``ziglang`` wheel (a bundled ``zig cc``) is installed."""
+    return importlib.util.find_spec("ziglang") is not None
+
+
+def host_compiler_command() -> list[str] | None:
+    """The command that runs a host C compiler, or None.
+
+    The first of cc, gcc or clang on PATH; failing those, ``zig cc`` from the
+    ``ziglang`` wheel, which is how a Windows checkout with no toolchain
+    builds the modules.
+    """
     for name in ("cc", "gcc", "clang"):
         found = shutil.which(name)
         if found:
-            return found
+            return [found]
+    if _ziglang_available():
+        return [sys.executable, "-m", "ziglang", "cc"]
     return None
+
+
+def host_compiler() -> str | None:
+    """The host C compiler command as display text, or None without one."""
+    command = host_compiler_command()
+    return None if command is None else " ".join(command)
 
 
 def _source_digest(sources: tuple[Path, ...]) -> str:
@@ -991,9 +1021,11 @@ def build_firmware_library(
     sources' digest, so repeated replays skip the compile. Raises RuntimeError
     without a compiler; the C compile's own errors propagate.
     """
-    compiler = host_compiler()
+    compiler = host_compiler_command()
     if compiler is None:
-        raise RuntimeError("no host C compiler (cc, gcc or clang) for the firmware modules")
+        raise RuntimeError(
+            "no host C compiler (cc, gcc, clang or the ziglang wheel) for the firmware modules"
+        )
     sources = tuple(firmware_dir / name for name in HOST_SOURCES)
     if out_dir is None:
         out_dir = Path(tempfile.gettempdir()) / f"openflight-l3-host-{_source_digest(sources)}"
@@ -1004,7 +1036,7 @@ def build_firmware_library(
         build = out_dir / "l3_host.build.so"
         subprocess.run(
             [
-                compiler,
+                *compiler,
                 "-std=c99",
                 "-Wall",
                 "-Wextra",
@@ -1116,4 +1148,5 @@ __all__ = [
     "build_firmware_library",
     "c_text",
     "host_compiler",
+    "host_compiler_command",
 ]

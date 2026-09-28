@@ -16,6 +16,10 @@ void l3_ball_track_cfg_defaults(l3_ball_track_cfg_t *cfg)
     l3_track_cfg_defaults(&cfg->core);
     cfg->core.gateBins = 6.0F;        /* a 70 m/s ball moves ~4.5 bins per 3 ms frame */
     cfg->core.maxMisses = 1U;
+    /* The club rules (ascending bins, at most two per bin) describe the
+     * approach; the ball tracker has its own departure tests. */
+    cfg->core.ascendingOnly = 0U;
+    cfg->core.maxSameBinPoints = 0U;
     cfg->minDepartureMps = 10.0F;     /* the slowest chip leaves faster than this */
     cfg->maxSpeedMps = 100.0F;
     cfg->originGateBins = 8.0F;       /* the first post frame is at most ~5 bins out */

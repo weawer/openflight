@@ -24,6 +24,18 @@
 #define L3_TRACK_NO_TARGET 0xFFFFFFFFU
 /* Fit points counted as "enough" for full confidence. */
 #define L3_TRACK_FULL_POINTS 8U
+/* After a release, acquisition skips a target that looks like the released
+ * return: inside its gate AND within this much aliased Doppler of it. A club
+ * sweeping through that range reads at a different Doppler and is taken. */
+#define L3_TRACK_RELEASE_DOPPLER_TOL_MPS 2.0F
+/* After impact the club stalls and its peak jitters: l3_track_follow looks
+ * this far behind the track's last point. */
+#define L3_TRACK_FOLLOW_RETREAT_BINS 1.0F
+/* ... and no further ahead than its impact speed allows, plus this: after
+ * impact the club only slows, and the ball leaves faster than the club arrived
+ * (smash factor > 1), so a return beyond is the ball's. Half a bin covers the
+ * sub-bin jitter of a club still at its impact speed. */
+#define L3_TRACK_FOLLOW_LEAD_BINS 0.5F
 
 typedef struct {
     uint32_t frame;
@@ -61,6 +73,15 @@ typedef struct {
      * delivery falls back to the radial speed and marks path and attack
      * invalid instead of reporting a precise-looking wrong direction. */
     float    maxAngleResidualM;
+    /* The clubhead approaches the ball: it moves into ascending bins.
+     * With ascendingOnly, association never takes a candidate whose rounded
+     * bin is below the track's last point's; with maxSameBinPoints (0
+     * disables), one more consecutive point than that in the same rounded bin
+     * says the track is not the club -- a hand or body beside the ball reads
+     * as a mover (it can alias to several m/s) and wins acquisition, but it
+     * stays put -- and the track is released so the club can be acquired. */
+    uint32_t ascendingOnly;
+    uint32_t maxSameBinPoints;
 } l3_track_cfg_t;
 
 /* Club delivery from a regression of position against time over the newest
@@ -94,6 +115,7 @@ enum {
     L3_TRACK_WHY_COASTED,       /* nothing in the gate; predicted forward */
     L3_TRACK_WHY_DROPPED,       /* coasted too long */
     L3_TRACK_WHY_IDLE,          /* no track and nothing confident enough */
+    L3_TRACK_WHY_RELEASED,      /* held one bin too long: dropped for reacquisition */
     L3_TRACK_WHY_COUNT
 };
 
@@ -113,6 +135,16 @@ typedef struct {
                                    * appended, L3_TRACK_NO_TARGET when none */
     l3_track_point_t points[L3_TRACK_POINTS];
     uint32_t counters[L3_TRACK_WHY_COUNT];
+    int32_t  sameBin;             /* rounded bin of the newest point ... */
+    uint32_t sameBinCount;        /* ... and how many consecutive points share it */
+    uint8_t  following;           /* l3_track_follow has taken over (after impact) */
+    float    followBinsPerFrame;  /* the approach speed at impact: the follow's cap */
+    /* The last released track's final bin and Doppler, which acquisition
+     * avoids (see L3_TRACK_RELEASE_DOPPLER_TOL_MPS) until something else is
+     * acquired; releasedValid is 0 when nothing was released. */
+    uint8_t  releasedValid;
+    float    releasedBin;
+    float    releasedDopplerMps;
 } l3_club_track_t;
 
 void l3_track_cfg_defaults(l3_track_cfg_t *cfg);
@@ -123,6 +155,18 @@ void l3_track_reset(l3_club_track_t *track);
  * when a point was appended. Frames without a call are frames without
  * observations; the prediction uses frame numbers, so call once per frame. */
 int32_t l3_track_update(l3_club_track_t *track, const l3_target_obs_t *targets, uint32_t n,
+                        uint32_t frame, uint32_t timestampUs);
+/* After impact: continue an active track by association alone -- never
+ * acquire, never release (a club slowing after impact repeats its bin) --
+ * taking the STRONGEST target between L3_TRACK_FOLLOW_RETREAT_BINS behind the
+ * last point and where the club would be at its impact speed (frozen on the
+ * first call) plus L3_TRACK_FOLLOW_LEAD_BINS, never a third consecutive point
+ * in one bin: of the two tracks visible after impact the club is the
+ * stronger, the ball the weaker, and the club only slows while the ball
+ * leaves faster. lastTargetIndex
+ * says which of this frame's targets it claimed. Returns 1 when a point was
+ * appended. */
+int32_t l3_track_follow(l3_club_track_t *track, const l3_target_obs_t *targets, uint32_t n,
                         uint32_t frame, uint32_t timestampUs);
 /* Angles for the point the last update appended (the target at
  * lastTargetIndex), measured after association so only one target per frame

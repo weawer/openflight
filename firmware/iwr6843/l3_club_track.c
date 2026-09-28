@@ -7,7 +7,7 @@
 #include "l3_text.h"
 
 static const char *const kWhyNames[L3_TRACK_WHY_COUNT] = {
-    "none", "acquired", "associated", "coasted", "dropped", "idle"
+    "none", "acquired", "associated", "coasted", "dropped", "idle", "released"
 };
 
 void l3_track_cfg_defaults(l3_track_cfg_t *cfg)
@@ -24,6 +24,8 @@ void l3_track_cfg_defaults(l3_track_cfg_t *cfg)
     l3_cal_identity(&cfg->cal, L3_CAL_MAX_VIRTUAL);
     cfg->minAcquireDopplerMps = 1.0F;
     cfg->maxAngleResidualM = 2.0F * cfg->binWidthM;  /* two bins of scatter */
+    cfg->ascendingOnly = 1U;
+    cfg->maxSameBinPoints = 2U;
 }
 
 static float l3_track_absf(float value)
@@ -59,6 +61,13 @@ void l3_track_reset(l3_club_track_t *track)
     track->velocityBinsPerFrame = 0.0F;
     track->predictedBin = 0.0F;
     track->lastTargetIndex = L3_TRACK_NO_TARGET;
+    track->sameBin = 0;
+    track->sameBinCount = 0U;
+    track->following = 0U;
+    track->followBinsPerFrame = 0.0F;
+    track->releasedValid = 0U;
+    track->releasedBin = 0.0F;
+    track->releasedDopplerMps = 0.0F;
 }
 
 static void l3_track_note(l3_club_track_t *track, uint8_t why)
@@ -111,107 +120,223 @@ static float l3_track_wrappedDiff(float a, float b, float span)
     return (diff < 0.0F) ? -diff : diff;
 }
 
+static int32_t l3_track_roundBin(float rangeBin)
+{
+    return (int32_t)floorf(rangeBin + 0.5F);
+}
+
+/* Count the newest point into its rounded bin's run of consecutive points. */
+static void l3_track_countBin(l3_club_track_t *track, float rangeBin, int32_t first)
+{
+    int32_t bin = l3_track_roundBin(rangeBin);
+
+    if (!first && bin == track->sameBin) {
+        track->sameBinCount++;
+    } else {
+        track->sameBin = bin;
+        track->sameBinCount = 1U;
+    }
+}
+
+/* Forget the track, remembering its last return so acquisition does not take
+ * it straight back. */
+static void l3_track_release(l3_club_track_t *track)
+{
+    float releasedBin = track->lastBin;
+    float releasedDoppler =
+        track->points[(track->next + L3_TRACK_POINTS - 1U) % L3_TRACK_POINTS].dopplerAliasMps;
+
+    l3_track_reset(track);
+    track->releasedValid = 1U;
+    track->releasedBin = releasedBin;
+    track->releasedDopplerMps = releasedDoppler;
+    l3_track_note(track, L3_TRACK_WHY_RELEASED);
+}
+
+/* Acquire the most confident target that clears the bar, preferring one that
+ * reads as moving (a stationary body in the lane is often the strongest
+ * return) and skipping one that looks like the last released return. With
+ * quietWhenIdle, finding nothing leaves the last "why" (a release) standing. */
+static int32_t l3_track_acquire(l3_club_track_t *track, const l3_target_obs_t *targets,
+                                uint32_t n, uint32_t frame, int32_t quietWhenIdle)
+{
+    const l3_track_cfg_t *cfg = &track->cfg;
+    const l3_target_obs_t *best = NULL;
+    uint8_t bestMoves = 0U;
+    uint32_t i;
+
+    for (i = 0U; i < n; i++) {
+        uint8_t moves = (uint8_t)(cfg->minAcquireDopplerMps <= 0.0F ||
+                                  l3_track_absf(targets[i].dopplerAliasMps) >=
+                                      cfg->minAcquireDopplerMps);
+        if (targets[i].confidence < cfg->minConfidence) {
+            continue;
+        }
+        if (track->releasedValid &&
+            l3_track_absf(targets[i].rangeBin - track->releasedBin) <= cfg->gateBins &&
+            l3_track_wrappedDiff(targets[i].dopplerAliasMps, track->releasedDopplerMps,
+                                 cfg->velocitySpanMps) <= L3_TRACK_RELEASE_DOPPLER_TOL_MPS) {
+            continue;
+        }
+        if (best == NULL || (moves && !bestMoves) ||
+            (moves == bestMoves && targets[i].confidence > best->confidence)) {
+            best = &targets[i];
+            bestMoves = moves;
+            track->lastTargetIndex = i;
+        }
+    }
+    if (best == NULL) {
+        if (!quietWhenIdle) {
+            l3_track_note(track, L3_TRACK_WHY_IDLE);
+        }
+        return 0;
+    }
+    track->active = 1U;
+    track->misses = 0U;
+    track->lastFrame = frame;
+    track->lastBin = best->rangeBin;
+    track->velocityBinsPerFrame = 0.0F;
+    track->predictedBin = best->rangeBin;
+    track->releasedValid = 0U;
+    l3_track_append(track, best, 0.0F, 0.0F);
+    l3_track_countBin(track, best->rangeBin, 1);
+    l3_track_note(track, L3_TRACK_WHY_ACQUIRED);
+    return 1;
+}
+
+/* One frame of association for an active track; coast, then drop, when
+ * nothing qualifies. Approaching: the best-scoring target in the gate around
+ * the prediction, never below the last point's rounded bin when
+ * ascendingOnly. Following after impact: the strongest target from
+ * L3_TRACK_FOLLOW_RETREAT_BINS behind the last point to where the club would
+ * be at its impact speed, plus L3_TRACK_FOLLOW_LEAD_BINS -- the club is the
+ * stronger of the two returns after impact and only slows from its impact
+ * speed, so it is anywhere between; beyond, it would be moving faster than
+ * it arrived, which only the ball does -- and never a third consecutive point
+ * in one bin, which a stall beside the ball is and the club is not. */
+static int32_t l3_track_associate(l3_club_track_t *track, const l3_target_obs_t *targets,
+                                  uint32_t n, uint32_t frame, uint32_t timestampUs,
+                                  int32_t following)
+{
+    const l3_track_cfg_t *cfg = &track->cfg;
+    uint32_t elapsed = frame - track->lastFrame;
+    float predicted = track->lastBin + track->velocityBinsPerFrame * (float)elapsed;
+    int32_t floorBin = l3_track_roundBin(track->lastBin);
+    const l3_target_obs_t *best = NULL;
+    float bestScore = 0.0F;
+    const l3_track_point_t *last =
+        &track->points[(track->next + L3_TRACK_POINTS - 1U) % L3_TRACK_POINTS];
+    uint32_t i;
+
+    track->predictedBin = predicted;
+    for (i = 0U; i < n; i++) {
+        float rangeErr = l3_track_absf(targets[i].rangeBin - predicted);
+        float velocityErr;
+        float score;
+
+        if (following) {
+            float reach = track->lastBin + track->followBinsPerFrame * (float)elapsed +
+                          L3_TRACK_FOLLOW_LEAD_BINS;
+
+            if (targets[i].rangeBin < track->lastBin - L3_TRACK_FOLLOW_RETREAT_BINS ||
+                targets[i].rangeBin > reach) {
+                continue;
+            }
+            if (cfg->maxSameBinPoints > 0U &&
+                l3_track_roundBin(targets[i].rangeBin) == track->sameBin &&
+                track->sameBinCount >= cfg->maxSameBinPoints) {
+                continue;
+            }
+            if (best == NULL || targets[i].stat > best->stat) {
+                best = &targets[i];
+                track->lastTargetIndex = i;
+            }
+            continue;
+        }
+        if (rangeErr > cfg->gateBins) {
+            continue;
+        }
+        if (cfg->ascendingOnly && l3_track_roundBin(targets[i].rangeBin) < floorBin) {
+            continue;
+        }
+        velocityErr = l3_track_wrappedDiff(targets[i].dopplerAliasMps, last->dopplerAliasMps,
+                                           cfg->velocitySpanMps) /
+                      ((cfg->velocitySpanMps > 0.0F) ? cfg->velocitySpanMps : 1.0F);
+        score = cfg->weightRange * rangeErr + cfg->weightVelocity * velocityErr +
+                cfg->weightQuality * (1.0F - targets[i].confidence);
+        if (best == NULL || score < bestScore) {
+            best = &targets[i];
+            bestScore = score;
+            track->lastTargetIndex = i;
+        }
+    }
+    if (best == NULL) {
+        track->lastTargetIndex = L3_TRACK_NO_TARGET;
+        track->misses++;
+        if (track->misses > cfg->maxMisses) {
+            track->active = 0U;
+            l3_track_note(track, L3_TRACK_WHY_DROPPED);
+        } else {
+            l3_track_note(track, L3_TRACK_WHY_COASTED);
+        }
+        return 0;
+    }
+    if (elapsed > 0U) {
+        float measured = (best->rangeBin - track->lastBin) / (float)elapsed;
+        float dtS = (float)(timestampUs - last->timestampUs) * 1.0e-6F;
+        /* Half new, half old: smooth enough to predict with, quick enough
+         * for a club that accelerates through the approach. */
+        track->velocityBinsPerFrame = (track->count > 1U)
+                                          ? 0.5F * (track->velocityBinsPerFrame + measured)
+                                          : measured;
+        l3_track_append(track, best, track->velocityBinsPerFrame, dtS / (float)elapsed);
+    } else {
+        l3_track_append(track, best, track->velocityBinsPerFrame, 0.0F);
+    }
+    track->misses = 0U;
+    track->lastFrame = frame;
+    track->lastBin = best->rangeBin;
+    l3_track_countBin(track, best->rangeBin, 0);
+    l3_track_note(track, L3_TRACK_WHY_ASSOCIATED);
+    return 1;
+}
+
 int32_t l3_track_update(l3_club_track_t *track, const l3_target_obs_t *targets, uint32_t n,
                         uint32_t frame, uint32_t timestampUs)
 {
     const l3_track_cfg_t *cfg = &track->cfg;
-    uint32_t i;
 
     track->lastTargetIndex = L3_TRACK_NO_TARGET;
+    if (track->active) {
+        if (!l3_track_associate(track, targets, n, frame, timestampUs, 0)) {
+            return 0;
+        }
+        if (cfg->maxSameBinPoints == 0U || track->sameBinCount <= cfg->maxSameBinPoints) {
+            return 1;
+        }
+        /* One point too many in one bin: not the club. Release it, and let
+         * this frame's other targets seed the next track at once. */
+        l3_track_release(track);
+        track->lastTargetIndex = L3_TRACK_NO_TARGET;
+        return l3_track_acquire(track, targets, n, frame, 1);
+    }
+    return l3_track_acquire(track, targets, n, frame, 0);
+}
+
+int32_t l3_track_follow(l3_club_track_t *track, const l3_target_obs_t *targets, uint32_t n,
+                        uint32_t frame, uint32_t timestampUs)
+{
+    track->lastTargetIndex = L3_TRACK_NO_TARGET;
     if (!track->active) {
-        /* Acquire the most confident target that clears the bar, preferring
-         * one that reads as moving: a stationary body in the lane is often
-         * the strongest return and must not become the club. */
-        const l3_target_obs_t *best = NULL;
-        uint8_t bestMoves = 0U;
-        for (i = 0U; i < n; i++) {
-            uint8_t moves = (uint8_t)(cfg->minAcquireDopplerMps <= 0.0F ||
-                                      l3_track_absf(targets[i].dopplerAliasMps) >=
-                                          cfg->minAcquireDopplerMps);
-            if (targets[i].confidence < cfg->minConfidence) {
-                continue;
-            }
-            if (best == NULL || (moves && !bestMoves) ||
-                (moves == bestMoves && targets[i].confidence > best->confidence)) {
-                best = &targets[i];
-                bestMoves = moves;
-                track->lastTargetIndex = i;
-            }
-        }
-        if (best == NULL) {
-            l3_track_note(track, L3_TRACK_WHY_IDLE);
-            return 0;
-        }
-        track->active = 1U;
-        track->misses = 0U;
-        track->lastFrame = frame;
-        track->lastBin = best->rangeBin;
-        track->velocityBinsPerFrame = 0.0F;
-        track->predictedBin = best->rangeBin;
-        l3_track_append(track, best, 0.0F, 0.0F);
-        l3_track_note(track, L3_TRACK_WHY_ACQUIRED);
-        return 1;
+        return 0;
     }
-
-    {
-        uint32_t elapsed = frame - track->lastFrame;
-        float predicted = track->lastBin + track->velocityBinsPerFrame * (float)elapsed;
-        const l3_target_obs_t *best = NULL;
-        float bestScore = 0.0F;
-        const l3_track_point_t *last =
-            &track->points[(track->next + L3_TRACK_POINTS - 1U) % L3_TRACK_POINTS];
-
-        track->predictedBin = predicted;
-        for (i = 0U; i < n; i++) {
-            float rangeErr = targets[i].rangeBin - predicted;
-            float velocityErr;
-            float score;
-            if (rangeErr < 0.0F) {
-                rangeErr = -rangeErr;
-            }
-            if (rangeErr > cfg->gateBins) {
-                continue;
-            }
-            velocityErr = l3_track_wrappedDiff(targets[i].dopplerAliasMps,
-                                               last->dopplerAliasMps, cfg->velocitySpanMps) /
-                          ((cfg->velocitySpanMps > 0.0F) ? cfg->velocitySpanMps : 1.0F);
-            score = cfg->weightRange * rangeErr + cfg->weightVelocity * velocityErr +
-                    cfg->weightQuality * (1.0F - targets[i].confidence);
-            if (best == NULL || score < bestScore) {
-                best = &targets[i];
-                bestScore = score;
-                track->lastTargetIndex = i;
-            }
-        }
-        if (best == NULL) {
-            track->lastTargetIndex = L3_TRACK_NO_TARGET;
-            track->misses++;
-            if (track->misses > cfg->maxMisses) {
-                track->active = 0U;
-                l3_track_note(track, L3_TRACK_WHY_DROPPED);
-            } else {
-                l3_track_note(track, L3_TRACK_WHY_COASTED);
-            }
-            return 0;
-        }
-        if (elapsed > 0U) {
-            float measured = (best->rangeBin - track->lastBin) / (float)elapsed;
-            float dtS = (float)(timestampUs - last->timestampUs) * 1.0e-6F;
-            /* Half new, half old: smooth enough to predict with, quick enough
-             * for a club that accelerates through the approach. */
-            track->velocityBinsPerFrame = (track->count > 1U)
-                                              ? 0.5F * (track->velocityBinsPerFrame + measured)
-                                              : measured;
-            l3_track_append(track, best, track->velocityBinsPerFrame, dtS / (float)elapsed);
-        } else {
-            l3_track_append(track, best, track->velocityBinsPerFrame, 0.0F);
-        }
-        track->misses = 0U;
-        track->lastFrame = frame;
-        track->lastBin = best->rangeBin;
-        l3_track_note(track, L3_TRACK_WHY_ASSOCIATED);
-        return 1;
+    if (!track->following) {
+        /* The first frame after impact: the club can only slow from here. */
+        track->following = 1U;
+        track->followBinsPerFrame =
+            (track->velocityBinsPerFrame > 0.0F) ? track->velocityBinsPerFrame : 0.0F;
     }
+    return l3_track_associate(track, targets, n, frame, timestampUs, 1);
 }
 
 int32_t l3_track_point(const l3_club_track_t *track, uint32_t index, l3_track_point_t *out)
