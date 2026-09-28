@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 FIRMWARE = Path(__file__).parents[1] / "firmware" / "iwr6843" / "l3_dump.c"
 
 
@@ -226,12 +228,20 @@ def test_stats_and_trigger_log_report_the_compact_state():
         assert reset in start, reset
 
 
-def test_the_adaptive_profile_asks_for_the_compact_format_and_its_retain_widths():
-    cfg = (
-        FIRMWARE.parents[2] / "config" / "iwr6843_l3dump_adaptive_47f3ms_53bin_a16.cfg"
-    ).read_text()
+@pytest.mark.parametrize(
+    "config_name,period_ms",
+    [
+        ("iwr6843_l3dump_adaptive_47f3ms_53bin_a16.cfg", "3"),
+        ("iwr6843_l3dump_adaptive_47f2ms_53bin_a16.cfg", "2"),
+    ],
+)
+def test_the_adaptive_profile_asks_for_the_compact_format_and_its_retain_widths(
+    config_name, period_ms
+):
+    cfg = (FIRMWARE.parents[2] / "config" / config_name).read_text()
     lines = [line.split() for line in cfg.splitlines() if line and not line.startswith("%")]
     by_name = {line[0]: line[1:] for line in lines}
+    assert by_name["frameCfg"][4] == period_ms
     assert by_name["captureFormat"] == ["adaptive16"]
     assert by_name["captureCfg"] == ["retain", "16", "24", "16"]
     (
@@ -261,6 +271,35 @@ def test_the_adaptive_profile_asks_for_the_compact_format_and_its_retain_widths(
         < order.index("phaseCaptureCfg")
     )
     assert order[-1] == "sensorStart"
+
+
+def test_the_2ms_adaptive_profile_differs_from_3ms_only_in_frame_period():
+    """The 2 ms profile exists to test the detect task's deadline shrinking
+    from 3000 to 2000 us with nothing else changing; a second difference
+    here would mean the two soaks are no longer comparable."""
+    config_dir = FIRMWARE.parents[2] / "config"
+    lines_3ms = [
+        line.split()
+        for line in (config_dir / "iwr6843_l3dump_adaptive_47f3ms_53bin_a16.cfg")
+        .read_text()
+        .splitlines()
+        if line and not line.startswith("%")
+    ]
+    lines_2ms = [
+        line.split()
+        for line in (config_dir / "iwr6843_l3dump_adaptive_47f2ms_53bin_a16.cfg")
+        .read_text()
+        .splitlines()
+        if line and not line.startswith("%")
+    ]
+    assert len(lines_3ms) == len(lines_2ms)
+    diffs = [(a, b) for a, b in zip(lines_3ms, lines_2ms) if a != b]
+    assert diffs == [
+        (
+            ["frameCfg", "0", "2", "12", "0", "3", "1", "0"],
+            ["frameCfg", "0", "2", "12", "0", "2", "1", "0"],
+        )
+    ]
 
 
 def test_iq16_frames_take_the_exact_integer_statistics_path():
