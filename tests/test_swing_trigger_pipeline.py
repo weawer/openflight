@@ -24,5 +24,5 @@ def test_arm_rejects_error_even_with_done():
         swing.arm(radar, "cfg", 41, 6.0, 2)
 
 
-def test_default_config_is_the_2ms_pipeline():
-    assert swing.DEFAULT_CONFIG == "config/iwr6843_l3dump_adaptive_47f2ms_53bin_a16.cfg"
+def test_default_config_is_the_3ms_pipeline():
+    assert swing.DEFAULT_CONFIG == "config/iwr6843_l3dump_adaptive_47f3ms_53bin_a16.cfg"

@@ -139,7 +139,7 @@ def test_main_arms_with_calibrated_tee_and_saves_failure_evidence(monkeypatch, t
         [
             "soak",
             "--config",
-            "config/iwr6843_l3dump_adaptive_47f2ms_53bin_a16.cfg",
+            "config/iwr6843_l3dump_adaptive_47f3ms_53bin_a16.cfg",
             "--self-trigger-tee-m",
             "1.845",
             "--frames",

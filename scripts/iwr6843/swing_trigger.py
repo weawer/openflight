@@ -18,7 +18,7 @@ from openflight.iwr6843.driver import IWR6843Radar
 from openflight.iwr6843.firmware_checks import parse_trig
 from openflight.iwr6843.monitor import SelfTriggerConfig, tee_global_bin
 
-DEFAULT_CONFIG = "config/iwr6843_l3dump_adaptive_47f2ms_53bin_a16.cfg"
+DEFAULT_CONFIG = "config/iwr6843_l3dump_adaptive_47f3ms_53bin_a16.cfg"
 
 
 def port_name_error(port: str | None, platform: str) -> str | None:
