@@ -41,7 +41,7 @@ def test_windows_port_name_is_rejected_on_the_pi():
 def test_diagnostics_are_saved_before_dump_and_watch_continues(tmp_path):
     radar = Mock()
     radar.wait_trigger_notice.side_effect = [(True, b""), (True, b""), KeyboardInterrupt]
-    radar.stats.side_effect = [health(latched=1), health()] * 2
+    radar.stats.side_effect = [health(active=0, latched=1), health()] * 2
     radar.cmd.return_value = "frame=20 why=fired\nDone"
     radar.read_dump.return_value = valid_dump()
     output = io.StringIO()
@@ -81,7 +81,19 @@ def test_untriggered_observation_saves_evidence_without_forcing_capture(tmp_path
     with pytest.raises(KeyboardInterrupt):
         swing_trigger.observe(radar, output, tmp_path, 2.0)
     radar.read_dump.assert_not_called()
-    assert "why=slow" in output.getvalue()
+    radar.cmd.assert_not_called()
+    assert health() in json.loads(output.getvalue())["stats"]
+
+
+def test_post_trigger_recording_is_not_interrupted_by_verbose_logs(tmp_path):
+    radar = Mock()
+    radar.wait_trigger_notice.side_effect = [(True, b""), KeyboardInterrupt]
+    radar.stats.side_effect = [health(active=1, latched=1), health()]
+    radar.read_dump.return_value = valid_dump()
+    with pytest.raises(KeyboardInterrupt):
+        swing_trigger.observe(radar, io.StringIO(), tmp_path, 2.0)
+    radar.cmd.assert_not_called()
+    radar.read_dump.assert_called_once()
 
 
 def test_disabled_detector_is_an_error(tmp_path):

@@ -77,16 +77,16 @@ def observe(radar, output, capture_dir: Path, poll_s: float) -> None:
         if fields is None:
             raise RuntimeError("stats missing trigger state")
         fired = fired or fields.get("latched") == "1"
-        logs = {
-            command: radar.cmd(command)
-            for command in (
-                "triggerLog",
-                "triggerLog trace",
-                "triggerLog perf",
-            )
-        }
+        # Polled CLI output preempts detection; only print traces on a frozen ring.
+        logs = {}
+        if fired and parse_snapshot(health).active == 0:
+            logs = {
+                command: radar.cmd(command)
+                for command in ("triggerLog", "triggerLog trace", "triggerLog perf")
+            }
         record(output, "trigger_diagnostics", stats=health, logs=logs, fired=fired)
-        print(logs["triggerLog"], flush=True)
+        if logs:
+            print(logs["triggerLog"], flush=True)
         check_health(health, rearmed=not fired)
         if fired:
             raw = radar.read_dump()
