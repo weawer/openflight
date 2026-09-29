@@ -15,7 +15,8 @@ from pathlib import Path
 
 from openflight.iwr6843.calibration import DEFAULT_CAL_PATH, DEFAULT_TEE_RANGE_M, Calibration
 from openflight.iwr6843.driver import IWR6843Radar
-from openflight.iwr6843.firmware_checks import parse_trig
+from openflight.iwr6843.dump import parse_dump
+from openflight.iwr6843.firmware_checks import parse_snapshot, parse_stats, parse_trig
 from openflight.iwr6843.monitor import SelfTriggerConfig, tee_global_bin
 
 DEFAULT_CONFIG = "config/iwr6843_l3dump_adaptive_47f3ms_53bin_a16.cfg"
@@ -38,6 +39,27 @@ def arm(radar, config: str, tee_bin: int, snr: float, frames: int) -> None:
 def record(output, event: str, **fields) -> None:
     output.write(json.dumps({"event": event, "ts": time.time(), **fields}) + "\n")
     output.flush()
+
+
+def check_health(raw: str, *, rearmed: bool = False) -> None:
+    if "Done" not in raw or "Error" in raw:
+        raise RuntimeError(f"stats failed: {raw.strip()}")
+    snapshot = parse_snapshot(raw)
+    if snapshot.enabled != 1:
+        raise RuntimeError("firmware self-trigger is disabled")
+    counters = parse_stats(raw)
+    required = ("scratch_stale", "hwa_missed", "iq8_overrun", "iq8_edma_err")
+    for key in required:
+        if key not in counters:
+            raise RuntimeError(f"stats missing {key}")
+        if counters[key]:
+            raise RuntimeError(f"capture health failed: {key}={counters[key]}")
+    for key in ("detect_dropped", "detect_stale"):
+        value = getattr(snapshot, key)
+        if value is None or value != 0:
+            raise RuntimeError(f"capture health failed: {key}={value}")
+    if rearmed and (snapshot.active != 1 or snapshot.latched != 0):
+        raise RuntimeError("rearm not confirmed: expected active=1 latched=0 enabled=1")
 
 
 def observe(radar, output, capture_dir: Path, poll_s: float) -> None:
@@ -65,15 +87,27 @@ def observe(radar, output, capture_dir: Path, poll_s: float) -> None:
         }
         record(output, "trigger_diagnostics", stats=health, logs=logs, fired=fired)
         print(logs["triggerLog"], flush=True)
-        if fields.get("enabled") != "1":
-            raise RuntimeError("firmware self-trigger is disabled")
+        check_health(health, rearmed=not fired)
         if fired:
             raw = radar.read_dump()
+            try:
+                metadata, _ = parse_dump(raw)
+                if metadata["n_frames"] == 0:
+                    raise ValueError("empty capture")
+            except ValueError as exc:
+                path = capture_dir / f"failed-{time.time_ns()}.invalid.bin"
+                path.write_bytes(raw)
+                record(output, "capture_failed", path=str(path), bytes=len(raw), error=str(exc))
+                raise RuntimeError(f"invalid dump: {exc}; evidence saved to {path}") from exc
             captures += 1
             path = capture_dir / f"swing-{time.time_ns()}-{captures:03d}.l3dump"
             path.write_bytes(raw)
             record(output, "capture", path=str(path), bytes=len(raw))
-            print(f"Triggered: saved {path}; watching again", flush=True)
+            health = radar.stats()
+            record(output, "rearm_check", stats=health)
+            check_health(health, rearmed=True)
+            record(output, "rearmed", capture=captures)
+            print(f"Capture {captures}: valid dump saved to {path}; rearm confirmed", flush=True)
             pending = b""
         next_poll = time.monotonic() + poll_s
 
