@@ -1,0 +1,84 @@
+[
+  {
+    "shot": 31,
+    "impact_idx": 44,
+    "status": "track_too_short (3 pts, 3 pre)"
+  },
+  {
+    "shot": 32,
+    "impact_idx": 43,
+    "status": "track_too_short (3 pts, 3 pre)"
+  },
+  {
+    "shot": 33,
+    "impact_idx": 59,
+    "status": "track_too_short (0 pts, 0 pre)"
+  },
+  {
+    "shot": 34,
+    "impact_idx": 44,
+    "status": "track_too_short (3 pts, 3 pre)"
+  },
+  {
+    "shot": 35,
+    "status": "error: no round bright reference ball found"
+  },
+  {
+    "shot": 36,
+    "status": "error: no round bright reference ball found"
+  },
+  {
+    "shot": 37,
+    "impact_idx": 59,
+    "status": "track_too_short (0 pts, 0 pre)"
+  },
+  {
+    "shot": 38,
+    "impact_idx": 59,
+    "status": "track_too_short (0 pts, 0 pre)"
+  },
+  {
+    "shot": 39,
+    "status": "error: no round bright reference ball found"
+  },
+  {
+    "shot": 40,
+    "status": "error: no round bright reference ball found"
+  },
+  {
+    "shot": 41,
+    "status": "error: no round bright reference ball found"
+  },
+  {
+    "shot": 42,
+    "status": "error: no round bright reference ball found"
+  },
+  {
+    "shot": 43,
+    "status": "error: no round bright reference ball found"
+  },
+  {
+    "shot": 44,
+    "status": "error: no round bright reference ball found"
+  },
+  {
+    "shot": 45,
+    "status": "error: no round bright reference ball found"
+  },
+  {
+    "shot": 46,
+    "status": "error: no round bright reference ball found"
+  },
+  {
+    "shot": 47,
+    "status": "error: no round bright reference ball found"
+  },
+  {
+    "shot": 48,
+    "status": "error: no round bright reference ball found"
+  },
+  {
+    "shot": 49,
+    "status": "error: no round bright reference ball found"
+  }
+]

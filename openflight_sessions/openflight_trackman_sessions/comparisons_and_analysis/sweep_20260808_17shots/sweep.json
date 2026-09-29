@@ -1,0 +1,1568 @@
+[
+ {
+  "shot": 1,
+  "ball_mph": 93.6551085821793,
+  "club_mph": 75.65638550024416,
+  "ti_horz": 17.93087176427752,
+  "ti_horz_conf": 0.591,
+  "radar_aoa": 5.0,
+  "trace_status": "ok",
+  "trace_deg": -36.87,
+  "impact": 41,
+  "ball_xy": [
+   327.8,
+   190.8
+  ],
+  "mm_per_px": 3.207,
+  "impact_used": 41,
+  "vx_sign": 1,
+  "signed_trace": -36.9,
+  "n_pairs": 3,
+  "flight_n": 11,
+  "flight": [
+   {
+    "frame": 42,
+    "x": 311.3,
+    "y": 184.1,
+    "area": 23
+   },
+   {
+    "frame": 43,
+    "x": 321.9,
+    "y": 184.2,
+    "area": 34
+   },
+   {
+    "frame": 44,
+    "x": 303.5,
+    "y": 189.3,
+    "area": 49
+   },
+   {
+    "frame": 45,
+    "x": 305.6,
+    "y": 189.7,
+    "area": 31
+   },
+   {
+    "frame": 46,
+    "x": 308.0,
+    "y": 188.9,
+    "area": 31
+   },
+   {
+    "frame": 47,
+    "x": 306.6,
+    "y": 182.9,
+    "area": 23
+   },
+   {
+    "frame": 48,
+    "x": 328.7,
+    "y": 136.4,
+    "area": 88
+   },
+   {
+    "frame": 49,
+    "x": 328.3,
+    "y": 119.8,
+    "area": 73
+   },
+   {
+    "frame": 50,
+    "x": 328.9,
+    "y": 104.9,
+    "area": 65
+   },
+   {
+    "frame": 51,
+    "x": 329.0,
+    "y": 91.8,
+    "area": 61
+   },
+   {
+    "frame": 52,
+    "x": 328.6,
+    "y": 80.6,
+    "area": 50
+   }
+  ],
+  "cam_horz": 3.0,
+  "cam_vert_la": 15.23,
+  "flight_x0_off": -16.5
+ },
+ {
+  "shot": 2,
+  "ball_mph": 98.34795971468749,
+  "club_mph": 78.20202431250001,
+  "ti_horz": 0.21700794208903368,
+  "ti_horz_conf": 0.928,
+  "radar_aoa": -19.6,
+  "trace_status": "ok",
+  "trace_deg": -55.71,
+  "impact": 40,
+  "ball_xy": [
+   325.8,
+   188.5
+  ],
+  "mm_per_px": 3.207,
+  "impact_used": 40,
+  "vx_sign": 1,
+  "signed_trace": -55.7,
+  "n_pairs": 4,
+  "fused_aoa": -3.6,
+  "signed_path": 2.5,
+  "flight_n": 11,
+  "flight": [
+   {
+    "frame": 41,
+    "x": 322.9,
+    "y": 182.1,
+    "area": 68
+   },
+   {
+    "frame": 42,
+    "x": 306.8,
+    "y": 181.8,
+    "area": 49
+   },
+   {
+    "frame": 43,
+    "x": 310.8,
+    "y": 184.6,
+    "area": 47
+   },
+   {
+    "frame": 44,
+    "x": 312.2,
+    "y": 185.2,
+    "area": 37
+   },
+   {
+    "frame": 45,
+    "x": 313.9,
+    "y": 185.3,
+    "area": 37
+   },
+   {
+    "frame": 46,
+    "x": 316.1,
+    "y": 179.7,
+    "area": 33
+   },
+   {
+    "frame": 47,
+    "x": 325.2,
+    "y": 115.2,
+    "area": 77
+   },
+   {
+    "frame": 48,
+    "x": 325.1,
+    "y": 99.1,
+    "area": 67
+   },
+   {
+    "frame": 49,
+    "x": 324.6,
+    "y": 85.1,
+    "area": 58
+   },
+   {
+    "frame": 50,
+    "x": 324.8,
+    "y": 73.0,
+    "area": 54
+   },
+   {
+    "frame": 51,
+    "x": 324.6,
+    "y": 61.9,
+    "area": 45
+   }
+  ],
+  "cam_horz": 1.82,
+  "cam_vert_la": 17.47,
+  "flight_x0_off": -2.9
+ },
+ {
+  "shot": 3,
+  "ball_mph": 98.00401188437455,
+  "club_mph": 78.8129776274414,
+  "ti_horz": 1.5846605809276728,
+  "ti_horz_conf": 0.761,
+  "radar_aoa": -14.7,
+  "trace_status": "ok",
+  "trace_deg": -59.04,
+  "impact": 41,
+  "ball_xy": [
+   322.3,
+   188.6
+  ],
+  "mm_per_px": 3.243,
+  "impact_used": 41,
+  "vx_sign": 1,
+  "signed_trace": -59.0,
+  "n_pairs": 3,
+  "flight_n": 11,
+  "flight": [
+   {
+    "frame": 42,
+    "x": 315.6,
+    "y": 177.8,
+    "area": 16
+   },
+   {
+    "frame": 43,
+    "x": 304.1,
+    "y": 184.7,
+    "area": 52
+   },
+   {
+    "frame": 44,
+    "x": 306.2,
+    "y": 186.2,
+    "area": 43
+   },
+   {
+    "frame": 45,
+    "x": 306.9,
+    "y": 186.1,
+    "area": 35
+   },
+   {
+    "frame": 46,
+    "x": 326.6,
+    "y": 148.8,
+    "area": 82
+   },
+   {
+    "frame": 47,
+    "x": 327.8,
+    "y": 128.6,
+    "area": 85
+   },
+   {
+    "frame": 48,
+    "x": 329.3,
+    "y": 111.5,
+    "area": 70
+   },
+   {
+    "frame": 49,
+    "x": 330.7,
+    "y": 96.5,
+    "area": 67
+   },
+   {
+    "frame": 50,
+    "x": 332.0,
+    "y": 83.0,
+    "area": 53
+   },
+   {
+    "frame": 51,
+    "x": 332.6,
+    "y": 71.8,
+    "area": 48
+   },
+   {
+    "frame": 52,
+    "x": 333.7,
+    "y": 61.7,
+    "area": 45
+   }
+  ],
+  "cam_horz": 3.87,
+  "cam_vert_la": 17.65,
+  "flight_x0_off": -6.7
+ },
+ {
+  "shot": 4,
+  "ball_mph": 96.92019894436076,
+  "club_mph": 80.84948867724609,
+  "ti_horz": 4.958305386887309,
+  "ti_horz_conf": 0.812,
+  "radar_aoa": -16.8,
+  "trace_status": "ok",
+  "trace_deg": 85.63,
+  "impact": 45,
+  "ball_xy": [
+   328.3,
+   188.1
+  ],
+  "mm_per_px": 3.231,
+  "impact_used": 45,
+  "vx_sign": 1,
+  "signed_trace": 85.6,
+  "n_pairs": 2,
+  "flight_n": 11,
+  "flight": [
+   {
+    "frame": 46,
+    "x": 316.6,
+    "y": 179.6,
+    "area": 41
+   },
+   {
+    "frame": 47,
+    "x": 326.7,
+    "y": 142.3,
+    "area": 74
+   },
+   {
+    "frame": 48,
+    "x": 326.2,
+    "y": 131.2,
+    "area": 74
+   },
+   {
+    "frame": 49,
+    "x": 325.6,
+    "y": 121.3,
+    "area": 66
+   },
+   {
+    "frame": 50,
+    "x": 325.2,
+    "y": 112.4,
+    "area": 57
+   },
+   {
+    "frame": 51,
+    "x": 325.1,
+    "y": 104.4,
+    "area": 53
+   },
+   {
+    "frame": 52,
+    "x": 324.7,
+    "y": 97.4,
+    "area": 46
+   },
+   {
+    "frame": 53,
+    "x": 324.5,
+    "y": 91.1,
+    "area": 44
+   },
+   {
+    "frame": 54,
+    "x": 324.0,
+    "y": 85.4,
+    "area": 41
+   },
+   {
+    "frame": 55,
+    "x": 324.0,
+    "y": 80.1,
+    "area": 40
+   },
+   {
+    "frame": 56,
+    "x": 324.0,
+    "y": 75.7,
+    "area": 33
+   }
+  ],
+  "cam_horz": 0.19,
+  "cam_vert_la": 10.92,
+  "flight_x0_off": -11.7
+ },
+ {
+  "shot": 5,
+  "ball_mph": 96.71950946937515,
+  "club_mph": 85.83894074926759,
+  "ti_horz": -0.794457005478065,
+  "ti_horz_conf": 0.793,
+  "radar_aoa": -10.2,
+  "trace_status": "ok",
+  "trace_deg": -52.01,
+  "impact": 41,
+  "ball_xy": [
+   324.2,
+   188.2
+  ],
+  "mm_per_px": 3.573,
+  "impact_used": 41,
+  "vx_sign": 1,
+  "signed_trace": -52.0,
+  "n_pairs": 4,
+  "flight_n": 11,
+  "flight": [
+   {
+    "frame": 42,
+    "x": 325.5,
+    "y": 175.1,
+    "area": 22
+   },
+   {
+    "frame": 43,
+    "x": 305.2,
+    "y": 181.2,
+    "area": 42
+   },
+   {
+    "frame": 44,
+    "x": 310.1,
+    "y": 184.3,
+    "area": 26
+   },
+   {
+    "frame": 45,
+    "x": 312.9,
+    "y": 185.7,
+    "area": 28
+   },
+   {
+    "frame": 46,
+    "x": 317.8,
+    "y": 182.6,
+    "area": 33
+   },
+   {
+    "frame": 47,
+    "x": 314.9,
+    "y": 176.6,
+    "area": 21
+   },
+   {
+    "frame": 48,
+    "x": 313.4,
+    "y": 167.7,
+    "area": 19
+   },
+   {
+    "frame": 49,
+    "x": 310.1,
+    "y": 158.8,
+    "area": 20
+   },
+   {
+    "frame": 50,
+    "x": 329.9,
+    "y": 80.0,
+    "area": 49
+   },
+   {
+    "frame": 51,
+    "x": 330.4,
+    "y": 67.5,
+    "area": 38
+   },
+   {
+    "frame": 52,
+    "x": 330.8,
+    "y": 56.5,
+    "area": 36
+   }
+  ],
+  "cam_horz": 2.35,
+  "cam_vert_la": 18.03,
+  "flight_x0_off": 1.3
+ },
+ {
+  "shot": 6,
+  "ball_mph": 83.98110711054723,
+  "club_mph": 54.68032168725586,
+  "ti_horz": 6.1028029192539455,
+  "ti_horz_conf": 0.924,
+  "radar_aoa": -15.2,
+  "trace_status": "ok",
+  "trace_deg": -54.01,
+  "impact": 41,
+  "ball_xy": [
+   324.0,
+   186.8
+  ],
+  "mm_per_px": 3.542,
+  "impact_used": 41,
+  "vx_sign": 1,
+  "signed_trace": -54.0,
+  "n_pairs": 4,
+  "flight_n": 11,
+  "flight": [
+   {
+    "frame": 42,
+    "x": 302.6,
+    "y": 173.9,
+    "area": 52
+   },
+   {
+    "frame": 43,
+    "x": 309.1,
+    "y": 180.7,
+    "area": 38
+   },
+   {
+    "frame": 44,
+    "x": 313.6,
+    "y": 183.8,
+    "area": 26
+   },
+   {
+    "frame": 45,
+    "x": 312.8,
+    "y": 183.5,
+    "area": 26
+   },
+   {
+    "frame": 46,
+    "x": 323.4,
+    "y": 179.9,
+    "area": 54
+   },
+   {
+    "frame": 47,
+    "x": 318.9,
+    "y": 175.0,
+    "area": 25
+   },
+   {
+    "frame": 48,
+    "x": 319.4,
+    "y": 166.9,
+    "area": 27
+   },
+   {
+    "frame": 49,
+    "x": 380.0,
+    "y": 104.1,
+    "area": 54
+   },
+   {
+    "frame": 50,
+    "x": 388.9,
+    "y": 91.9,
+    "area": 49
+   },
+   {
+    "frame": 51,
+    "x": 396.4,
+    "y": 80.2,
+    "area": 40
+   },
+   {
+    "frame": 52,
+    "x": 403.7,
+    "y": 70.0,
+    "area": 35
+   }
+  ],
+  "cam_horz": 18.6,
+  "cam_vert_la": 20.85,
+  "flight_x0_off": -21.4
+ },
+ {
+  "shot": 7,
+  "ball_mph": 102.4470519427124,
+  "club_mph": 91.03204392626954,
+  "ti_horz": -0.11761717285770185,
+  "ti_horz_conf": 0.906,
+  "radar_aoa": -19.1,
+  "trace_status": "ok",
+  "trace_deg": -35.85,
+  "impact": 42,
+  "ball_xy": [
+   319.6,
+   185.8
+  ],
+  "mm_per_px": 3.557,
+  "impact_used": 42,
+  "vx_sign": 1,
+  "signed_trace": -35.8,
+  "n_pairs": 4,
+  "fused_aoa": -3.1,
+  "signed_path": 4.3,
+  "flight_n": 11,
+  "flight": [
+   {
+    "frame": 43,
+    "x": 292.5,
+    "y": 182.4,
+    "area": 33
+   },
+   {
+    "frame": 44,
+    "x": 298.4,
+    "y": 182.9,
+    "area": 22
+   },
+   {
+    "frame": 45,
+    "x": 323.5,
+    "y": 160.5,
+    "area": 111
+   },
+   {
+    "frame": 46,
+    "x": 327.2,
+    "y": 135.8,
+    "area": 85
+   },
+   {
+    "frame": 47,
+    "x": 330.8,
+    "y": 114.4,
+    "area": 64
+   },
+   {
+    "frame": 48,
+    "x": 333.4,
+    "y": 95.5,
+    "area": 59
+   },
+   {
+    "frame": 49,
+    "x": 335.8,
+    "y": 79.3,
+    "area": 47
+   },
+   {
+    "frame": 50,
+    "x": 338.3,
+    "y": 65.2,
+    "area": 41
+   },
+   {
+    "frame": 51,
+    "x": 340.0,
+    "y": 52.5,
+    "area": 34
+   },
+   {
+    "frame": 52,
+    "x": 341.7,
+    "y": 41.5,
+    "area": 32
+   },
+   {
+    "frame": 53,
+    "x": 343.0,
+    "y": 31.6,
+    "area": 29
+   }
+  ],
+  "cam_horz": 6.35,
+  "cam_vert_la": 22.11,
+  "flight_x0_off": -27.1
+ },
+ {
+  "shot": 8,
+  "ball_mph": 89.02413426137326,
+  "club_mph": 64.76105138378907,
+  "ti_horz": 5.491776536058663,
+  "ti_horz_conf": 0.85,
+  "radar_aoa": -13.3,
+  "trace_status": "ok",
+  "trace_deg": 10.62,
+  "impact": 44,
+  "ball_xy": [
+   325.4,
+   187.4
+  ],
+  "mm_per_px": 3.41,
+  "impact_used": 44,
+  "vx_sign": 1,
+  "signed_trace": 10.6,
+  "n_pairs": 4,
+  "flight_n": 11,
+  "flight": [
+   {
+    "frame": 45,
+    "x": 332.1,
+    "y": 193.5,
+    "area": 46
+   },
+   {
+    "frame": 46,
+    "x": 347.7,
+    "y": 162.7,
+    "area": 103
+   },
+   {
+    "frame": 47,
+    "x": 360.0,
+    "y": 147.3,
+    "area": 82
+   },
+   {
+    "frame": 48,
+    "x": 370.5,
+    "y": 134.1,
+    "area": 72
+   },
+   {
+    "frame": 49,
+    "x": 380.0,
+    "y": 122.4,
+    "area": 61
+   },
+   {
+    "frame": 50,
+    "x": 388.1,
+    "y": 111.7,
+    "area": 51
+   },
+   {
+    "frame": 51,
+    "x": 395.6,
+    "y": 102.5,
+    "area": 43
+   },
+   {
+    "frame": 52,
+    "x": 402.3,
+    "y": 94.3,
+    "area": 41
+   },
+   {
+    "frame": 53,
+    "x": 408.1,
+    "y": 86.9,
+    "area": 37
+   },
+   {
+    "frame": 54,
+    "x": 413.7,
+    "y": 80.5,
+    "area": 34
+   },
+   {
+    "frame": 55,
+    "x": 418.7,
+    "y": 74.2,
+    "area": 30
+   }
+  ],
+  "cam_horz": 12.31,
+  "cam_vert_la": 15.95,
+  "flight_x0_off": 6.7
+ },
+ {
+  "shot": 9,
+  "ball_mph": 104.17195461051959,
+  "club_mph": 81.25679088720705,
+  "ti_horz": 15.672930211047916,
+  "ti_horz_conf": 0.618,
+  "radar_aoa": -19.5,
+  "trace_status": "ok",
+  "trace_deg": -60.9,
+  "impact": 41,
+  "ball_xy": [
+   324.2,
+   188.3
+  ],
+  "mm_per_px": 3.342,
+  "impact_used": 41,
+  "vx_sign": 1,
+  "signed_trace": -60.9,
+  "n_pairs": 4,
+  "fused_aoa": -3.5,
+  "signed_path": 1.9,
+  "flight_n": 11,
+  "flight": [
+   {
+    "frame": 42,
+    "x": 327.2,
+    "y": 177.2,
+    "area": 221
+   },
+   {
+    "frame": 43,
+    "x": 330.1,
+    "y": 176.9,
+    "area": 41
+   },
+   {
+    "frame": 44,
+    "x": 331.5,
+    "y": 179.7,
+    "area": 37
+   },
+   {
+    "frame": 45,
+    "x": 319.1,
+    "y": 177.9,
+    "area": 200
+   },
+   {
+    "frame": 46,
+    "x": 311.4,
+    "y": 178.1,
+    "area": 37
+   },
+   {
+    "frame": 47,
+    "x": 313.4,
+    "y": 174.5,
+    "area": 16
+   },
+   {
+    "frame": 48,
+    "x": 310.1,
+    "y": 167.1,
+    "area": 17
+   },
+   {
+    "frame": 49,
+    "x": 305.6,
+    "y": 159.1,
+    "area": 17
+   },
+   {
+    "frame": 50,
+    "x": 300.6,
+    "y": 150.3,
+    "area": 15
+   },
+   {
+    "frame": 51,
+    "x": 305.1,
+    "y": 119.1,
+    "area": 42
+   },
+   {
+    "frame": 52,
+    "x": 303.4,
+    "y": 113.5,
+    "area": 39
+   }
+  ],
+  "cam_horz": -3.66,
+  "cam_vert_la": 7.28,
+  "flight_x0_off": 3.0
+ },
+ {
+  "shot": 10,
+  "ball_mph": 112.64883386475744,
+  "club_mph": 85.22798743432618,
+  "ti_horz": -1.9695452790656378,
+  "ti_horz_conf": 0.937,
+  "radar_aoa": -17.6,
+  "trace_status": "ok",
+  "trace_deg": -55.01,
+  "impact": 40,
+  "ball_xy": [
+   324.0,
+   188.1
+  ],
+  "mm_per_px": 3.396,
+  "impact_used": 40,
+  "vx_sign": 1,
+  "signed_trace": -55.0,
+  "n_pairs": 3,
+  "fused_aoa": -1.6,
+  "signed_path": 1.1,
+  "flight_n": 11,
+  "flight": [
+   {
+    "frame": 41,
+    "x": 310.5,
+    "y": 181.7,
+    "area": 229
+   },
+   {
+    "frame": 42,
+    "x": 307.3,
+    "y": 182.1,
+    "area": 116
+   },
+   {
+    "frame": 43,
+    "x": 305.6,
+    "y": 186.2,
+    "area": 61
+   },
+   {
+    "frame": 44,
+    "x": 309.2,
+    "y": 186.1,
+    "area": 44
+   },
+   {
+    "frame": 45,
+    "x": 312.5,
+    "y": 184.7,
+    "area": 35
+   },
+   {
+    "frame": 46,
+    "x": 314.4,
+    "y": 178.5,
+    "area": 42
+   },
+   {
+    "frame": 47,
+    "x": 317.7,
+    "y": 169.4,
+    "area": 20
+   },
+   {
+    "frame": 48,
+    "x": 308.9,
+    "y": 101.3,
+    "area": 57
+   },
+   {
+    "frame": 49,
+    "x": 306.2,
+    "y": 87.0,
+    "area": 47
+   },
+   {
+    "frame": 50,
+    "x": 304.0,
+    "y": 74.4,
+    "area": 42
+   },
+   {
+    "frame": 51,
+    "x": 301.9,
+    "y": 63.4,
+    "area": 37
+   }
+  ],
+  "cam_horz": -0.52,
+  "cam_vert_la": 15.4,
+  "flight_x0_off": -13.5
+ },
+ {
+  "shot": 11,
+  "ball_mph": 73.0285629922176,
+  "club_mph": 53.76389171484376,
+  "ti_horz": -26.015856206196357,
+  "ti_horz_conf": 0.387,
+  "radar_aoa": -22.9,
+  "trace_status": "ok",
+  "trace_deg": -40.59,
+  "impact": 41,
+  "ball_xy": [
+   324.3,
+   188.5
+  ],
+  "mm_per_px": 3.185,
+  "impact_used": 41,
+  "vx_sign": 1,
+  "signed_trace": -40.6,
+  "n_pairs": 4,
+  "fused_aoa": -6.9,
+  "signed_path": 8.0,
+  "flight_n": 9,
+  "flight": [
+   {
+    "frame": 42,
+    "x": 317.0,
+    "y": 180.4,
+    "area": 102
+   },
+   {
+    "frame": 43,
+    "x": 313.7,
+    "y": 180.0,
+    "area": 47
+   },
+   {
+    "frame": 44,
+    "x": 315.2,
+    "y": 181.0,
+    "area": 28
+   },
+   {
+    "frame": 45,
+    "x": 322.5,
+    "y": 179.7,
+    "area": 46
+   },
+   {
+    "frame": 46,
+    "x": 320.1,
+    "y": 180.2,
+    "area": 48
+   },
+   {
+    "frame": 48,
+    "x": 323.5,
+    "y": 156.3,
+    "area": 17
+   },
+   {
+    "frame": 50,
+    "x": 318.7,
+    "y": 139.4,
+    "area": 18
+   },
+   {
+    "frame": 51,
+    "x": 323.7,
+    "y": 137.0,
+    "area": 56
+   },
+   {
+    "frame": 52,
+    "x": 323.7,
+    "y": 130.6,
+    "area": 58
+   }
+  ],
+  "cam_horz": 1.27,
+  "cam_vert_la": 9.39,
+  "flight_x0_off": -7.3
+ },
+ {
+  "shot": 12,
+  "ball_mph": 105.88780063174663,
+  "club_mph": 84.00608080444337,
+  "ti_horz": -3.074324801119118,
+  "ti_horz_conf": 0.886,
+  "radar_aoa": -23.7,
+  "trace_status": "overexposed",
+  "trace_deg": null,
+  "impact": null,
+  "ball_xy": [
+   323.4,
+   187.1
+  ],
+  "mm_per_px": 3.243,
+  "impact_used": 43,
+  "vx_sign": 1,
+  "signed_trace": 6.6,
+  "n_pairs": 4,
+  "flight_n": 11,
+  "flight": [
+   {
+    "frame": 44,
+    "x": 310.1,
+    "y": 183.1,
+    "area": 87
+   },
+   {
+    "frame": 45,
+    "x": 312.7,
+    "y": 182.1,
+    "area": 67
+   },
+   {
+    "frame": 46,
+    "x": 320.8,
+    "y": 152.1,
+    "area": 24
+   },
+   {
+    "frame": 47,
+    "x": 315.0,
+    "y": 131.3,
+    "area": 82
+   },
+   {
+    "frame": 48,
+    "x": 312.6,
+    "y": 115.9,
+    "area": 73
+   },
+   {
+    "frame": 49,
+    "x": 310.5,
+    "y": 102.3,
+    "area": 63
+   },
+   {
+    "frame": 50,
+    "x": 308.6,
+    "y": 90.4,
+    "area": 54
+   },
+   {
+    "frame": 51,
+    "x": 306.9,
+    "y": 80.0,
+    "area": 50
+   },
+   {
+    "frame": 52,
+    "x": 305.5,
+    "y": 71.0,
+    "area": 43
+   },
+   {
+    "frame": 53,
+    "x": 304.0,
+    "y": 63.0,
+    "area": 41
+   },
+   {
+    "frame": 54,
+    "x": 303.0,
+    "y": 55.4,
+    "area": 35
+   }
+  ],
+  "cam_horz": -1.49,
+  "cam_vert_la": 15.59,
+  "flight_x0_off": -13.3
+ },
+ {
+  "shot": 13,
+  "ball_mph": 110.44829535793481,
+  "club_mph": 83.39512748950196,
+  "ti_horz": -4.852008284028625,
+  "ti_horz_conf": 0.532,
+  "radar_aoa": -1.0,
+  "trace_status": "overexposed",
+  "trace_deg": null,
+  "impact": null,
+  "ball_xy": [
+   326.2,
+   191.2
+  ],
+  "mm_per_px": 3.047,
+  "impact_used": 43,
+  "vx_sign": 1,
+  "signed_trace": 20.4,
+  "n_pairs": 4,
+  "fused_aoa": 15.0,
+  "signed_path": 35.8,
+  "flight_n": 11,
+  "flight": [
+   {
+    "frame": 44,
+    "x": 303.3,
+    "y": 185.7,
+    "area": 49
+   },
+   {
+    "frame": 45,
+    "x": 306.7,
+    "y": 185.1,
+    "area": 43
+   },
+   {
+    "frame": 46,
+    "x": 318.6,
+    "y": 183.9,
+    "area": 83
+   },
+   {
+    "frame": 47,
+    "x": 313.3,
+    "y": 179.7,
+    "area": 40
+   },
+   {
+    "frame": 48,
+    "x": 316.5,
+    "y": 123.1,
+    "area": 81
+   },
+   {
+    "frame": 49,
+    "x": 314.2,
+    "y": 108.1,
+    "area": 69
+   },
+   {
+    "frame": 50,
+    "x": 312.4,
+    "y": 95.0,
+    "area": 61
+   },
+   {
+    "frame": 51,
+    "x": 310.7,
+    "y": 83.9,
+    "area": 54
+   },
+   {
+    "frame": 52,
+    "x": 309.4,
+    "y": 74.1,
+    "area": 46
+   },
+   {
+    "frame": 53,
+    "x": 308.1,
+    "y": 65.4,
+    "area": 40
+   },
+   {
+    "frame": 54,
+    "x": 306.8,
+    "y": 57.5,
+    "area": 37
+   }
+  ],
+  "cam_horz": -0.16,
+  "cam_vert_la": 15.96,
+  "flight_x0_off": -22.9
+ },
+ {
+  "shot": 14,
+  "ball_mph": 109.19373365323402,
+  "club_mph": 84.20973190942384,
+  "ti_horz": -2.9377328574677004,
+  "ti_horz_conf": 0.901,
+  "radar_aoa": -5.0,
+  "trace_status": "ok",
+  "trace_deg": -50.87,
+  "impact": 42,
+  "ball_xy": [
+   326.2,
+   190.6
+  ],
+  "mm_per_px": 3.14,
+  "impact_used": 42,
+  "vx_sign": 1,
+  "signed_trace": -50.9,
+  "n_pairs": 4,
+  "flight_n": 11,
+  "flight": [
+   {
+    "frame": 43,
+    "x": 306.2,
+    "y": 187.1,
+    "area": 273
+   },
+   {
+    "frame": 44,
+    "x": 299.2,
+    "y": 189.8,
+    "area": 56
+   },
+   {
+    "frame": 45,
+    "x": 302.9,
+    "y": 185.3,
+    "area": 27
+   },
+   {
+    "frame": 46,
+    "x": 306.9,
+    "y": 183.6,
+    "area": 22
+   },
+   {
+    "frame": 47,
+    "x": 321.2,
+    "y": 183.3,
+    "area": 84
+   },
+   {
+    "frame": 48,
+    "x": 315.6,
+    "y": 178.6,
+    "area": 25
+   },
+   {
+    "frame": 49,
+    "x": 321.2,
+    "y": 116.8,
+    "area": 76
+   },
+   {
+    "frame": 50,
+    "x": 320.0,
+    "y": 101.2,
+    "area": 69
+   },
+   {
+    "frame": 51,
+    "x": 319.0,
+    "y": 87.6,
+    "area": 57
+   },
+   {
+    "frame": 52,
+    "x": 318.1,
+    "y": 75.6,
+    "area": 54
+   },
+   {
+    "frame": 53,
+    "x": 317.4,
+    "y": 65.0,
+    "area": 45
+   }
+  ],
+  "cam_horz": 2.01,
+  "cam_vert_la": 15.16,
+  "flight_x0_off": -20.0
+ },
+ {
+  "shot": 15,
+  "ball_mph": 100.6527069832059,
+  "club_mph": 89.7083117438965,
+  "ti_horz": -4.4736330917715,
+  "ti_horz_conf": 0.95,
+  "radar_aoa": -20.1,
+  "trace_status": "overexposed",
+  "trace_deg": null,
+  "impact": null,
+  "ball_xy": [
+   323.3,
+   188.6
+  ],
+  "mm_per_px": 3.185,
+  "impact_used": 42,
+  "vx_sign": -1,
+  "signed_trace": 16.6,
+  "n_pairs": 4,
+  "flight_n": 11,
+  "flight": [
+   {
+    "frame": 43,
+    "x": 328.6,
+    "y": 180.1,
+    "area": 19
+   },
+   {
+    "frame": 44,
+    "x": 329.9,
+    "y": 194.9,
+    "area": 34
+   },
+   {
+    "frame": 45,
+    "x": 332.8,
+    "y": 184.3,
+    "area": 17
+   },
+   {
+    "frame": 46,
+    "x": 308.9,
+    "y": 186.1,
+    "area": 51
+   },
+   {
+    "frame": 47,
+    "x": 312.5,
+    "y": 184.9,
+    "area": 61
+   },
+   {
+    "frame": 48,
+    "x": 317.0,
+    "y": 113.8,
+    "area": 88
+   },
+   {
+    "frame": 49,
+    "x": 315.5,
+    "y": 95.3,
+    "area": 70
+   },
+   {
+    "frame": 50,
+    "x": 314.1,
+    "y": 79.3,
+    "area": 61
+   },
+   {
+    "frame": 51,
+    "x": 312.9,
+    "y": 65.0,
+    "area": 55
+   },
+   {
+    "frame": 52,
+    "x": 311.9,
+    "y": 52.8,
+    "area": 53
+   },
+   {
+    "frame": 53,
+    "x": 310.6,
+    "y": 41.6,
+    "area": 25
+   }
+  ],
+  "cam_horz": -2.34,
+  "cam_vert_la": 21.0,
+  "flight_x0_off": 5.3
+ },
+ {
+  "shot": 16,
+  "ball_mph": 88.4763115678174,
+  "club_mph": 78.50750096997072,
+  "ti_horz": 3.2010673028412717,
+  "ti_horz_conf": 0.926,
+  "radar_aoa": -16.4,
+  "trace_status": "overexposed",
+  "trace_deg": null,
+  "impact": null,
+  "ball_xy": [
+   323.5,
+   189.7
+  ],
+  "mm_per_px": 3.151,
+  "impact_used": 41,
+  "vx_sign": 1,
+  "signed_trace": -79.9,
+  "n_pairs": 4,
+  "fused_aoa": -0.4,
+  "signed_path": 0.1,
+  "flight_n": 11,
+  "flight": [
+   {
+    "frame": 42,
+    "x": 328.5,
+    "y": 180.8,
+    "area": 17
+   },
+   {
+    "frame": 43,
+    "x": 314.5,
+    "y": 180.7,
+    "area": 28
+   },
+   {
+    "frame": 44,
+    "x": 262.5,
+    "y": 80.4,
+    "area": 304
+   },
+   {
+    "frame": 45,
+    "x": 251.2,
+    "y": 65.6,
+    "area": 100
+   },
+   {
+    "frame": 46,
+    "x": 157.7,
+    "y": 28.7,
+    "area": 257
+   },
+   {
+    "frame": 47,
+    "x": 157.6,
+    "y": 28.6,
+    "area": 264
+   },
+   {
+    "frame": 48,
+    "x": 157.6,
+    "y": 28.5,
+    "area": 264
+   },
+   {
+    "frame": 49,
+    "x": 157.7,
+    "y": 28.5,
+    "area": 267
+   },
+   {
+    "frame": 50,
+    "x": 157.9,
+    "y": 28.4,
+    "area": 263
+   },
+   {
+    "frame": 51,
+    "x": 158.2,
+    "y": 28.5,
+    "area": 258
+   },
+   {
+    "frame": 52,
+    "x": 158.2,
+    "y": 28.5,
+    "area": 262
+   }
+  ],
+  "cam_horz": -26.27,
+  "cam_vert_la": 21.92,
+  "flight_x0_off": 5.0
+ },
+ {
+  "shot": 17,
+  "ball_mph": 101.47661276052176,
+  "club_mph": 83.08965083203127,
+  "ti_horz": -3.642668209905688,
+  "ti_horz_conf": 0.95,
+  "radar_aoa": -7.1,
+  "trace_status": "overexposed",
+  "trace_deg": null,
+  "impact": null,
+  "ball_xy": [
+   321.9,
+   188.5
+  ],
+  "mm_per_px": 3.185,
+  "impact_used": 41,
+  "vx_sign": -1,
+  "signed_trace": -74.3,
+  "n_pairs": 2,
+  "flight_n": 11,
+  "flight": [
+   {
+    "frame": 42,
+    "x": 263.2,
+    "y": 92.2,
+    "area": 452
+   },
+   {
+    "frame": 43,
+    "x": 262.9,
+    "y": 96.6,
+    "area": 420
+   },
+   {
+    "frame": 44,
+    "x": 259.4,
+    "y": 93.8,
+    "area": 411
+   },
+   {
+    "frame": 45,
+    "x": 250.4,
+    "y": 79.1,
+    "area": 261
+   },
+   {
+    "frame": 46,
+    "x": 241.4,
+    "y": 61.9,
+    "area": 20
+   },
+   {
+    "frame": 47,
+    "x": 152.9,
+    "y": 21.7,
+    "area": 344
+   },
+   {
+    "frame": 48,
+    "x": 152.7,
+    "y": 22.0,
+    "area": 332
+   },
+   {
+    "frame": 49,
+    "x": 152.7,
+    "y": 22.0,
+    "area": 328
+   },
+   {
+    "frame": 50,
+    "x": 152.7,
+    "y": 22.1,
+    "area": 329
+   },
+   {
+    "frame": 51,
+    "x": 152.9,
+    "y": 22.0,
+    "area": 322
+   },
+   {
+    "frame": 52,
+    "x": 152.5,
+    "y": 24.9,
+    "area": 267
+   }
+  ],
+  "cam_horz": -17.64,
+  "cam_vert_la": 11.28,
+  "flight_x0_off": -58.7
+ }
+]

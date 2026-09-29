@@ -1,0 +1,140 @@
+{
+  "radar_all": {
+    "n": 84,
+    "total": 84,
+    "coverage_pct": 100.0,
+    "mae_deg": 4.805635030221375,
+    "p50_deg": 3.3836915817771525,
+    "p75_deg": 6.219575853884887,
+    "p90_deg": 10.343889757572244,
+    "bias_deg": -0.4408101413018641
+  },
+  "models": {
+    "direct_only": {
+      "n": 84,
+      "total": 84,
+      "coverage_pct": 100.0,
+      "mae_deg": 4.00989972335117,
+      "p50_deg": 3.3219224381150934,
+      "p75_deg": 5.227727034559059,
+      "p90_deg": 6.984935444428851,
+      "bias_deg": -2.878515278295962
+    },
+    "four4_path_tdm": {
+      "n": 84,
+      "total": 84,
+      "coverage_pct": 100.0,
+      "mae_deg": 5.287864376222645,
+      "p50_deg": 3.569544792418073,
+      "p75_deg": 7.45103491281487,
+      "p90_deg": 10.826403605068359,
+      "bias_deg": 0.013535258324171271
+    },
+    "reciprocal3_no_tdm": {
+      "n": 84,
+      "total": 84,
+      "coverage_pct": 100.0,
+      "mae_deg": 3.6881729353443196,
+      "p50_deg": 2.5444184481926007,
+      "p75_deg": 4.830102764444158,
+      "p90_deg": 8.338563713021522,
+      "bias_deg": 1.4005924315056775
+    },
+    "two8": {
+      "n": 84,
+      "total": 84,
+      "coverage_pct": 100.0,
+      "mae_deg": 4.3682601146162,
+      "p50_deg": 3.8709903348600925,
+      "p75_deg": 5.909174495769438,
+      "p90_deg": 8.322583770485087,
+      "bias_deg": -4.004224376338125
+    }
+  },
+  "by_height": {
+    "high_5.25in": {
+      "radar_all": {
+        "n": 48,
+        "total": 48,
+        "coverage_pct": 100.0,
+        "mae_deg": 4.010024238699876,
+        "p50_deg": 2.8435014051895635,
+        "p75_deg": 4.949014964962629,
+        "p90_deg": 9.64806032442824,
+        "bias_deg": -0.47835468683177645
+      },
+      "radar_medium_plus": {
+        "n": 34,
+        "total": 34,
+        "coverage_pct": 100.0,
+        "mae_deg": 3.205823862672082,
+        "p50_deg": 2.6343986521322984,
+        "p75_deg": 4.45825536222623,
+        "p90_deg": 5.815062365564282,
+        "bias_deg": -1.4954755830776056
+      },
+      "camera_validated_medium_plus": {
+        "n": 0,
+        "total": 0,
+        "coverage_pct": 0.0,
+        "mae_deg": null,
+        "p50_deg": null,
+        "p75_deg": null,
+        "p90_deg": null,
+        "bias_deg": null
+      }
+    },
+    "low_2.875in": {
+      "radar_all": {
+        "n": 36,
+        "total": 36,
+        "coverage_pct": 100.0,
+        "mae_deg": 5.8664494189167105,
+        "p50_deg": 5.02274727787724,
+        "p75_deg": 7.231590535907371,
+        "p90_deg": 11.13205044625603,
+        "bias_deg": -0.3907507472619809
+      },
+      "radar_medium_plus": {
+        "n": 28,
+        "total": 28,
+        "coverage_pct": 100.0,
+        "mae_deg": 4.607355347430257,
+        "p50_deg": 3.6350782780869455,
+        "p75_deg": 5.710111469172444,
+        "p90_deg": 7.250143363504365,
+        "bias_deg": -2.0271496131199593
+      },
+      "camera_validated_medium_plus": {
+        "n": 0,
+        "total": 0,
+        "coverage_pct": 0.0,
+        "mae_deg": null,
+        "p50_deg": null,
+        "p75_deg": null,
+        "p90_deg": null,
+        "bias_deg": null
+      }
+    }
+  },
+  "radar_medium_plus": {
+    "n": 62,
+    "total": 62,
+    "coverage_pct": 100.0,
+    "mae_deg": 3.838773565466096,
+    "p50_deg": 2.9479173794549878,
+    "p75_deg": 5.177624439737822,
+    "p90_deg": 7.105543775364432,
+    "bias_deg": -1.7355864353547976
+  },
+  "camera_validated_medium_plus": {
+    "n": 0,
+    "total": 0,
+    "coverage_pct": 0.0,
+    "mae_deg": null,
+    "p50_deg": null,
+    "p75_deg": null,
+    "p90_deg": null,
+    "bias_deg": null
+  }
+}

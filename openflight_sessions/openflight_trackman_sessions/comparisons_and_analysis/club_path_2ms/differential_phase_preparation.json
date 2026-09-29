@@ -1,0 +1,274 @@
+[
+  {
+    "dataset": "trackman_4ms",
+    "shot": 6,
+    "status": "ok",
+    "impact_ms": 10.943538067538864,
+    "track_speed_ms": 37.2139040018821,
+    "track_rms_bins": 0.3336770442444514
+  },
+  {
+    "dataset": "trackman_4ms",
+    "shot": 8,
+    "status": "ok",
+    "impact_ms": 18.620746343628685,
+    "track_speed_ms": 33.26995120785317,
+    "track_rms_bins": 0.3586433028693801
+  },
+  {
+    "dataset": "trackman_4ms",
+    "shot": 9,
+    "status": "ok",
+    "impact_ms": 17.966342431326463,
+    "track_speed_ms": 26.281528946825652,
+    "track_rms_bins": 0.46348821853873345
+  },
+  {
+    "dataset": "trackman_4ms",
+    "shot": 10,
+    "status": "ok",
+    "impact_ms": 15.59238597469359,
+    "track_speed_ms": 34.64170498583549,
+    "track_rms_bins": 0.3103959913579005
+  },
+  {
+    "dataset": "trackman_4ms",
+    "shot": 11,
+    "status": "ok",
+    "impact_ms": 16.808236784805747,
+    "track_speed_ms": 34.122093124248,
+    "track_rms_bins": 0.3665587834365358
+  },
+  {
+    "dataset": "trackman_4ms",
+    "shot": 12,
+    "status": "ok",
+    "impact_ms": 16.60871614926093,
+    "track_speed_ms": 32.880413109057066,
+    "track_rms_bins": 0.3522791154721151
+  },
+  {
+    "dataset": "trackman_4ms",
+    "shot": 13,
+    "status": "ok",
+    "impact_ms": 17.77850945938583,
+    "track_speed_ms": 31.950231203587993,
+    "track_rms_bins": 0.4868760855696604
+  },
+  {
+    "dataset": "trackman_4ms",
+    "shot": 14,
+    "status": "ok",
+    "impact_ms": 15.456359081253368,
+    "track_speed_ms": 34.875547900922676,
+    "track_rms_bins": 0.358836903217834
+  },
+  {
+    "dataset": "trackman_4ms",
+    "shot": 16,
+    "status": "ok",
+    "impact_ms": 13.299071274310663,
+    "track_speed_ms": 33.234473124175004,
+    "track_rms_bins": 0.3214166963852202
+  },
+  {
+    "dataset": "trackman_4ms",
+    "shot": 17,
+    "status": "ok",
+    "impact_ms": 15.93000897275601,
+    "track_speed_ms": 34.70380629147074,
+    "track_rms_bins": 0.3009399482442016
+  },
+  {
+    "dataset": "trackman_4ms",
+    "shot": 18,
+    "status": "ok",
+    "impact_ms": 19.800377414517484,
+    "track_speed_ms": 32.77221295770549,
+    "track_rms_bins": 0.42413636367471946
+  },
+  {
+    "dataset": "trackman_4ms",
+    "shot": 19,
+    "status": "ok",
+    "impact_ms": 12.902174226877873,
+    "track_speed_ms": 34.39575803448154,
+    "track_rms_bins": 0.33428124959777106
+  },
+  {
+    "dataset": "trackman_4ms",
+    "shot": 20,
+    "status": "ok",
+    "impact_ms": 13.130429346526446,
+    "track_speed_ms": 35.94225814364401,
+    "track_rms_bins": 0.36314248414127304
+  },
+  {
+    "dataset": "trackman_4ms",
+    "shot": 21,
+    "status": "ok",
+    "impact_ms": 14.675544365715695,
+    "track_speed_ms": 36.82329301598179,
+    "track_rms_bins": 0.3812710851160432
+  },
+  {
+    "dataset": "trackman_4ms",
+    "shot": 22,
+    "status": "ok",
+    "impact_ms": 18.038695393618976,
+    "track_speed_ms": 34.14110395047405,
+    "track_rms_bins": 0.39358253917231384
+  },
+  {
+    "dataset": "trackman_4ms",
+    "shot": 23,
+    "status": "ok",
+    "impact_ms": 13.707668577629624,
+    "track_speed_ms": 34.243213477311045,
+    "track_rms_bins": 0.3198451513378975
+  },
+  {
+    "dataset": "trackman_4ms",
+    "shot": 24,
+    "status": "ok",
+    "impact_ms": 13.937482219780728,
+    "track_speed_ms": 35.27654244105217,
+    "track_rms_bins": 0.2646753589988957
+  },
+  {
+    "dataset": "trackman_4ms",
+    "shot": 25,
+    "status": "ok",
+    "impact_ms": 15.16169647491384,
+    "track_speed_ms": 35.43108932093909,
+    "track_rms_bins": 0.2838991570199136
+  },
+  {
+    "dataset": "home_2ms",
+    "shot": 1,
+    "status": "ok",
+    "impact_ms": 16.09787274635791,
+    "track_speed_ms": 31.511844813151953,
+    "track_rms_bins": 0.30431377078462507
+  },
+  {
+    "dataset": "home_2ms",
+    "shot": 2,
+    "status": "ok",
+    "impact_ms": 15.839911543679033,
+    "track_speed_ms": 30.335500620012404,
+    "track_rms_bins": 0.3229132554776381
+  },
+  {
+    "dataset": "home_2ms",
+    "shot": 3,
+    "status": "ok",
+    "impact_ms": 12.679643867902934,
+    "track_speed_ms": 27.94380588523112,
+    "track_rms_bins": 0.208843261753203
+  },
+  {
+    "dataset": "home_2ms",
+    "shot": 4,
+    "status": "ok",
+    "impact_ms": 13.755075233470254,
+    "track_speed_ms": 27.950593749015354,
+    "track_rms_bins": 0.27705922834951097
+  },
+  {
+    "dataset": "home_2ms",
+    "shot": 5,
+    "status": "ok",
+    "impact_ms": 12.6469330635945,
+    "track_speed_ms": 29.03702988467736,
+    "track_rms_bins": 0.2942617751319325
+  },
+  {
+    "dataset": "home_2ms",
+    "shot": 6,
+    "status": "ok",
+    "impact_ms": 15.71582784242671,
+    "track_speed_ms": 32.24290512459817,
+    "track_rms_bins": 0.32718011037399297
+  },
+  {
+    "dataset": "home_2ms",
+    "shot": 7,
+    "status": "ok",
+    "impact_ms": 14.694659617928545,
+    "track_speed_ms": 29.231098420571094,
+    "track_rms_bins": 0.2324181634665331
+  },
+  {
+    "dataset": "home_2ms",
+    "shot": 8,
+    "status": "ok",
+    "impact_ms": 15.854980930484711,
+    "track_speed_ms": 29.743794464266646,
+    "track_rms_bins": 0.28576717485057057
+  },
+  {
+    "dataset": "home_2ms",
+    "shot": 9,
+    "status": "ok",
+    "impact_ms": 13.68158093479992,
+    "track_speed_ms": 33.93870743027233,
+    "track_rms_bins": 0.3116804337567626
+  },
+  {
+    "dataset": "home_2ms",
+    "shot": 10,
+    "status": "ok",
+    "impact_ms": 20.721320677475482,
+    "track_speed_ms": 33.077846066783636,
+    "track_rms_bins": 0.3071734483815039
+  },
+  {
+    "dataset": "home_2ms",
+    "shot": 11,
+    "status": "ok",
+    "impact_ms": 11.948947077366062,
+    "track_speed_ms": 34.03083198938108,
+    "track_rms_bins": 0.2893379068145056
+  },
+  {
+    "dataset": "home_2ms",
+    "shot": 12,
+    "status": "ok",
+    "impact_ms": 17.734572251178673,
+    "track_speed_ms": 34.14766306721351,
+    "track_rms_bins": 0.41111607368596886
+  },
+  {
+    "dataset": "home_2ms",
+    "shot": 13,
+    "status": "ok",
+    "impact_ms": 15.06089049760619,
+    "track_speed_ms": 33.78875874908321,
+    "track_rms_bins": 0.34052956934925427
+  },
+  {
+    "dataset": "home_2ms",
+    "shot": 14,
+    "status": "ok",
+    "impact_ms": 14.893324904962032,
+    "track_speed_ms": 34.20684045201364,
+    "track_rms_bins": 0.3899937848478136
+  },
+  {
+    "dataset": "home_2ms",
+    "shot": 15,
+    "status": "ok",
+    "impact_ms": 13.853874119224445,
+    "track_speed_ms": 31.337167683182766,
+    "track_rms_bins": 0.2794879619246572
+  },
+  {
+    "dataset": "home_2ms",
+    "shot": 16,
+    "status": "ok",
+    "impact_ms": 17.010386286542968,
+    "track_speed_ms": 32.84525969075797,
+    "track_rms_bins": 0.34139087468225066
+  }
+]

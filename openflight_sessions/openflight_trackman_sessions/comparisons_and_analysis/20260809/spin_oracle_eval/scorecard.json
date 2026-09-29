@@ -1,0 +1,81 @@
+{
+  "combined": {
+    "shots": 100,
+    "reported": 100,
+    "coverage_pct": 100.0,
+    "rank1_mae_rpm": 2296.8,
+    "rank1_p50_rpm": 2331.4,
+    "oracle_top5_mae_rpm": 490.1,
+    "oracle_top5_p50_rpm": 352.2,
+    "recall_at_1_500rpm_pct": 22.0,
+    "recall_at_5_500rpm_pct": 63.0,
+    "recall_at_1_1000rpm_pct": 26.0,
+    "recall_at_5_1000rpm_pct": 87.0,
+    "rank1_p75_rpm": 3247.6,
+    "rank1_p90_rpm": 4312.8,
+    "oracle_top5_p75_rpm": 676.3,
+    "oracle_top5_p90_rpm": 1078.5,
+    "oracle_top5_max_rpm": 1905.4,
+    "oracle_top5_within_1500rpm_pct": 96.0,
+    "oracle_selected_rank_counts": {
+      "1": 28,
+      "2": 20,
+      "3": 19,
+      "4": 18,
+      "5": 15
+    }
+  },
+  "7Iron": {
+    "shots": 18,
+    "reported": 18,
+    "coverage_pct": 100.0,
+    "rank1_mae_rpm": 3710.9,
+    "rank1_p50_rpm": 3712.4,
+    "oracle_top5_mae_rpm": 625.2,
+    "oracle_top5_p50_rpm": 545.3,
+    "recall_at_1_500rpm_pct": 5.56,
+    "recall_at_5_500rpm_pct": 44.44,
+    "recall_at_1_1000rpm_pct": 5.56,
+    "recall_at_5_1000rpm_pct": 77.78,
+    "rank1_p75_rpm": 4566.6,
+    "rank1_p90_rpm": 6364.5,
+    "oracle_top5_p75_rpm": 836.8,
+    "oracle_top5_p90_rpm": 1215.2,
+    "oracle_top5_max_rpm": 1905.4,
+    "oracle_top5_within_1500rpm_pct": 94.44,
+    "oracle_selected_rank_counts": {
+      "1": 2,
+      "2": 2,
+      "3": 5,
+      "4": 4,
+      "5": 5
+    }
+  },
+  "9Iron": {
+    "shots": 82,
+    "reported": 82,
+    "coverage_pct": 100.0,
+    "rank1_mae_rpm": 1986.3,
+    "rank1_p50_rpm": 2117.1,
+    "oracle_top5_mae_rpm": 460.4,
+    "oracle_top5_p50_rpm": 319.5,
+    "recall_at_1_500rpm_pct": 25.61,
+    "recall_at_5_500rpm_pct": 67.07,
+    "recall_at_1_1000rpm_pct": 30.49,
+    "recall_at_5_1000rpm_pct": 89.02,
+    "rank1_p75_rpm": 3067.9,
+    "rank1_p90_rpm": 3798.5,
+    "oracle_top5_p75_rpm": 579.2,
+    "oracle_top5_p90_rpm": 1040.8,
+    "oracle_top5_max_rpm": 1701.8,
+    "oracle_top5_within_1500rpm_pct": 96.34,
+    "oracle_selected_rank_counts": {
+      "1": 26,
+      "2": 18,
+      "3": 14,
+      "4": 14,
+      "5": 10
+    }
+  },
+  "elapsed_seconds": 12.999
+}

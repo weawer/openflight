@@ -1,0 +1,278 @@
+{
+  "experiment": "pre_range_fft_window_ab",
+  "windows": [
+    "rectangular",
+    "hann",
+    "hamming"
+  ],
+  "normalization": "unit coherent gain (window / mean(window))",
+  "groups": {
+    "0714/block_a_old_enclosure/hamming": {
+      "eligible": 60,
+      "accepted": 53,
+      "coverage_pct": 88.33333333333333,
+      "mae_deg": 1.7317807137595609,
+      "p50_deg": 1.0831584042336466,
+      "p75_deg": 2.247110084150523,
+      "p90_deg": 3.744974566257053,
+      "bias_deg": 0.7880538918076455
+    },
+    "0714/block_a_old_enclosure/hann": {
+      "eligible": 60,
+      "accepted": 53,
+      "coverage_pct": 88.33333333333333,
+      "mae_deg": 1.691427015932614,
+      "p50_deg": 0.9500995637155718,
+      "p75_deg": 2.4140945819703283,
+      "p90_deg": 3.6604319677094344,
+      "bias_deg": 0.6179418096847519
+    },
+    "0714/block_a_old_enclosure/rectangular": {
+      "eligible": 60,
+      "accepted": 50,
+      "coverage_pct": 83.33333333333333,
+      "mae_deg": 1.559271383357909,
+      "p50_deg": 0.8519698877829072,
+      "p75_deg": 1.7513368837046372,
+      "p90_deg": 3.881376104967351,
+      "bias_deg": 1.0236661259595332
+    },
+    "0717/normal_tx/hamming": {
+      "eligible": 73,
+      "accepted": 56,
+      "coverage_pct": 76.71232876712328,
+      "mae_deg": 2.0386872309629687,
+      "p50_deg": 1.1645614689874275,
+      "p75_deg": 2.3233075291944436,
+      "p90_deg": 3.252653344052454,
+      "bias_deg": 1.333180233789365
+    },
+    "0717/normal_tx/hann": {
+      "eligible": 73,
+      "accepted": 58,
+      "coverage_pct": 79.45205479452055,
+      "mae_deg": 2.3187093935596925,
+      "p50_deg": 1.229268431919257,
+      "p75_deg": 2.1574942148395615,
+      "p90_deg": 4.161471788046228,
+      "bias_deg": 1.4879183056137202
+    },
+    "0717/normal_tx/rectangular": {
+      "eligible": 73,
+      "accepted": 59,
+      "coverage_pct": 80.82191780821918,
+      "mae_deg": 2.484208463826245,
+      "p50_deg": 1.463700981783318,
+      "p75_deg": 2.5698134864135422,
+      "p90_deg": 3.5763302221047106,
+      "bias_deg": 1.998726428925094
+    },
+    "0717/reversed_tx_experimental/hamming": {
+      "eligible": 18,
+      "accepted": 14,
+      "coverage_pct": 77.77777777777777,
+      "mae_deg": 1.1081737111628644,
+      "p50_deg": 0.7498109085418818,
+      "p75_deg": 1.2689331275574656,
+      "p90_deg": 1.531804456835289,
+      "bias_deg": 0.36586378798028946
+    },
+    "0717/reversed_tx_experimental/hann": {
+      "eligible": 18,
+      "accepted": 14,
+      "coverage_pct": 77.77777777777777,
+      "mae_deg": 1.016210236116843,
+      "p50_deg": 0.7488163389066731,
+      "p75_deg": 0.9517487838315919,
+      "p90_deg": 1.7088993398574306,
+      "bias_deg": 0.23252446701605095
+    },
+    "0717/reversed_tx_experimental/rectangular": {
+      "eligible": 18,
+      "accepted": 14,
+      "coverage_pct": 77.77777777777777,
+      "mae_deg": 1.1737044318460474,
+      "p50_deg": 0.845119429808646,
+      "p75_deg": 1.535984941470672,
+      "p90_deg": 2.3197249389746672,
+      "bias_deg": -0.0983049203329792
+    },
+    "0722/old_enclosure/hamming": {
+      "eligible": 0,
+      "accepted": 0,
+      "coverage_pct": null,
+      "mae_deg": null,
+      "p50_deg": null,
+      "p75_deg": null,
+      "p90_deg": null,
+      "bias_deg": null
+    },
+    "0722/old_enclosure/hann": {
+      "eligible": 0,
+      "accepted": 0,
+      "coverage_pct": null,
+      "mae_deg": null,
+      "p50_deg": null,
+      "p75_deg": null,
+      "p90_deg": null,
+      "bias_deg": null
+    },
+    "0722/old_enclosure/rectangular": {
+      "eligible": 0,
+      "accepted": 0,
+      "coverage_pct": null,
+      "mae_deg": null,
+      "p50_deg": null,
+      "p75_deg": null,
+      "p90_deg": null,
+      "bias_deg": null
+    }
+  },
+  "paired": {
+    "0714/block_a_old_enclosure": {
+      "hann": {
+        "paired_shots": 49,
+        "rectangular_mae_deg": 1.5667717998527253,
+        "candidate_mae_deg": 1.704227259201132,
+        "mae_delta_deg": 0.13745545934840703,
+        "median_abs_error_delta_deg": 0.04479814975517726,
+        "shots_improved": 24,
+        "shots_worsened": 25,
+        "shots_unchanged": 0
+      },
+      "hamming": {
+        "paired_shots": 49,
+        "rectangular_mae_deg": 1.5667717998527253,
+        "candidate_mae_deg": 1.7618048876544086,
+        "mae_delta_deg": 0.1950330878016834,
+        "median_abs_error_delta_deg": 0.16025260351295856,
+        "shots_improved": 19,
+        "shots_worsened": 30,
+        "shots_unchanged": 0
+      }
+    },
+    "0717/normal_tx": {
+      "hann": {
+        "paired_shots": 54,
+        "rectangular_mae_deg": 2.3507061013754758,
+        "candidate_mae_deg": 2.3873104344125378,
+        "mae_delta_deg": 0.036604333037062224,
+        "median_abs_error_delta_deg": 0.0932907383445496,
+        "shots_improved": 26,
+        "shots_worsened": 28,
+        "shots_unchanged": 0
+      },
+      "hamming": {
+        "paired_shots": 52,
+        "rectangular_mae_deg": 2.07550801710285,
+        "candidate_mae_deg": 2.0750316824316553,
+        "mae_delta_deg": -0.00047633467119419985,
+        "median_abs_error_delta_deg": -0.09120020686667196,
+        "shots_improved": 27,
+        "shots_worsened": 25,
+        "shots_unchanged": 0
+      }
+    },
+    "0717/reversed_tx_experimental": {
+      "hann": {
+        "paired_shots": 13,
+        "rectangular_mae_deg": 1.2629573757740016,
+        "candidate_mae_deg": 1.0485460034693999,
+        "mae_delta_deg": -0.21441137230460164,
+        "median_abs_error_delta_deg": 0.014024863144996402,
+        "shots_improved": 6,
+        "shots_worsened": 7,
+        "shots_unchanged": 0
+      },
+      "hamming": {
+        "paired_shots": 13,
+        "rectangular_mae_deg": 1.2629573757740016,
+        "candidate_mae_deg": 1.1398878409175792,
+        "mae_delta_deg": -0.12306953485642243,
+        "median_abs_error_delta_deg": 0.2147077482123798,
+        "shots_improved": 6,
+        "shots_worsened": 7,
+        "shots_unchanged": 0
+      }
+    },
+    "0722/old_enclosure": {
+      "hann": {
+        "paired_shots": 0,
+        "rectangular_mae_deg": null,
+        "candidate_mae_deg": null,
+        "mae_delta_deg": null,
+        "median_abs_error_delta_deg": null,
+        "shots_improved": 0,
+        "shots_worsened": 0,
+        "shots_unchanged": 0
+      },
+      "hamming": {
+        "paired_shots": 0,
+        "rectangular_mae_deg": null,
+        "candidate_mae_deg": null,
+        "mae_delta_deg": null,
+        "median_abs_error_delta_deg": null,
+        "shots_improved": 0,
+        "shots_worsened": 0,
+        "shots_unchanged": 0
+      }
+    }
+  },
+  "overall_raw": {
+    "rectangular": {
+      "eligible": 151,
+      "accepted": 123,
+      "coverage_pct": 81.45695364238411,
+      "mae_deg": 1.9590547201584438,
+      "p50_deg": 1.1226708222872297,
+      "p75_deg": 2.3556171105047827,
+      "p90_deg": 3.634327053456499,
+      "bias_deg": 1.363673957072321
+    },
+    "hann": {
+      "eligible": 151,
+      "accepted": 125,
+      "coverage_pct": 82.78145695364239,
+      "mae_deg": 1.9068617598122122,
+      "p50_deg": 1.0158931561925222,
+      "p75_deg": 2.133280935176483,
+      "p90_deg": 3.9206932917654522,
+      "bias_deg": 0.9784441614168986
+    },
+    "hamming": {
+      "eligible": 151,
+      "accepted": 123,
+      "coverage_pct": 81.45695364238411,
+      "mae_deg": 1.8005308513777492,
+      "p50_deg": 1.0442558921334122,
+      "p75_deg": 2.196378102146787,
+      "p90_deg": 3.257050182086334,
+      "bias_deg": 0.9881873365018999
+    }
+  },
+  "overall_paired": {
+    "hann": {
+      "paired_shots": 116,
+      "rectangular_mae_deg": 1.8976585651044933,
+      "candidate_mae_deg": 1.948732734519265,
+      "mae_delta_deg": 0.051074169414771414,
+      "median_abs_error_delta_deg": 0.03686599547697966,
+      "shots_improved": 56,
+      "shots_worsened": 60,
+      "shots_unchanged": 0
+    },
+    "hamming": {
+      "paired_shots": 114,
+      "rectangular_mae_deg": 1.7641814119929276,
+      "candidate_mae_deg": 1.8337599027494795,
+      "mae_delta_deg": 0.06957849075655172,
+      "median_abs_error_delta_deg": 0.06812674466928126,
+      "shots_improved": 52,
+      "shots_worsened": 62,
+      "shots_unchanged": 0
+    }
+  },
+  "reference_only": [
+    "0722/old_enclosure"
+  ]
+}
