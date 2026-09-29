@@ -22,10 +22,14 @@ def _function_source(source: str, name: str, next_name: str) -> str:
 
 
 def test_hwa_dump_stops_at_boundary_before_streaming():
+    """Stopping (or, after a self-trigger, awaiting the already-latched
+    freeze -- see test_dump_waits_on_an_already_latched_freeze_instead_of_
+    requesting_a_new_one in test_iwr6843_firmware_sparse.py) must happen
+    before any ring bytes go out."""
     source = FIRMWARE.read_text(encoding="utf-8")
     dump = _function_source(source, "int32_t l3_cli_dump", "static int32_t l3_cli_stats")
 
-    stop = dump.index("l3_stopCaptureAtBoundary")
+    stop = dump.index("l3_awaitFrozenRing()")
     stream = dump.index("UART_writePolling")
 
     assert stop < stream

@@ -79,6 +79,23 @@ def test_release_rearms_without_reading_a_cell_line():
     assert 'tableEntry[16].cmd           = "l3release"' in _source()
 
 
+def test_dump_waits_on_an_already_latched_freeze_instead_of_requesting_a_new_one():
+    """l3_stopCaptureAtBoundary's l3_freezeHwaAfterPostFrames unconditionally
+    requests a fresh HWA freeze and waits up to 250 ticks for it to complete.
+    Called directly after a self-trigger already froze the ring (stopped
+    re-arming), nothing produces the new completion it waits for, so it times
+    out and l3dump returns -1 on every self-triggered capture -- confirmed on
+    the rig, 13/13 real swings, each read back as 18 bytes ("Error -1").
+    l3_cli_dump must await the EXISTING freeze the same way l3_cli_release
+    and sensorStop already do (test_latched_self_trigger_stops_the_front_end_
+    before_rearm, above), not re-request one."""
+    dump = _function("int32_t l3_cli_dump(")
+
+    assert "l3_awaitFrozenRing()" in dump
+    assert "l3_stopCaptureAtBoundary()" not in dump
+    assert "if (!gCaptureActive) {" not in dump.split("l3_awaitFrozenRing()", 1)[0]
+
+
 def test_blank_line_before_the_cell_request_is_not_a_missing_request():
     """A stray CR/LF left in the FIFO must not reject the real cells line."""
     sparse = _function("int32_t l3_cli_sparse(")

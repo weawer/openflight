@@ -549,6 +549,10 @@ static int32_t l3_cli_hwaTest(int32_t argc, char *argv[]);
 static int32_t l3_cli_hwaReal(int32_t argc, char *argv[]);
 #endif
 static int32_t l3_armCapture(void);
+/* Waits on an already-latched self-trigger freeze instead of requesting a
+ * new one; l3_cli_dump, l3_cli_release and sensorStop all need this, not
+ * l3_stopCaptureAtBoundary's unconditional fresh request (see l3_cli_dump). */
+static int32_t l3_awaitFrozenRing(void);
 #ifdef HWA_CHAINED_SNAPSHOT_RING
 static void l3_hwaRearmTask(UArg arg0, UArg arg1);
 static void l3_considerSelfTrigger(uint32_t slot);
@@ -2611,9 +2615,17 @@ static uint8_t l3_dumpCancelRequested(void)
     return (value == L3_DUMP_CANCEL_BYTE) ? 1U : 0U;
 }
 
-/* CLI "l3dump": record the current circular position, retain the configured
- * post-trigger frames, stop at that completed frame boundary, stream the ring,
- * then restart from slot zero. */
+/* CLI "l3dump": if a self-trigger already froze the ring, wait on that
+ * freeze (l3_awaitFrozenRing, as sensorStop and l3release do); otherwise
+ * record the current circular position, retain the configured post-trigger
+ * frames, and stop at that completed frame boundary. Either way, stream the
+ * ring, then restart from slot zero.
+ *
+ * A self-triggered freeze already stopped re-arming; calling
+ * l3_stopCaptureAtBoundary directly (as this did before 2026-09-29) issues
+ * a SECOND, redundant freeze request that nothing will ever complete, since
+ * no further HWA output is coming -- it times out and every self-triggered
+ * l3dump returns -1 (hardware evidence: 13/13 real swings, "Error -1"). */
 int32_t l3_cli_dump(int32_t argc, char *argv[])
 {
     l3_dump_header_t h;
@@ -2624,12 +2636,7 @@ int32_t l3_cli_dump(int32_t argc, char *argv[])
     uint32_t oldestPre;
     (void)argc; (void)argv;
 
-    if (!gCaptureActive) {
-        return -1;
-    }
-
-    /* Halt chirping only after HWA and both output EDMAs completed naturally. */
-    if (l3_stopCaptureAtBoundary() != 0) {
+    if (l3_awaitFrozenRing() != 0) {
         return -1;
     }
 
