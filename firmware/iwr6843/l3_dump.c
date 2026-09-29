@@ -79,19 +79,27 @@
 #define L3_CLI_TASK_PRIORITY   3
 /* Above the CLI: a stats or debug write must never delay the next HWA arm
  * past the ~380 us gap a 2 ms frame leaves after its chirps. */
-#define L3_HWA_REARM_TASK_PRIORITY (L3_DETECT_TASK_PRIORITY + 1U)
+#define L3_HWA_REARM_TASK_PRIORITY (L3_CLI_TASK_PRIORITY + 1U)
 /* Keep the live snapshot worker below CLI. SYS/BIOS Task_yield does not allow
  * lower-priority tasks to run, and a priority-4 snapshot loop starved l3dump
  * so the host only saw the echoed 7-byte "l3dump\n" command. */
 #define L3_SNAPSHOT_TASK_PRIORITY 1
-/* Outrank polled CLI writes so scratch reads finish before HWA reuse. */
-#define L3_DETECT_TASK_PRIORITY (L3_CLI_TASK_PRIORITY + 1U)
+/* Below rearm, so a slot read runs while the next frame is captured. Kept
+ * below the CLI task too: raising it above CLI (tried 2026-09-28, reverted
+ * 2026-09-29) stopped scratch_stale during diagnostic output, but the CLI's
+ * l3dump readback after a real trigger also runs at this priority, with
+ * polled (not interrupt-driven) UART writes -- a detect task that outranks
+ * it can starve that polling loop. Hardware evidence: real self-triggered
+ * captures on this rig stalled at 18 bytes of a ~450 KB dump with detect
+ * above CLI; the l3_iq16_stats fix (l3_dump_hann_fast_3ms_20260929.bin)
+ * already cleared scratch_stale at the old, safe ordering. */
+#define L3_DETECT_TASK_PRIORITY 1
 /* Writes the detect task's CLI lines. At the CLI task's own priority SYS/BIOS
  * never preempts one for the other, so neither can splice a line into the
  * other's; below it, a host command arriving mid-line would let the CLI
  * task cut a "Triggered" notice or a debug line in two. */
 #define L3_NOTICE_TASK_PRIORITY L3_CLI_TASK_PRIORITY
-#define L3_CTRL_TASK_PRIORITY (L3_HWA_REARM_TASK_PRIORITY + 1U)
+#define L3_CTRL_TASK_PRIORITY  5
 
 /* ASCII CAN is reserved as an out-of-band dump cancellation byte. The CLI
  * task is executing l3dump synchronously, so RX interrupts are disabled and

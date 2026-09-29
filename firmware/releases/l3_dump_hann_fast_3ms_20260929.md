@@ -33,9 +33,17 @@ covers the float path the same way.
 
 ## Status
 
-Host tests pass; the image links with the TI toolchain. **Not yet run on the
-rig — the armed soak with `_hann.cfg` needs to be repeated on this image**
-before the `DO NOT USE` warning is removed from
-`config/iwr6843_l3dump_adaptive_47f3ms_53bin_a16_hann.cfg`. This fix removes
-the known 2x redundant-computation cost; it has not been measured to confirm
-the windowed path now fits the 3 ms deadline on real hardware.
+Host tests pass; the image links with the TI toolchain.
+
+**Armed soak passed on the rig (2026-09-29, jamorro@Openflight):**
+`config/iwr6843_l3dump_adaptive_47f3ms_53bin_a16_hann.cfg`, tee 1.845 m,
+1000-frame request: `frames=1046 missed=0 rate=0.000000% scratch_stale=0`,
+`PASS`. The `iq8_overrun`/`iq8_edma_err` fields in the stats line are always
+printed regardless of capture format; this profile is `adaptive16` (IQ16),
+and the self-trigger only arms on IQ16 profiles, so the windowed IQ16 fast
+path (`l3_iq16_channel_stats_windowed`, not the IQ8/float fallback) is what
+was exercised and fixed.
+
+The `DO NOT USE` warning is lifted from the `_hann` config. Still open:
+real-swing trigger behaviour and ball-track quality with Hann on — the
+armed soak only proves the timing budget, not detection.

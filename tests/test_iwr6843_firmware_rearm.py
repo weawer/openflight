@@ -599,14 +599,20 @@ def test_rearm_task_outranks_the_cli():
     inter-frame gap; the 2 ms profiles leave about 380 us after the chirps."""
     source = FIRMWARE.read_text(encoding="utf-8")
 
-    assert "#define L3_HWA_REARM_TASK_PRIORITY (L3_DETECT_TASK_PRIORITY + 1U)" in source
+    assert "#define L3_HWA_REARM_TASK_PRIORITY (L3_CLI_TASK_PRIORITY + 1U)" in source
 
 
-def test_detection_outranks_cli_but_not_rearm_or_control():
+def test_detection_stays_below_the_cli():
+    """Raising detection above the CLI (tried 2026-09-28, reverted 2026-09-29)
+    stopped scratch_stale during diagnostic output, but a real self-triggered
+    capture on the rig then stalled its l3dump readback at 18 of ~450,000
+    bytes: the CLI's polled UART writes share this priority and a detect task
+    that outranks it can starve them. The l3_iq16_stats double-read fix
+    (l3_dump_hann_fast_3ms_20260929.bin) already clears scratch_stale at this,
+    the safe, ordering."""
     source = FIRMWARE.read_text()
-    assert "#define L3_DETECT_TASK_PRIORITY (L3_CLI_TASK_PRIORITY + 1U)" in source
-    assert "#define L3_HWA_REARM_TASK_PRIORITY (L3_DETECT_TASK_PRIORITY + 1U)" in source
-    assert "#define L3_CTRL_TASK_PRIORITY (L3_HWA_REARM_TASK_PRIORITY + 1U)" in source
+    assert "#define L3_DETECT_TASK_PRIORITY 1" in source
+    assert "#define L3_CTRL_TASK_PRIORITY  5" in source
     assert "#define L3_NOTICE_TASK_PRIORITY L3_CLI_TASK_PRIORITY" in source
 
 
