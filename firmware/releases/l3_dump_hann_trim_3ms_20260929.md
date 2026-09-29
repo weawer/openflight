@@ -20,5 +20,22 @@ Runtime profiles, 3 ms frames:
 | `config/iwr6843_l3dump_adaptive_47f3ms_53bin_a16_hann.cfg` | Hann |
 
 Status: host tests pass (IWR, swing and soak suites); the image links with the
-TI toolchain. **Not run on hardware.** The live split trigger is not in this
-image; see `docs/superpowers/plans/2026-09-29-iwr6843-split-trigger.md`.
+TI toolchain. The live split trigger is not in this image; see
+`docs/superpowers/plans/2026-09-29-iwr6843-split-trigger.md`.
+
+## Hardware evidence (2026-09-29, jamorro@Openflight rig)
+
+- **Plain profile (no window): armed soak clean.** 1000-frame run on
+  `iwr6843_l3dump_adaptive_47f3ms_53bin_a16.cfg` at tee 1.845 m passed with no
+  `scratch_stale`, no missed frames, no false trigger.
+- **Hann profile: FAILS the armed soak.** Same rig, same tee, `_hann.cfg`:
+  `scratch_stale=13` of 106 frames captured, then a false self-trigger latch
+  (`active=0 latched=1`) with a still scene, ending the soak early. The
+  windowed residual reads each bin's two neighbours as well as itself (about
+  3x the memory reads of the plain path per bin/channel/loop) across the full
+  53-bin wide processing region every frame; this misses the 3 ms detect-task
+  deadline often enough to corrupt the trigger's floor tracking.
+- **Conclusion: do not arm the `_hann` profile on the rig until the kernel is
+  narrowed or cheapened.** The plain profile is unaffected (Hann is off by
+  default; `gRangeWindow` only changes when a cfg explicitly sends `trackCfg
+  window hann`) and is safe to keep using for trigger-reliability testing.
