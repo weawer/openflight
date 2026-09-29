@@ -14,6 +14,7 @@ import ctypes
 import importlib.util
 import json
 import math
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -134,6 +135,67 @@ def test_bin_observations_reject_a_window_outside_the_frame_or_a_partial_loop():
         bin_observations(cube, 0, 0, 4, 5)  # 36 chirps is not a whole number of 5-TX loops
 
 
+def _board_bin_stats(lib, cube, frame, local_bin, n_tx, window):
+    """``l3_verticalResidual``'s IQ16 path on the board's memory layout:
+    [loop][tx][rx][bin][Im, Re] int16, stats through the compiled C."""
+    chirps, n_rx, bins = cube.shape[1], cube.shape[2], cube.shape[3]
+    loops = chirps // n_tx
+    words = np.zeros((loops, n_tx, n_rx, bins, 2), dtype=np.int16)
+    data = cube[frame].reshape(loops, n_tx, n_rx, bins)
+    words[..., 0] = data.imag
+    words[..., 1] = data.real
+    flat = words.reshape(-1)
+    stride = n_tx * n_rx * bins * 2
+    bin_stats = fw.Iq16BinStats()
+    lib.l3_iq16_bin_stats_init(ctypes.byref(bin_stats), loops)
+    for tx in vertical_tx_indices(n_tx):
+        for rx in range(n_rx):
+            offset = ((tx * n_rx + rx) * bins + local_bin) * 2
+            pointer = ctypes.cast(
+                flat.ctypes.data + offset * flat.itemsize, ctypes.POINTER(ctypes.c_int16)
+            )
+            stats = fw.Iq16ChannelStats()
+            assert (
+                lib.l3_iq16_channel_stats_windowed(
+                    pointer, loops, stride, window, ctypes.byref(stats)
+                )
+                == 0
+            )
+            lib.l3_iq16_bin_stats_add(ctypes.byref(bin_stats), ctypes.byref(stats))
+    values = [ctypes.c_float() for _ in range(5)]
+    lib.l3_iq16_bin_stats_finish(ctypes.byref(bin_stats), *map(ctypes.byref, values), None)
+    return tuple(v.value for v in values)
+
+
+def test_the_hann_table_matches_the_board_layout_through_the_c_statistics(lib):
+    """The replay's window equals the board's: the neighbours the C reads at
+    +/- 2 words are the adjacent range bins, and the edge bins stay plain."""
+    cube = _random_cube(11, 3)
+    table = bin_observation_table(cube, 1, 0, 20, 3, window="hann")
+    for local_bin in range(20):
+        edge = local_bin in (0, 19)
+        window = fw.RANGE_WINDOW_NONE if edge else fw.RANGE_WINDOW_HANN
+        expected = _board_bin_stats(lib, cube, 1, local_bin, 3, window)
+        got = tuple(
+            float(table[name][local_bin]) for name in ("energy", "peak", "loop0", "r1Re", "r1Im")
+        )
+        assert got == pytest.approx(expected, rel=1e-5, abs=1e-2), local_bin
+
+
+def test_the_hann_window_changes_interior_bins_and_honours_the_frames_valid_bins():
+    cube = _random_cube(12, 3)
+    plain = bin_observation_table(cube, 0, 0, 20, 3)
+    hann = bin_observation_table(cube, 0, 0, 20, 3, window="hann")
+    assert hann["energy"][0] == plain["energy"][0] and hann["energy"][19] == plain["energy"][19]
+    assert all(hann["energy"][k] != plain["energy"][k] for k in range(1, 19))
+    # A frame holding 12 valid bins: bin 11 is its edge, bin 10 is interior.
+    short = bin_observation_table(cube, 0, 0, 20, 3, window="hann", valid_bins=12)
+    assert short["energy"][11] == plain["energy"][11]
+    assert short["energy"][10] == hann["energy"][10]
+    with pytest.raises(ValueError, match="window"):
+        bin_observation_table(cube, 0, 0, 20, 3, window="kaiser")
+
+
 def test_frame_window_and_timestamps_prefer_the_per_frame_metadata():
     fixed = {"n_frames": 3, "n_samples": 128, "range_bin_start": 20, "frame_period_us": 3000}
     assert frame_window(fixed, 2) == (20, 128)
@@ -224,6 +286,23 @@ def test_replay_rejects_raw_adc_dumps_bad_stats_and_bad_trigger_configs(lib, swi
         replay_dump(swing, ReplayConfig(tee_bin=TEE_BIN, stat="loop0"), lib=lib)
     with pytest.raises(ValueError, match="rejects"):
         replay_dump(swing, ReplayConfig(tee_bin=TEE_BIN, snr=0.5), lib=lib)
+    with pytest.raises(ValueError, match="range_window"):
+        replay_dump(swing, ReplayConfig(tee_bin=TEE_BIN, range_window="kaiser"), lib=lib)
+
+
+def test_the_synthetic_swing_still_fires_through_the_hann_window(lib, swing):
+    """The window must not cost the trigger a clean single-target swing. Scored
+    as the board scores (stop at the fire): after it, the wider main lobe of a
+    club that has left the watch region still lifts the region's last bin."""
+    board = replace(CLUB_ONLY, stop_at_fire=True)
+    plain = replay_dump(swing, board, lib=lib)
+    hann = replay_dump(swing, replace(board, range_window="hann"), lib=lib)
+    assert hann.fired_frame == plain.fired_frame
+    assert hann.acquisitions == 1
+    assert hann.speed_mps == pytest.approx(CLUB_SPEED_MS, abs=0.5)
+    assert [p.range_bin for p in hann.points] == pytest.approx(
+        [p.range_bin for p in plain.points], abs=0.1
+    )
 
 
 def test_report_leads_with_the_continuity_numbers(lib, swing):
@@ -454,9 +533,7 @@ def test_joint_search_arms_from_the_club_tracks_own_last_point(lib, whole_shot):
     does not have, raising AttributeError as soon as a real (non-empty) club
     track reached impact with joint_search enabled. The seed must come from
     the club track's own last point and its range-rate fitted speed."""
-    result = replay_dump(
-        whole_shot, ReplayConfig(tee_bin=TEE_BIN, joint_search=True), lib=lib
-    )
+    result = replay_dump(whole_shot, ReplayConfig(tee_bin=TEE_BIN, joint_search=True), lib=lib)
     assert result.fired_frame is not None
     assert len(result.joint_ball_points) > 0
     assert len(result.joint_club_points) > 0

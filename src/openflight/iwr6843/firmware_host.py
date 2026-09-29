@@ -57,6 +57,10 @@ STAT_NAMES = {"energy": STAT_ENERGY, "peak": STAT_PEAK}
 SUBBIN_CENTROID, SUBBIN_PARABOLIC = 0, 1
 SUBBIN_NAMES = {"centroid": SUBBIN_CENTROID, "parabolic": SUBBIN_PARABOLIC}
 
+# l3_iq16_stats.h
+RANGE_WINDOW_NONE, RANGE_WINDOW_HANN = 0, 1
+RANGE_WINDOW_NAMES = {"none": RANGE_WINDOW_NONE, "hann": RANGE_WINDOW_HANN}
+
 # l3_trigger.h
 TRIG_MAX_BINS = 64
 TRIG_LOG_DEPTH = 128
@@ -981,6 +985,7 @@ class Iq16ChannelStats(ctypes.Structure):
         ("loops", ctypes.c_uint32),
         ("sumIm", ctypes.c_int32),
         ("sumRe", ctypes.c_int32),
+        ("window", ctypes.c_uint32),
         ("energy", ctypes.c_int64),
         ("loopPower", ctypes.c_int64 * 16),
         ("r1Re", ctypes.c_int64),
@@ -994,6 +999,7 @@ class Iq16BinStats(ctypes.Structure):
     _fields_ = [
         ("loops", ctypes.c_uint32),
         ("channels", ctypes.c_uint32),
+        ("window", ctypes.c_uint32),
         ("energy", ctypes.c_int64),
         ("loopPower", ctypes.c_int64 * 16),
         ("r1Re", ctypes.c_int64),
@@ -1134,6 +1140,10 @@ _SIGNATURES: dict[str, tuple[list, object]] = {
     # l3_iq16_stats.h
     "l3_iq16_channel_stats": (
         [_P(ctypes.c_int16), _U32, _U32, _P(Iq16ChannelStats)],
+        ctypes.c_int32,
+    ),
+    "l3_iq16_channel_stats_windowed": (
+        [_P(ctypes.c_int16), _U32, _U32, _U32, _P(Iq16ChannelStats)],
         ctypes.c_int32,
     ),
     "l3_iq16_bin_stats_init": ([_P(Iq16BinStats), _U32], None),

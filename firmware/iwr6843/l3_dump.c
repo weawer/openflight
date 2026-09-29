@@ -386,6 +386,9 @@ static volatile uint8_t  gSelfTriggerLatched;
 static l3_trig_cfg_t     gTrigCfg;
 /* How targets read their sub-bin range (L3_OBS_SUBBIN_*): "trackCfg subbin". */
 static uint32_t          gObsSubBin = L3_OBS_SUBBIN_PARABOLIC;
+/* Range window the detector scores bins through (L3_RANGE_WINDOW_*, see
+ * l3_iq16_stats.h): "trackCfg window". Stored samples are never windowed. */
+static volatile uint32_t gRangeWindow = L3_RANGE_WINDOW_NONE;
 static l3_trig_t         gTrig;
 static volatile uint8_t  gTrigBusy;
 static float             gTrigLoopPeriodS;
@@ -2937,6 +2940,19 @@ static float l3_ringComponent(const uint8_t *component, uint32_t bytes)
     return (float)*(const int16_t *)(const void *)component;
 }
 
+/* One component of a bin through the range window: the same component of the
+ * adjacent complex samples sits 2 * bytes either side. */
+static float l3_ringComponentWindowed(const uint8_t *component, uint32_t bytes, uint32_t window)
+{
+    float value = l3_ringComponent(component, bytes);
+
+    if (window == L3_RANGE_WINDOW_HANN) {
+        value -= 0.5F * (l3_ringComponent(component - 2U * bytes, bytes) +
+                         l3_ringComponent(component + 2U * bytes, bytes));
+    }
+    return value;
+}
+
 /* The slot's frame as stored in the ring (the retained window). */
 static l3_detect_frame_t l3_ringFrameOf(uint32_t slot)
 {
@@ -3015,6 +3031,9 @@ static void l3_verticalResidual(const l3_detect_frame_t *source, uint32_t localB
     float peak = 0.0F;
     float r1Re = 0.0F;
     float r1Im = 0.0F;
+    /* A bin on the edge of the frame's window has one neighbour: unwindowed. */
+    uint32_t window = (localBin > 0U && localBin + 1U < binCount) ? gRangeWindow
+                                                                  : L3_RANGE_WINDOW_NONE;
     uint32_t tx;
     uint32_t loop;
 
@@ -3038,7 +3057,8 @@ static void l3_verticalResidual(const l3_detect_frame_t *source, uint32_t localB
                 const int16_t *words =
                     (const int16_t *)(const void *)&frame[((tx * N_RX + rx) * binCount + localBin) * 4U];
 
-                if (l3_iq16_channel_stats(words, loops, loopStride / 2U, &channelStats) == 0) {
+                if (l3_iq16_channel_stats_windowed(words, loops, loopStride / 2U, window,
+                                                   &channelStats) == 0) {
                     l3_iq16_bin_stats_add(&bin, &channelStats);
                 }
             }
@@ -3067,16 +3087,16 @@ static void l3_verticalResidual(const l3_detect_frame_t *source, uint32_t localB
             float prevRe = 0.0F;
 
             for (loop = 0U; loop < loops; loop++) {
-                meanIm += l3_ringComponent(sample, cb);
-                meanRe += l3_ringComponent(sample + cb, cb);
+                meanIm += l3_ringComponentWindowed(sample, cb, window);
+                meanRe += l3_ringComponentWindowed(sample + cb, cb, window);
                 sample += loopStride;
             }
             meanIm /= (float)loops;
             meanRe /= (float)loops;
             sample = base;
             for (loop = 0U; loop < loops; loop++) {
-                float im = (l3_ringComponent(sample, cb) - meanIm) * scale;
-                float re = (l3_ringComponent(sample + cb, cb) - meanRe) * scale;
+                float im = (l3_ringComponentWindowed(sample, cb, window) - meanIm) * scale;
+                float re = (l3_ringComponentWindowed(sample + cb, cb, window) - meanRe) * scale;
                 float power = im * im + re * re;
                 sample += loopStride;
                 energy += power;
@@ -4373,9 +4393,24 @@ static int32_t l3_cli_trackCfg(int32_t argc, char *argv[])
         CLI_write("Done\n");
         return 0;
     }
+    if (argc == 3 && strcmp(argv[1], "window") == 0) {
+        /* "trackCfg window none|hann": the range window the detector scores
+         * bins through (l3_iq16_stats.h). Send it before triggerCfg, which
+         * restarts the noise floor the old window's statistics built. */
+        if (strcmp(argv[2], "none") == 0) {
+            gRangeWindow = L3_RANGE_WINDOW_NONE;
+        } else if (strcmp(argv[2], "hann") == 0) {
+            gRangeWindow = L3_RANGE_WINDOW_HANN;
+        } else {
+            CLI_write("Error: trackCfg window none|hann\n");
+            return -1;
+        }
+        CLI_write("Done\n");
+        return 0;
+    }
     if (argc != 6) {
         CLI_write("Error: trackCfg <loopPeriodS> <rangeResM> <maxRangeM> <clubLoM> <clubHiM> "
-                  "| cal ... | elem ... | impact ... | subbin ...\n");
+                  "| cal ... | elem ... | impact ... | subbin ... | window ...\n");
         return -1;
     }
     for (i = 0; i < 5; i++) {
@@ -5482,6 +5517,10 @@ static int32_t l3_cli_sensorStop(int32_t argc, char *argv[])
         }
         gSensorOpened = 0U;
     }
+    /* Every configuration starts with sensorStop (driver.send_config): a cfg
+     * that wants the range window sets it again, and one without it must not
+     * inherit the last run's. */
+    gRangeWindow = L3_RANGE_WINDOW_NONE;
     return status;
 }
 

@@ -137,6 +137,164 @@ def test_bin_stats_sum_channels_and_finish_in_physical_units(lib):
     assert bin_stats.channels == 8
 
 
+# --- range window --------------------------------------------------------------
+
+
+def windowed_channel(lib, bins: list[list[tuple[int, int]]], window: int, stride: int = 6):
+    """bins: per loop, the (im, re) of bins k-1, k, k+1, laid out as the board
+    lays out adjacent bins of one channel. Stats are taken at bin k."""
+    loops = len(bins)
+    words = np.zeros(loops * stride + 6, dtype=np.int16)
+    for loop, triple in enumerate(bins):
+        for offset, (im, re) in enumerate(triple):
+            words[loop * stride + 2 * offset] = im
+            words[loop * stride + 2 * offset + 1] = re
+    centre = ctypes.cast(
+        words.ctypes.data + 2 * ctypes.sizeof(ctypes.c_int16), ctypes.POINTER(ctypes.c_int16)
+    )
+    out = fw.Iq16ChannelStats()
+    status = lib.l3_iq16_channel_stats_windowed(centre, loops, stride, window, ctypes.byref(out))
+    return status, out
+
+
+def finish(lib, bin_stats):
+    energy, peak, loop0, r1re, r1im = (ctypes.c_float() for _ in range(5))
+    lib.l3_iq16_bin_stats_finish(
+        ctypes.byref(bin_stats),
+        ctypes.byref(energy),
+        ctypes.byref(peak),
+        ctypes.byref(loop0),
+        ctypes.byref(r1re),
+        ctypes.byref(r1im),
+        None,
+    )
+    return energy.value, peak.value, loop0.value, r1re.value, r1im.value
+
+
+def test_the_kernel_is_the_periodic_hann_window_in_time():
+    """The claim the firmware rests on, in numpy alone: for a 128-point FFT of
+    128 samples, X[k] - (X[k-1] + X[k+1]) / 2 is the FFT of the signal times
+    2 x the periodic Hann window, for every bin (cyclically)."""
+    n = 128
+    rng = np.random.default_rng(4)
+    x = rng.normal(size=n) + 1j * rng.normal(size=n)
+    spectrum = np.fft.fft(x)
+    kernel = spectrum - 0.5 * (np.roll(spectrum, 1) + np.roll(spectrum, -1))
+    hann = 0.5 - 0.5 * np.cos(2 * np.pi * np.arange(n) / n)
+    np.testing.assert_allclose(kernel, np.fft.fft(2 * hann * x), atol=1e-9)
+
+
+@pytest.mark.parametrize("seed", [1, 2])
+@pytest.mark.parametrize("loops", [2, 12, 16])
+def test_hann_channel_stats_are_exact_integers(lib, seed, loops):
+    rng = np.random.default_rng(seed)
+    bins = [
+        [(int(a), int(b)) for a, b in rng.integers(-32768, 32768, size=(3, 2))]
+        for _ in range(loops)
+    ]
+    status, out = windowed_channel(lib, bins, fw.RANGE_WINDOW_HANN)
+    assert status == 0 and out.window == fw.RANGE_WINDOW_HANN
+    doubled = [
+        (2 * mid[0] - left[0] - right[0], 2 * mid[1] - left[1] - right[1])
+        for left, mid, right in bins
+    ]
+    sum_im, sum_re, energy, power, r1re, r1im = exact_reference(doubled)
+    assert (out.sumIm, out.sumRe) == (sum_im, sum_re)
+    assert out.energy == energy
+    assert list(out.loopPower[:loops]) == power
+    assert (out.r1Re, out.r1Im) == (r1re, r1im)
+
+
+def test_no_window_through_the_windowed_entry_is_the_plain_statistics(lib):
+    rng = np.random.default_rng(5)
+    bins = [
+        [(int(a), int(b)) for a, b in rng.integers(-32768, 32768, size=(3, 2))] for _ in range(12)
+    ]
+    status, windowed = windowed_channel(lib, bins, fw.RANGE_WINDOW_NONE)
+    _, plain = channel(lib, [triple[1] for triple in bins])
+    assert status == 0 and windowed.window == fw.RANGE_WINDOW_NONE
+    assert bytes(windowed) == bytes(plain)
+
+
+def test_hann_full_scale_extremes_do_not_overflow(lib):
+    # The widest windowed swing: centre and both neighbours at opposite rails.
+    high = [(-32768, -32768), (32767, 32767), (-32768, -32768)]
+    low = [(32767, 32767), (-32768, -32768), (32767, 32767)]
+    bins = [high, low] * 8
+    status, out = windowed_channel(lib, bins, fw.RANGE_WINDOW_HANN)
+    assert status == 0
+    doubled = [
+        (2 * mid[0] - left[0] - right[0], 2 * mid[1] - left[1] - right[1])
+        for left, mid, right in bins
+    ]
+    _, _, energy, power, _, _ = exact_reference(doubled)
+    assert out.energy == energy and list(out.loopPower) == power
+    # Eight channels of this still fit int64 and double's exact integers.
+    assert 8 * out.energy < 2**53
+
+
+def test_an_unknown_window_is_refused(lib):
+    status, _ = windowed_channel(lib, [[(1, 1)] * 3] * 4, 7)
+    assert status == -1
+
+
+def test_bin_stats_refuse_a_channel_with_another_window(lib):
+    rng = np.random.default_rng(6)
+    bins = [
+        [(int(a), int(b)) for a, b in rng.integers(-3000, 3000, size=(3, 2))] for _ in range(12)
+    ]
+    _, hann = windowed_channel(lib, bins, fw.RANGE_WINDOW_HANN)
+    _, plain = windowed_channel(lib, bins, fw.RANGE_WINDOW_NONE)
+    bin_stats = fw.Iq16BinStats()
+    lib.l3_iq16_bin_stats_init(ctypes.byref(bin_stats), 12)
+    lib.l3_iq16_bin_stats_add(ctypes.byref(bin_stats), ctypes.byref(hann))
+    lib.l3_iq16_bin_stats_add(ctypes.byref(bin_stats), ctypes.byref(plain))
+    assert bin_stats.channels == 1 and bin_stats.window == fw.RANGE_WINDOW_HANN
+
+
+def _moving_tone_spectra(tone_bin: float, loops: int, amplitude: float, n: int = 128):
+    """Range FFT of a tone at tone_bin whose phase advances each loop (a mover,
+    so the burst-MTI residual keeps it), quantized to int16: [loops, n]."""
+    samples = np.arange(n)
+    spectra = []
+    for loop in range(loops):
+        x = np.exp(2j * np.pi * (tone_bin * samples / n + 0.23 * loop))
+        spectra.append(np.fft.fft(x) * amplitude / n)
+    return np.round(np.array(spectra))
+
+
+def _bin_energy(lib, spectra: np.ndarray, k: int, window: int) -> float:
+    bins = [[(int(s[j].imag), int(s[j].real)) for j in (k - 1, k, k + 1)] for s in spectra]
+    _, stats = windowed_channel(lib, bins, window)
+    bin_stats = fw.Iq16BinStats()
+    lib.l3_iq16_bin_stats_init(ctypes.byref(bin_stats), len(spectra))
+    lib.l3_iq16_bin_stats_add(ctypes.byref(bin_stats), ctypes.byref(stats))
+    return finish(lib, bin_stats)[0]
+
+
+def test_hann_keeps_an_on_bin_return_and_buries_its_sidelobes(lib):
+    """A strong mover between bins 40 and 41: unwindowed, bin 46 (5.5 bins
+    away) sits about 25 dB under it, where a ball could hide; through the
+    window it falls by at least another 25 dB. An on-bin return keeps its
+    energy (the window is gain-compensated)."""
+    loops = 12
+    off_bin = _moving_tone_spectra(40.5, loops, 20000.0)
+    for window in (fw.RANGE_WINDOW_NONE, fw.RANGE_WINDOW_HANN):
+        assert _bin_energy(lib, off_bin, 40, window) > 0.0
+    plain_ratio = _bin_energy(lib, off_bin, 46, fw.RANGE_WINDOW_NONE) / _bin_energy(
+        lib, off_bin, 40, fw.RANGE_WINDOW_NONE
+    )
+    hann_ratio = _bin_energy(lib, off_bin, 46, fw.RANGE_WINDOW_HANN) / _bin_energy(
+        lib, off_bin, 40, fw.RANGE_WINDOW_HANN
+    )
+    assert 10 * math.log10(plain_ratio) == pytest.approx(-21.0, abs=4.0)
+    assert 10 * math.log10(hann_ratio) < 10 * math.log10(plain_ratio) - 25.0
+    on_bin = _moving_tone_spectra(40.0, loops, 20000.0)
+    assert _bin_energy(lib, on_bin, 40, fw.RANGE_WINDOW_HANN) == pytest.approx(
+        _bin_energy(lib, on_bin, 40, fw.RANGE_WINDOW_NONE), rel=1e-3
+    )
+
+
 # --- parabolic sub-bin ---------------------------------------------------------
 
 

@@ -263,17 +263,40 @@ def test_the_adaptive_profile_asks_for_the_compact_format_and_its_retain_widths(
     assert order[-1] == "sensorStart"
 
 
+def _commands(path: Path) -> list[str]:
+    return [
+        line.strip()
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.strip().startswith("%")
+    ]
+
+
+def test_the_hann_profile_is_the_3ms_adaptive_profile_plus_the_window():
+    config = Path(__file__).parents[1] / "config"
+    plain = _commands(config / "iwr6843_l3dump_adaptive_47f3ms_53bin_a16.cfg")
+    hann = _commands(config / "iwr6843_l3dump_adaptive_47f3ms_53bin_a16_hann.cfg")
+    assert [line for line in hann if line != "trackCfg window hann"] == plain
+    assert hann.index("trackCfg window hann") < hann.index("sensorStart")
+
+
+def test_sensor_stop_clears_the_range_window_so_the_next_cfg_decides():
+    stop = _function("static int32_t l3_cli_sensorStop(")
+    assert "gRangeWindow = L3_RANGE_WINDOW_NONE;" in stop
+    track_cfg = _function("static int32_t l3_cli_trackCfg(")
+    assert 'strcmp(argv[1], "window") == 0' in track_cfg
+
+
 def test_iq16_frames_take_the_exact_integer_statistics_path():
     residual = _function("static void l3_verticalResidual(")
     assert "if (cb == 2U && loops <= L3_IQ16_MAX_LOOPS) {" in residual
     assert "l3_iq16_bin_stats_init(&bin, loops);" in residual
-    assert "l3_iq16_channel_stats(words, loops, loopStride / 2U, &channelStats)" in residual
+    assert "l3_iq16_channel_stats_windowed(words, loops, loopStride / 2U, window," in residual
     assert (
         "l3_iq16_bin_stats_finish(&bin, &energy, &peak, &loopPower[0], &r1Re, &r1Im, perLoop);"
         in residual
     )
     assert residual.index("if (cb == 2U") < residual.index(
-        "(l3_ringComponent(sample, cb) - meanIm) * scale;"
+        "(l3_ringComponentWindowed(sample, cb, window) - meanIm) * scale;"
     ), "the float path stays for IQ8"
     assert '#include "l3_iq16_stats.h"' in _source()
     makefile = (FIRMWARE.parent / "makefile").read_text(encoding="utf-8")

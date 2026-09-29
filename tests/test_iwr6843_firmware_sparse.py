@@ -360,7 +360,10 @@ def test_loop_means_are_computed_once_per_bin():
     # through the detect frame that says where the samples are.
     assert "uint32_t cb = source->cb;" in residual
     assert "float scale = source->scale;" in residual
-    assert "(l3_ringComponent(sample, cb) - meanIm) * scale;" in residual
+    assert "(l3_ringComponentWindowed(sample, cb, window) - meanIm) * scale;" in residual
+    # The range window drops to none on the frame window's edge bins, where
+    # one neighbour is missing.
+    assert "(localBin > 0U && localBin + 1U < binCount) ? gRangeWindow" in residual
     # The sparse rows and the trigger share that one pass.
     assert "l3_verticalResidual(&frame, localBin, out, NULL);" in _function(
         "static void l3_verticalPowerLoops("

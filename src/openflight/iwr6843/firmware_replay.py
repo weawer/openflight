@@ -52,14 +52,43 @@ def vertical_tx_indices(n_tx: int) -> tuple[int, ...]:
     return tuple(tx for tx in range(n_tx) if not (n_tx == 3 and tx == 1))
 
 
-def bin_observation_table(
-    cube: np.ndarray, frame: int, first_local: int, count: int, n_tx: int
+def range_windowed(frame_bins: np.ndarray, window: str, valid_bins: int) -> np.ndarray:
+    """One frame's ``[..., bins]`` through the firmware's range window.
+
+    ``"hann"`` is the periodic Hann window in time, applied exactly as the
+    3-tap kernel ``X[k] - (X[k-1] + X[k+1]) / 2`` on the 128-point range FFT
+    (``l3_iq16_stats.h``). Bins on the edge of the frame's ``valid_bins`` have
+    one neighbour and stay unwindowed, as on the board; bins past it are
+    padding and are returned as they are.
+    """
+    if window not in fw.RANGE_WINDOW_NAMES:
+        raise ValueError(f"window must be one of {sorted(fw.RANGE_WINDOW_NAMES)}, got {window!r}")
+    if window == "none" or valid_bins < 3:
+        return frame_bins
+    out = frame_bins.astype(np.complex128)
+    source = frame_bins[..., :valid_bins].astype(np.complex128)
+    out[..., 1 : valid_bins - 1] = source[..., 1:-1] - 0.5 * (source[..., :-2] + source[..., 2:])
+    return out
+
+
+def bin_observation_table(  # pylint: disable=too-many-arguments
+    cube: np.ndarray,
+    frame: int,
+    first_local: int,
+    count: int,
+    n_tx: int,
+    *,
+    window: str = "none",
+    valid_bins: int | None = None,
 ) -> np.ndarray:
     """``l3_verticalResidual`` for ``count`` bins from local bin ``first_local``.
 
     ``cube`` is a parsed dump, ``[frames, chirps, rx, bins]`` with chirp c
-    from transmitter ``c % n_tx`` of loop ``c // n_tx``. Returns a structured
-    array with fields energy, peak, loop0, r1Re and r1Im, one row per bin.
+    from transmitter ``c % n_tx`` of loop ``c // n_tx``. ``window`` is the
+    firmware's ``trackCfg window``; ``valid_bins`` is the frame's bin count
+    (the cube's width when None), which decides the unwindowed edge bins.
+    Returns a structured array with fields energy, peak, loop0, r1Re and r1Im,
+    one row per bin.
     """
     chirps = cube.shape[1]
     if chirps % n_tx:
@@ -67,7 +96,8 @@ def bin_observation_table(
     loops = chirps // n_tx
     if count <= 0 or first_local < 0 or first_local + count > cube.shape[-1]:
         raise ValueError(f"bins {first_local}..{first_local + count - 1} outside the frame")
-    data = cube[frame, :, :, first_local : first_local + count]
+    width = cube.shape[-1] if valid_bins is None else valid_bins
+    data = range_windowed(cube[frame], window, width)[:, :, first_local : first_local + count]
     data = data.reshape(loops, n_tx, cube.shape[2], count)[:, list(vertical_tx_indices(n_tx))]
     residual = data - data.mean(axis=0, keepdims=True)
     power = residual.real**2 + residual.imag**2
@@ -82,12 +112,21 @@ def bin_observation_table(
     return table
 
 
-def bin_observations(
-    cube: np.ndarray, frame: int, first_local: int, count: int, n_tx: int
+def bin_observations(  # pylint: disable=too-many-arguments
+    cube: np.ndarray,
+    frame: int,
+    first_local: int,
+    count: int,
+    n_tx: int,
+    *,
+    window: str = "none",
+    valid_bins: int | None = None,
 ) -> ctypes.Array:
     """:func:`bin_observation_table` as a ctypes array of ``count`` :class:`BinObs`,
     ready for ``l3_trig_update`` and ``l3_obs_extract``."""
-    table = bin_observation_table(cube, frame, first_local, count, n_tx)
+    table = bin_observation_table(
+        cube, frame, first_local, count, n_tx, window=window, valid_bins=valid_bins
+    )
     return (fw.BinObs * count).from_buffer_copy(table.tobytes())
 
 
@@ -254,6 +293,7 @@ class ReplayConfig:
     track_frames: int = DEFAULT_TRACK_FRAMES
     stat: str = "peak"  # "peak" or "energy"
     subbin: str = "parabolic"  # how targets read their sub-bin range: "parabolic" or "centroid"
+    range_window: str = "none"  # "trackCfg window": "none" or "hann"
     dest_bin: int | None = None  # a locked ball's global bin; None uses the tee
     loop_period_s: float | None = None  # None: n_tx x the shipped chirp period
     fft_size: int = DEFAULT_FFT_SIZE
@@ -704,6 +744,11 @@ def replay_dump(
         raise ValueError(f"stat must be one of {sorted(fw.STAT_NAMES)}, got {config.stat!r}")
     if config.subbin not in fw.SUBBIN_NAMES:
         raise ValueError(f"subbin must be one of {sorted(fw.SUBBIN_NAMES)}, got {config.subbin!r}")
+    if config.range_window not in fw.RANGE_WINDOW_NAMES:
+        raise ValueError(
+            f"range_window must be one of {sorted(fw.RANGE_WINDOW_NAMES)}, "
+            f"got {config.range_window!r}"
+        )
     n_tx = int(meta["n_tx"])
     loop_period_s = config.loop_period_s or same_tx_loop_period_s(n_tx)
     timestamps = frame_timestamps_us(meta)
@@ -901,6 +946,7 @@ def replay_dump(
                     fw.TRIG_STATE_NAMES[trig.state],
                     track,
                     points,
+                    range_window=config.range_window,
                 )
             )
             if joint is not None:
@@ -916,6 +962,7 @@ def replay_dump(
                     params,
                     joint_floor,
                     joint_targets,
+                    range_window=config.range_window,
                 )
             continue
         in_window = lib.l3_trig_region(
@@ -946,7 +993,15 @@ def replay_dump(
             )
             continue
         first_bin = window_start + first_local.value
-        obs = bin_observations(cube, frame, first_local.value, count.value, n_tx)
+        obs = bin_observations(
+            cube,
+            frame,
+            first_local.value,
+            count.value,
+            n_tx,
+            window=config.range_window,
+            valid_bins=window_bins,
+        )
         fired = bool(
             lib.l3_trig_update(ctypes.byref(trig), frame, destination, first_bin, obs, count.value)
         )
@@ -1119,10 +1174,12 @@ def _joint_post_frame(  # pylint: disable=too-many-arguments
     params: fw.ObsParams,
     joint_floor: ctypes.c_float,
     joint_targets: ctypes.Array,
+    *,
+    range_window: str = "none",
 ) -> None:
     """Feed one post-impact frame to the joint search."""
     count = min(window_bins, fw.TRIG_MAX_BINS)
-    obs = bin_observations(cube, frame, 0, count, n_tx)
+    obs = bin_observations(cube, frame, 0, count, n_tx, window=range_window, valid_bins=window_bins)
     joint_params = fw.ObsParams(params.stat, DEFAULT_SNR, params.loopPeriodS, params.subBin)
     lib.l3_obs_floor_update(ctypes.byref(joint_floor), params.stat, obs, count, FLOOR_SHIFT)
     floor = joint_floor.value
@@ -1206,6 +1263,8 @@ def _replay_post_frame(  # pylint: disable=too-many-arguments,too-many-locals
     trig_state,
     track,
     points,
+    *,
+    range_window: str = "none",
 ) -> ReplayFrame:
     """``l3_considerBallTrack``: the whole window as targets against the post
     window's own floor; the club track followed through them (the stronger of
@@ -1213,7 +1272,7 @@ def _replay_post_frame(  # pylint: disable=too-many-arguments,too-many-locals
     the ball point, the launch fit and the shot machine's post-impact
     transitions."""
     count = min(window_bins, fw.TRIG_MAX_BINS)
-    obs = bin_observations(cube, frame, 0, count, n_tx)
+    obs = bin_observations(cube, frame, 0, count, n_tx, window=range_window, valid_bins=window_bins)
     ball_params = fw.ObsParams(params.stat, ball_track.cfg.snr, params.loopPeriodS, params.subBin)
     lib.l3_obs_floor_update(ctypes.byref(ball_floor), params.stat, obs, count, FLOOR_SHIFT)
     floor = ball_floor.value
