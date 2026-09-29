@@ -257,6 +257,33 @@ def main() -> int:
                                 )
                                 + "\n"
                             )
+                            time.sleep(2 * period_s)
+                            after_text = radar.stats()
+                            output.write(
+                                json.dumps(
+                                    {
+                                        "event": "post_diagnostics_stats",
+                                        "ts": time.time(),
+                                        "raw": after_text,
+                                    }
+                                )
+                                + "\n"
+                            )
+                            after = parse_stats(after_text)
+                            if (
+                                "Done" not in after_text
+                                or "Error" in after_text
+                                or any(key not in after for key in REQUIRED_STAT_FIELDS)
+                            ):
+                                ok = False
+                                lines.append("FAIL: invalid stats after diagnostics")
+                            else:
+                                after_ok, after_lines = evaluate(
+                                    after, args_frames=args.frames, period_s=period_s, armed=True
+                                )
+                                ok = ok and after_ok
+                                lines = [line for line in lines if line != "PASS"]
+                                lines += ["After diagnostic output:"] + after_lines
                         output.write(
                             json.dumps(
                                 {
