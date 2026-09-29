@@ -295,9 +295,9 @@ def test_iq16_frames_take_the_exact_integer_statistics_path():
         "l3_iq16_bin_stats_finish(&bin, &energy, &peak, &loopPower[0], &r1Re, &r1Im, perLoop);"
         in residual
     )
-    assert residual.index("if (cb == 2U") < residual.index(
-        "(l3_ringComponentWindowed(sample, cb, window) - meanIm) * scale;"
-    ), "the float path stays for IQ8"
+    assert residual.index("if (cb == 2U") < residual.index("(valueIm[loop] - meanIm) * scale;"), (
+        "the float path stays for IQ8"
+    )
     assert '#include "l3_iq16_stats.h"' in _source()
     makefile = (FIRMWARE.parent / "makefile").read_text(encoding="utf-8")
     assert "l3_iq16_stats.c" in makefile

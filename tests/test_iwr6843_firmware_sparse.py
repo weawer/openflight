@@ -360,7 +360,11 @@ def test_loop_means_are_computed_once_per_bin():
     # through the detect frame that says where the samples are.
     assert "uint32_t cb = source->cb;" in residual
     assert "float scale = source->scale;" in residual
-    assert "(l3_ringComponentWindowed(sample, cb, window) - meanIm) * scale;" in residual
+    assert "(valueIm[loop] - meanIm) * scale;" in residual
+    # Each loop's windowed component is read once (into valueIm/valueRe) and
+    # reused for the residual pass, not re-read: l3_ringComponentWindowed's
+    # 3-neighbour Hann read must not run twice per sample.
+    assert residual.count("l3_ringComponentWindowed(sample") == 2
     # The range window drops to none on the frame window's edge bins, where
     # one neighbour is missing.
     assert "(localBin > 0U && localBin + 1U < binCount) ? gRangeWindow" in residual
@@ -375,7 +379,12 @@ def test_residual_walks_loops_by_stride_instead_of_recomputing_indices():
 
     assert "l3_iq16Sample" not in residual
     assert "uint32_t loopStride = ntx * N_RX * binCount * 2U * cb;" in residual
-    assert residual.count("sample += loopStride;") == 2
+    # One walk over the samples, caching each loop's windowed component
+    # (valueIm/valueRe); the residual pass reads the cache, not the ring
+    # again, so l3_ringComponentWindowed's Hann read never runs twice per
+    # sample (see test_iwr6843_firmware_iq16_stats: the rig-caught bug).
+    assert residual.count("sample += loopStride;") == 1
+    assert "valueIm[loop]" in residual and "valueRe[loop]" in residual
     # Energy, strongest loop and the Doppler autocorrelation come from the
     # same pass; no second walk over the samples.
     for field in ("obs->energy = energy;", "obs->peak = peak;", "obs->r1Re = r1Re;"):

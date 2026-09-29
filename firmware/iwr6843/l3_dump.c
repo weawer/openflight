@@ -3085,20 +3085,26 @@ static void l3_verticalResidual(const l3_detect_frame_t *source, uint32_t localB
             float meanRe = 0.0F;
             float prevIm = 0.0F;
             float prevRe = 0.0F;
+            /* Read each loop's windowed component once and reuse it below,
+             * as l3_iq16_channel_stats_windowed does: the two-pass algorithm
+             * would otherwise re-run the windowed read for every sample. */
+            float valueIm[L3_MAX_LOOPS];
+            float valueRe[L3_MAX_LOOPS];
 
             for (loop = 0U; loop < loops; loop++) {
-                meanIm += l3_ringComponentWindowed(sample, cb, window);
-                meanRe += l3_ringComponentWindowed(sample + cb, cb, window);
+                valueIm[loop] = l3_ringComponentWindowed(sample, cb, window);
+                valueRe[loop] = l3_ringComponentWindowed(sample + cb, cb, window);
+                meanIm += valueIm[loop];
+                meanRe += valueRe[loop];
                 sample += loopStride;
             }
             meanIm /= (float)loops;
             meanRe /= (float)loops;
-            sample = base;
             for (loop = 0U; loop < loops; loop++) {
-                float im = (l3_ringComponentWindowed(sample, cb, window) - meanIm) * scale;
-                float re = (l3_ringComponentWindowed(sample + cb, cb, window) - meanRe) * scale;
+                float im = (valueIm[loop] - meanIm) * scale;
+                float re = (valueRe[loop] - meanRe) * scale;
                 float power = im * im + re * re;
-                sample += loopStride;
+
                 energy += power;
                 loopPower[loop] += power;
                 if (loop > 0U) {

@@ -29,6 +29,13 @@ int32_t l3_iq16_channel_stats_windowed(const int16_t *samples, uint32_t loops,
     int32_t sumRe = 0;
     int32_t prevIm = 0;
     int32_t prevRe = 0;
+    /* Each loop's windowed sample is read here once and reused below. The
+     * two-pass mean/residual algorithm would otherwise call l3_iq16_sample
+     * twice per loop, so L3_RANGE_WINDOW_HANN's 3-neighbour read and combine
+     * ran twice for every sample -- the cost that missed the 3 ms detect
+     * deadline on the rig (2026-09-29 armed soak, scratch_stale=13/106). */
+    int32_t valueIm[L3_IQ16_MAX_LOOPS];
+    int32_t valueRe[L3_IQ16_MAX_LOOPS];
     const int16_t *sample;
     uint32_t loop;
 
@@ -41,30 +48,19 @@ int32_t l3_iq16_channel_stats_windowed(const int16_t *samples, uint32_t loops,
     out->window = window;
     sample = samples;
     for (loop = 0U; loop < loops; loop++) {
-        int32_t im;
-        int32_t re;
-
-        l3_iq16_sample(sample, window, &im, &re);
-        sumIm += im;
-        sumRe += re;
+        l3_iq16_sample(sample, window, &valueIm[loop], &valueRe[loop]);
+        sumIm += valueIm[loop];
+        sumRe += valueRe[loop];
         sample += strideWords;
     }
     out->sumIm = sumIm;
     out->sumRe = sumRe;
-    sample = samples;
     for (loop = 0U; loop < loops; loop++) {
         /* Residual scaled by loops: exact in int32 (|x| < 2^17 windowed,
          * loops <= 16). */
-        int32_t x;
-        int32_t y;
-        int32_t im;
-        int32_t re;
-        int64_t power;
-
-        l3_iq16_sample(sample, window, &x, &y);
-        im = (int32_t)loops * x - sumIm;
-        re = (int32_t)loops * y - sumRe;
-        power = (int64_t)im * im + (int64_t)re * re;
+        int32_t im = (int32_t)loops * valueIm[loop] - sumIm;
+        int32_t re = (int32_t)loops * valueRe[loop] - sumRe;
+        int64_t power = (int64_t)im * im + (int64_t)re * re;
 
         out->loopPower[loop] = power;
         out->energy += power;
@@ -75,7 +71,6 @@ int32_t l3_iq16_channel_stats_windowed(const int16_t *samples, uint32_t loops,
         }
         prevIm = im;
         prevRe = re;
-        sample += strideWords;
     }
     return 0;
 }

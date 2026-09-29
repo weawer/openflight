@@ -11,11 +11,30 @@ from __future__ import annotations
 
 import ctypes
 import math
+from pathlib import Path
 
 import numpy as np
 import pytest
 
 from openflight.iwr6843 import firmware_host as fw
+
+_STATS_SOURCE = (Path(__file__).parents[1] / "firmware" / "iwr6843" / "l3_iq16_stats.c").read_text(
+    encoding="utf-8"
+)
+
+
+def _function(name: str) -> str:
+    start = _STATS_SOURCE.rindex(name)
+    brace = _STATS_SOURCE.index("{", start)
+    depth = 0
+    for index in range(brace, len(_STATS_SOURCE)):
+        if _STATS_SOURCE[index] == "{":
+            depth += 1
+        elif _STATS_SOURCE[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return _STATS_SOURCE[start : index + 1]
+    raise AssertionError(f"unbalanced braces in {name}")
 
 
 @pytest.fixture(scope="module")
@@ -135,6 +154,17 @@ def test_bin_stats_sum_channels_and_finish_in_physical_units(lib):
     _, odd = channel(lib, [(1, 2)] * 4)
     lib.l3_iq16_bin_stats_add(ctypes.byref(bin_stats), ctypes.byref(odd))
     assert bin_stats.channels == 8
+
+
+def test_the_windowed_sample_is_read_once_per_loop_not_twice():
+    """The bug the rig caught (2026-09-29): a two-pass mean/residual loop
+    that re-derives the windowed value in both passes runs the Hann kernel's
+    3-neighbour read twice per sample, which missed the 3 ms detect deadline
+    (scratch_stale=13/106 frames, armed soak). Each loop's value must be
+    cached in the first pass and only read from cache in the second."""
+    windowed = _function("int32_t l3_iq16_channel_stats_windowed(")
+    assert windowed.count("l3_iq16_sample(") == 1
+    assert "valueIm[loop]" in windowed and "valueRe[loop]" in windowed
 
 
 # --- range window --------------------------------------------------------------
