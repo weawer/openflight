@@ -114,8 +114,12 @@ def observe(radar, output, capture_dir: Path, poll_s: float) -> None:
         record(output, "trigger_diagnostics", stats=health, logs=logs, fired=fired)
         if logs:
             print(logs["triggerLog"], flush=True)
-        checked_health(radar, output, health, rearmed=not fired)
-        if fired:
+        if not fired:
+            checked_health(radar, output, health, rearmed=True)
+        else:
+            # Save a triggered capture before judging health: frames the
+            # detect task lost are counted in scratch_stale (cleared only
+            # at sensorStart), and the frames it kept are the evidence.
             raw = radar.read_dump()
             try:
                 metadata, _ = parse_dump(raw)
@@ -130,11 +134,12 @@ def observe(radar, output, capture_dir: Path, poll_s: float) -> None:
             path = capture_dir / f"swing-{time.time_ns()}-{captures:03d}.l3dump"
             path.write_bytes(raw)
             record(output, "capture", path=str(path), bytes=len(raw))
+            print(f"Capture {captures}: dump saved to {path}", flush=True)
             health = radar.stats()
             record(output, "rearm_check", stats=health)
             checked_health(radar, output, health, rearmed=True)
             record(output, "rearmed", capture=captures)
-            print(f"Capture {captures}: valid dump saved to {path}; rearm confirmed", flush=True)
+            print(f"Capture {captures}: healthy; rearm confirmed", flush=True)
             pending = b""
         next_poll = time.monotonic() + poll_s
 

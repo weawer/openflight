@@ -177,3 +177,24 @@ def test_evidence_collection_errors_do_not_hide_the_health_failure(tmp_path):
 
     failure = json.loads(output.getvalue().splitlines()[-1])
     assert failure["logs"]["triggerLog perf"] == "unavailable: port gone"
+
+
+def test_triggered_capture_is_saved_before_a_stale_failure(tmp_path):
+    """The rig case: the ball tracker overran 15 of 23 post frames. The dump
+    still holds the frames it kept, so it is saved first, then the run fails."""
+    radar = Mock()
+    radar.wait_trigger_notice.side_effect = [(True, b"")]
+    radar.stats.side_effect = [health(active=0, latched=1), health(stale=15)]
+    radar.cmd.side_effect = lambda command: f"{command} out\nDone"
+    radar.read_dump.return_value = valid_dump()
+    output = io.StringIO()
+
+    with pytest.raises(RuntimeError, match="scratch_stale=15"):
+        swing_trigger.observe(radar, output, tmp_path, 2.0)
+
+    events = [json.loads(line) for line in output.getvalue().splitlines()]
+    order = [event["event"] for event in events]
+    assert order.index("capture") < order.index("health_failure_diagnostics")
+    saved = next(event for event in events if event["event"] == "capture")
+    assert Path(saved["path"]).read_bytes() == valid_dump()
+    assert "triggerLog perf" in events[-1]["logs"]
