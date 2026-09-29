@@ -62,6 +62,33 @@ def check_health(raw: str, *, rearmed: bool = False) -> None:
         raise RuntimeError("rearm not confirmed: expected active=1 latched=0 enabled=1")
 
 
+FAILURE_LOGS = ("triggerLog perf", "triggerLog")
+
+
+def checked_health(radar, output, raw: str, *, rearmed: bool) -> None:
+    """``check_health``, saving per-stage timing evidence when it fails.
+
+    ``scratch_stale`` means the detect task finished a frame after the HWA
+    had begun reusing its scratch buffer, i.e. took over about one frame
+    period from arrival to finish; ``triggerLog perf`` says which stage
+    (residual, trigger, club track, angle, ball tracker...) took the time.
+    Fetched only once the check has already failed: live CLI output costs
+    frames, but it can no longer turn a failed check into a pass.
+    """
+    try:
+        check_health(raw, rearmed=rearmed)
+    except RuntimeError as failure:
+        logs = {}
+        for command in FAILURE_LOGS:
+            try:
+                logs[command] = radar.cmd(command)
+            except Exception as exc:  # pylint: disable=broad-exception-caught
+                logs[command] = f"unavailable: {exc}"
+        record(output, "health_failure_diagnostics", error=str(failure), stats=raw, logs=logs)
+        print(logs["triggerLog perf"], flush=True)
+        raise
+
+
 def observe(radar, output, capture_dir: Path, poll_s: float) -> None:
     pending = b""
     next_poll = 0.0
@@ -87,7 +114,7 @@ def observe(radar, output, capture_dir: Path, poll_s: float) -> None:
         record(output, "trigger_diagnostics", stats=health, logs=logs, fired=fired)
         if logs:
             print(logs["triggerLog"], flush=True)
-        check_health(health, rearmed=not fired)
+        checked_health(radar, output, health, rearmed=not fired)
         if fired:
             raw = radar.read_dump()
             try:
@@ -105,7 +132,7 @@ def observe(radar, output, capture_dir: Path, poll_s: float) -> None:
             record(output, "capture", path=str(path), bytes=len(raw))
             health = radar.stats()
             record(output, "rearm_check", stats=health)
-            check_health(health, rearmed=True)
+            checked_health(radar, output, health, rearmed=True)
             record(output, "rearmed", capture=captures)
             print(f"Capture {captures}: valid dump saved to {path}; rearm confirmed", flush=True)
             pending = b""

@@ -142,3 +142,38 @@ def test_stale_frames_stop_live_observation(tmp_path):
     with pytest.raises(RuntimeError, match="scratch_stale=531"):
         swing_trigger.observe(radar, io.StringIO(), tmp_path, 2.0)
     radar.read_dump.assert_not_called()
+
+
+def test_stale_failure_saves_per_stage_timing_then_still_fails(tmp_path):
+    """scratch_stale says detection overran a frame; triggerLog perf says which
+    stage did. Fetched only after the check failed, so it cannot mask it."""
+    radar = Mock()
+    radar.wait_trigger_notice.side_effect = [(False, b"")]
+    radar.stats.return_value = health(stale=15)
+    radar.cmd.side_effect = lambda command: f"{command} out\nDone"
+    output = io.StringIO()
+
+    with pytest.raises(RuntimeError, match="scratch_stale=15"):
+        swing_trigger.observe(radar, output, tmp_path, 2.0)
+
+    events = [json.loads(line) for line in output.getvalue().splitlines()]
+    failure = events[-1]
+    assert failure["event"] == "health_failure_diagnostics"
+    assert failure["error"] == "capture health failed: scratch_stale=15"
+    assert failure["logs"]["triggerLog perf"] == "triggerLog perf out\nDone"
+    assert "triggerLog" in failure["logs"]
+    radar.read_dump.assert_not_called()
+
+
+def test_evidence_collection_errors_do_not_hide_the_health_failure(tmp_path):
+    radar = Mock()
+    radar.wait_trigger_notice.side_effect = [(False, b"")]
+    radar.stats.return_value = health(stale=3)
+    radar.cmd.side_effect = OSError("port gone")
+    output = io.StringIO()
+
+    with pytest.raises(RuntimeError, match="scratch_stale=3"):
+        swing_trigger.observe(radar, output, tmp_path, 2.0)
+
+    failure = json.loads(output.getvalue().splitlines()[-1])
+    assert failure["logs"]["triggerLog perf"] == "unavailable: port gone"

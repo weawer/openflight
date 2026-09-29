@@ -54,3 +54,21 @@ If (1) fails, the detect task genuinely does not fit the 3 ms frame and
 the next step is `triggerLog perf`, not further priority changes. If (2)
 fails with detection above the CLI, that is new evidence for the
 starvation theory and the ordering needs revisiting.
+
+## Rig result (2026-09-29): did not fix it
+
+Flashed and verified (SHA-256 above). Two `swing_trigger.py` runs, armed
+and nominally still, both failed their first health checks at
+`scratch_stale=15`, up from 3 on the dumpfix image. So CLI starvation was
+at best part of the story. `scratch_stale` counts frames the detect task
+*finished* after the HWA began reusing their scratch buffer, which a late
+start or too much work per frame both produce. Removing late starts did not
+help, so per-frame workload is now the stronger suspect. The logs showed
+`trig phase=toward` while "still", i.e. something moving in the approach
+region (likely the operator), and that is when the club track and angle
+estimation run on each frame.
+
+Not conclusive either way: the scene was not controlled between the two
+images. Next evidence: `swing_trigger.py` now saves `triggerLog perf`
+(per-stage last/mean/max us) whenever a health check fails. Don't revert or
+further change priorities until that shows which stage overruns.
