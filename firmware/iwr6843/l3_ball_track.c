@@ -20,13 +20,13 @@ void l3_ball_track_cfg_defaults(l3_ball_track_cfg_t *cfg)
      * approach; the ball tracker has its own departure tests. */
     cfg->core.ascendingOnly = 0U;
     cfg->core.maxSameBinPoints = 0U;
-    cfg->minDepartureMps = 10.0F;     /* the slowest chip leaves faster than this */
+    cfg->minDepartureMps = 20.0F;     /* TrackMan Aug: rejects club-speed decoys, keeps chips */
     cfg->maxSpeedMps = 100.0F;
     cfg->originGateBins = 8.0F;       /* the first post frame is at most ~5 bins out */
     cfg->minDepartureBins = 1.0F;     /* the impact echo sits at the origin itself */
     cfg->launchPoints = 6U;
     cfg->snr = 3.0F;                  /* half the trigger's: the ball is weak and moving */
-    cfg->useHypotheses = 0U;          /* decided by the recorded captures */
+    cfg->useHypotheses = 1U;          /* TrackMan Aug 3 ms: 121/124 follow the ball vs 68 */
     cfg->skipClubClaim = 1U;
 #if L3_BALL_HYPOTHESES
     l3_ball_hyps_cfg_defaults(&cfg->hyps);

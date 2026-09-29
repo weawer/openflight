@@ -16,12 +16,12 @@ void l3_ball_hyps_cfg_defaults(l3_ball_hyps_cfg_t *cfg)
     cfg->gateMps = 8.0F;              /* drag and fit error, per second of prediction */
     cfg->maxMisses = 2U;
     cfg->classifyPoints = 4U;
-    cfg->minDepartureMps = 10.0F;     /* the slowest chip leaves faster than this */
+    cfg->minDepartureMps = 20.0F;     /* kept equal to the ball tracker's */
     cfg->maxSpeedMps = 100.0F;
     cfg->impactToleranceUs = 15000U;  /* the gate is not the exact impact */
     cfg->maxResidualBins = 1.0F;
     cfg->dopplerToleranceMps = 2.5F;
-    cfg->fastBallMps = 0.0F;          /* off until the recorded captures say otherwise */
+    cfg->fastBallMps = 26.5F;         /* TrackMan Aug: without it hypotheses regress at 2 ms */
     cfg->fastSupportFraction = 0.55F; /* the Pi detector's FAST_SUPPORT_FRAC */
     cfg->farWindowBins = 0.0F;        /* off until the recorded captures say otherwise */
 }

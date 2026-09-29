@@ -75,7 +75,7 @@ def test_defaults(lib):
         8.0,
     )
     assert (cfg.maxMisses, cfg.classifyPoints, cfg.impactToleranceUs) == (2, 4, 15000)
-    assert (cfg.minDepartureMps, cfg.maxSpeedMps) == (10.0, 100.0)
+    assert (cfg.minDepartureMps, cfg.maxSpeedMps) == (20.0, 100.0)
     assert (cfg.maxResidualBins, cfg.dopplerToleranceMps) == (1.0, 2.5)
     assert cfg.binWidthM == pytest.approx(BIN_M)
 
@@ -279,13 +279,18 @@ def test_a_late_gate_still_finds_a_fast_ball(lib, frame_us, late_frames):
 def test_the_pi_detector_rules_are_off_by_default(lib):
     cfg = fw.BallHypsCfg()
     lib.l3_ball_hyps_cfg_defaults(ctypes.byref(cfg))
-    assert (cfg.fastBallMps, cfg.farWindowBins) == (0.0, 0.0)
+    assert (cfg.fastBallMps, cfg.farWindowBins) == (26.5, 0.0)
     assert cfg.fastSupportFraction == pytest.approx(0.55)
 
 
 SLOW_MPS = 25.0  # the club's follow-through or the flying tee: clean and slow
 FAST_MPS = 42.0  # the ball: a little ragged
 FAST_JITTER = [0.0, 0.4, -0.4, 0.4, -0.4, 0.4, -0.4, 0.4]
+
+
+# The fastest-credible rule and the 20 m/s departure are firmware defaults;
+# these scenes need both off to show what score alone picks.
+RULE_OFF = {"fastBallMps": 0.0, "minDepartureMps": 10.0}
 
 
 def slow_and_fast(lib, *, slow_frames=range(1, 7), fast_frames=range(1, 7), **overrides):
@@ -309,7 +314,7 @@ def slow_and_fast(lib, *, slow_frames=range(1, 7), fast_frames=range(1, 7), **ov
 
 
 def test_on_score_alone_the_slow_clean_line_wins(lib):
-    v = verdict(lib, slow_and_fast(lib))
+    v = verdict(lib, slow_and_fast(lib, **RULE_OFF))
     assert v.index >= 0 and v.rateMps == pytest.approx(SLOW_MPS, rel=0.05)
     assert v.waitingForFast == 0
 
@@ -344,7 +349,7 @@ def test_a_slow_winner_waits_for_a_fast_line_still_gathering_points(lib):
     hyps = slow_and_fast(lib, slow_frames=range(1, 5), fast_frames=range(2, 5), fastBallMps=30.0)
     v = verdict(lib, hyps)  # slow: 4 points, classifiable; fast: 3, not yet
     assert (v.index, v.waitingForFast) == (-1, 1)
-    off = slow_and_fast(lib, slow_frames=range(1, 5), fast_frames=range(2, 5))
+    off = slow_and_fast(lib, slow_frames=range(1, 5), fast_frames=range(2, 5), **RULE_OFF)
     assert verdict(lib, off).rateMps == pytest.approx(SLOW_MPS, rel=0.05)
 
 

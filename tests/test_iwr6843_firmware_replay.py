@@ -522,7 +522,9 @@ def test_post_impact_frames_go_to_the_ball_tracker_and_the_launch_is_recovered(l
     assert result.launch.hla_deg == pytest.approx(2.0, abs=0.7)
     assert result.launch.vla_deg == pytest.approx(12.0, abs=0.7)
     assert result.launch.points >= 5 and result.launch.confidence > 0.5
-    assert len(result.ball_points) >= 6
+    # The launch fits the winning hypothesis's whole line; ball_points holds
+    # only what the core track appended after the search committed.
+    assert len(result.ball_points) >= 2
     bins = [p.range_bin for p in result.ball_points]
     assert all(b > a for a, b in zip(bins, bins[1:])), "the ball only ever departs"
     assert "balltrack armed=1 confirmed=1" in result.ball_status
@@ -550,12 +552,13 @@ def test_the_shot_machine_walks_the_whole_sequence_on_the_replay(lib, whole_shot
     assert result.frames[result.fired_frame].shot_state == "impact"
     assert "shot state=result" in result.shot_status and "source=gate" in result.shot_status
     verdicts = [f.ball_why for f in result.frames if f.shot_state in ("ball_track", "result")]
-    # The first post frame sees the ball still at the origin (excluded by the
-    # departure band); the flight is then acquired, confirmed and tracked.
-    assert "acquired" in verdicts and "confirmed" in verdicts and "tracked" in verdicts
-    first = verdicts.index("acquired")
-    assert verdicts[first : first + 3] == ["acquired", "confirmed", "tracked"]
-    assert all(v == "nocandidate" for v in verdicts[:first])
+    # The hypothesis search holds the track while lines compete, then commits
+    # the winner confirmed and tracks it from there.
+    assert "confirmed" in verdicts and "tracked" in verdicts
+    first = verdicts.index("confirmed")
+    assert verdicts[first : first + 2] == ["confirmed", "tracked"]
+    assert all(v in ("nocandidate", "searching") for v in verdicts[:first])
+    assert "searching" in verdicts[:first]
 
 
 def test_the_club_delivery_is_read_from_the_pre_impact_frames_alone(lib, whole_shot):
@@ -729,10 +732,12 @@ def test_the_hypothesis_search_recovers_the_synthetic_launch(lib, whole_shot):
     assert seen and all(len(snapshot) <= fw.BALL_HYP_MAX for snapshot in seen)
 
 
-def test_the_search_switch_leaves_the_default_replay_alone(lib, whole_shot):
+def test_the_default_replay_is_the_hypothesis_search_and_the_switch_turns_it_off(lib, whole_shot):
     default = replay_dump(whole_shot, ReplayConfig(tee_bin=TEE_BIN), lib=lib)
+    on = replay_dump(whole_shot, ReplayConfig(tee_bin=TEE_BIN, ball_hypotheses=True), lib=lib)
     off = replay_dump(whole_shot, ReplayConfig(tee_bin=TEE_BIN, ball_hypotheses=False), lib=lib)
-    assert [p.range_bin for p in default.ball_points] == [p.range_bin for p in off.ball_points]
+    assert [p.range_bin for p in default.ball_points] == [p.range_bin for p in on.ball_points]
+    assert [p.range_bin for p in default.ball_points] != [p.range_bin for p in off.ball_points]
     assert all(frame.ball_hypotheses == () for frame in off.frames)
 
 

@@ -48,6 +48,11 @@ Keys: `fires`, `impact_frame`, `geometric_frame`, `club_points_min`,
 `club_direction` ("approaching"), `acquisitions_max`, `ball_origin_bin`,
 `ball_speed_mps`, `club_speed_mps`.
 
+`ball_origin_bin` is the first point the core ball track appended. With the
+hypothesis search on (the firmware default since 2026-09-29) that is the
+first point after a line wins, typically 3-4 frames past the tee, not the
+tee itself; the launch still fits the winning line's earlier points.
+
 Every key other than `notes` and `expect` is a `ReplayConfig` field
 (`openflight.iwr6843.firmware_replay`). `tee_bin` and `dest_bin` are GLOBAL
 range-FFT bins (bin = range / (6 m / 128) on the shipped profiles; bin 34 is

@@ -9,8 +9,8 @@
     "notes": "ball departs from ~49 at ~33 m/s radial, tracked to bin 76",
     "expect": {
       "ball_origin_bin": [
-        50,
-        54
+        59,
+        63
       ],
       "ball_speed_mps": [
         28,
@@ -22,8 +22,8 @@
     "notes": "ball at ~38 m/s radial, tracked 52 to 77",
     "expect": {
       "ball_origin_bin": [
-        50,
-        54
+        60,
+        64
       ],
       "ball_speed_mps": [
         30,
@@ -35,8 +35,8 @@
     "notes": "ball at ~40 m/s radial, tracked 48 to 82",
     "expect": {
       "ball_origin_bin": [
-        49,
-        54
+        59,
+        63
       ],
       "ball_speed_mps": [
         32,
@@ -48,8 +48,8 @@
     "notes": "ball 52 to 85 at ~40 m/s radial",
     "expect": {
       "ball_origin_bin": [
-        50,
-        57
+        63,
+        67
       ],
       "ball_speed_mps": [
         30,
@@ -61,8 +61,8 @@
     "notes": "ball at ~33 m/s radial, tracked 53 to 80 with usable angles",
     "expect": {
       "ball_origin_bin": [
-        50,
-        55
+        61,
+        65
       ],
       "ball_speed_mps": [
         28,

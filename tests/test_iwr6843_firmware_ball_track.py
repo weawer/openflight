@@ -34,12 +34,17 @@ def lib(tmp_path_factory):
     return fw.build_firmware_library(tmp_path_factory.mktemp("l3_host"))
 
 
+# The single-track rules these tests describe; the firmware default is the
+# hypothesis search with a 20 m/s departure (TrackMan-validated, 2026-09-29).
+SINGLE_TRACK = {"useHypotheses": 0, "minDepartureMps": 10.0}
+
+
 class Ball:
     def __init__(self, lib, **overrides):
         self.lib = lib
         cfg = fw.BallTrackCfg()
         lib.l3_ball_track_cfg_defaults(ctypes.byref(cfg))
-        for name, value in overrides.items():
+        for name, value in {**SINGLE_TRACK, **overrides}.items():
             setattr(cfg, name, value)
         self.track = fw.BallTrack()
         lib.l3_ball_track_init(ctypes.byref(self.track), ctypes.byref(cfg))
@@ -117,7 +122,7 @@ def test_defaults_are_a_wide_gate_a_fast_departure_and_six_launch_points(lib):
     cfg = fw.BallTrackCfg()
     lib.l3_ball_track_cfg_defaults(ctypes.byref(cfg))
     assert cfg.core.gateBins == pytest.approx(6.0) and cfg.core.maxMisses == 1
-    assert cfg.minDepartureMps == pytest.approx(10.0) and cfg.maxSpeedMps == pytest.approx(100.0)
+    assert cfg.minDepartureMps == pytest.approx(20.0) and cfg.maxSpeedMps == pytest.approx(100.0)
     assert cfg.originGateBins == pytest.approx(8.0) and cfg.launchPoints == 6
     assert cfg.minDepartureBins == pytest.approx(1.0) and cfg.snr == pytest.approx(3.0)
 
@@ -443,11 +448,13 @@ def launch_of(lib, track):
     return used, out
 
 
-def test_the_hypothesis_search_is_off_by_default_until_evaluated(lib):
+def test_the_hypothesis_search_is_on_by_default_with_the_trackman_tuning(lib):
     cfg = fw.BallTrackCfg()
     lib.l3_ball_track_cfg_defaults(ctypes.byref(cfg))
-    assert (cfg.useHypotheses, cfg.skipClubClaim) == (0, 1)
+    assert (cfg.useHypotheses, cfg.skipClubClaim) == (1, 1)
     assert cfg.hyps.classifyPoints == 4
+    assert cfg.hyps.fastBallMps == pytest.approx(26.5)
+    assert cfg.minDepartureMps == pytest.approx(cfg.hyps.minDepartureMps) == pytest.approx(20.0)
 
 
 def test_the_hypotheses_share_the_core_geometry(lib):
@@ -471,6 +478,7 @@ def test_with_the_search_off_the_joint_update_is_todays_update(lib):
     b = fw.BallTrack()
     cfg = fw.BallTrackCfg()
     lib.l3_ball_track_cfg_defaults(ctypes.byref(cfg))
+    cfg.useHypotheses = 0
     lib.l3_ball_track_init(ctypes.byref(b), ctypes.byref(cfg))
     origin = fw.Vec3(scene.origin_bin * BIN_M, 0.0, 0.0)
     lib.l3_ball_track_arm(ctypes.byref(b), scene.origin_bin, ctypes.byref(origin), scene.gate_us)
@@ -595,7 +603,8 @@ def test_fastest_credible_keeps_an_unclaimed_follow_through_off_the_ball(lib, de
     scene = TwoTracks(frames=10, club_decel_mps2=decel, club_stat=1400.0)
 
     def launch_speed(**hyps):
-        track = hyp_track(lib)
+        track = hyp_track(lib, minDepartureMps=10.0)
+        hyps = {"fastBallMps": 0.0, "minDepartureMps": 10.0, **hyps}
         for name, value in hyps.items():
             setattr(track.cfg.hyps, name, value)
             setattr(track.hyps.cfg, name, value)
