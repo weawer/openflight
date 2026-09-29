@@ -1,0 +1,449 @@
+[
+  {
+    "shot": 1,
+    "impact_idx": 41,
+    "n_pairs": 3,
+    "pair_offsets": [
+      -1,
+      0,
+      1
+    ],
+    "aoa_deg": -45.0,
+    "cam_speed_mph": 39.7,
+    "ops_club_mph": 81.66409309716798,
+    "match_scores": [
+      0.73,
+      0.73,
+      0.76
+    ],
+    "step_px": [
+      23.3,
+      17.0,
+      10.0
+    ],
+    "mm_per_px": 3.656
+  },
+  {
+    "shot": 2,
+    "impact_idx": 41,
+    "n_pairs": 3,
+    "pair_offsets": [
+      -1,
+      0,
+      1
+    ],
+    "aoa_deg": -40.91,
+    "cam_speed_mph": 48.7,
+    "ops_club_mph": 80.34036091479491,
+    "match_scores": [
+      0.66,
+      0.74,
+      0.69
+    ],
+    "step_px": [
+      26.9,
+      19.8,
+      13.6
+    ],
+    "mm_per_px": 3.424
+  },
+  {
+    "shot": 3,
+    "impact_idx": 41,
+    "n_pairs": 3,
+    "pair_offsets": [
+      -1,
+      0,
+      1
+    ],
+    "aoa_deg": -46.85,
+    "cam_speed_mph": 44.6,
+    "ops_club_mph": 82.5805230695801,
+    "match_scores": [
+      0.62,
+      0.72,
+      0.74
+    ],
+    "step_px": [
+      28.4,
+      21.9,
+      14.9
+    ],
+    "mm_per_px": 3.542
+  },
+  {
+    "shot": 4,
+    "impact_idx": 41,
+    "n_pairs": 4,
+    "pair_offsets": [
+      -2,
+      -1,
+      0,
+      1
+    ],
+    "aoa_deg": -47.8,
+    "cam_speed_mph": 33.6,
+    "ops_club_mph": 84.20973190942384,
+    "match_scores": [
+      0.95,
+      0.7,
+      0.79,
+      0.74
+    ],
+    "step_px": [
+      0.0,
+      26.4,
+      18.4,
+      11.3
+    ],
+    "mm_per_px": 3.589
+  },
+  {
+    "shot": 5,
+    "impact_idx": 41,
+    "n_pairs": 4,
+    "pair_offsets": [
+      -2,
+      -1,
+      0,
+      1
+    ],
+    "aoa_deg": -50.05,
+    "cam_speed_mph": 42.2,
+    "ops_club_mph": 82.27504641210939,
+    "match_scores": [
+      0.94,
+      0.75,
+      0.79,
+      0.79
+    ],
+    "step_px": [
+      0.0,
+      27.2,
+      20.0,
+      12.0
+    ],
+    "mm_per_px": 3.589
+  },
+  {
+    "shot": 6,
+    "impact_idx": 41,
+    "n_pairs": 3,
+    "pair_offsets": [
+      -1,
+      0,
+      1
+    ],
+    "aoa_deg": -45.0,
+    "cam_speed_mph": 33.2,
+    "ops_club_mph": 83.59877859448244,
+    "match_scores": [
+      0.73,
+      0.74,
+      0.69
+    ],
+    "step_px": [
+      23.3,
+      15.6,
+      8.1
+    ],
+    "mm_per_px": 3.542
+  },
+  {
+    "shot": 7,
+    "impact_idx": 41,
+    "n_pairs": 3,
+    "pair_offsets": [
+      -1,
+      0,
+      1
+    ],
+    "aoa_deg": -46.97,
+    "cam_speed_mph": 47.8,
+    "ops_club_mph": 83.70060414697267,
+    "match_scores": [
+      0.65,
+      0.78,
+      0.71
+    ],
+    "step_px": [
+      28.4,
+      20.5,
+      12.0
+    ],
+    "mm_per_px": 3.557
+  },
+  {
+    "shot": 8,
+    "impact_idx": 43,
+    "n_pairs": 4,
+    "pair_offsets": [
+      -2,
+      -1,
+      0,
+      1
+    ],
+    "aoa_deg": -43.23,
+    "cam_speed_mph": 40.8,
+    "ops_club_mph": 83.90425525195313,
+    "match_scores": [
+      0.66,
+      0.72,
+      0.58,
+      0.56
+    ],
+    "step_px": [
+      28.4,
+      20.5,
+      12.8,
+      6.1
+    ],
+    "mm_per_px": 3.88
+  },
+  {
+    "shot": 9,
+    "impact_idx": 41,
+    "n_pairs": 3,
+    "pair_offsets": [
+      -1,
+      0,
+      1
+    ],
+    "aoa_deg": -50.19,
+    "cam_speed_mph": 60.7,
+    "ops_club_mph": 65.37200469873046,
+    "match_scores": [
+      0.63,
+      0.77,
+      0.69
+    ],
+    "step_px": [
+      31.4,
+      23.4,
+      14.1
+    ],
+    "mm_per_px": 3.511
+  },
+  {
+    "shot": 10,
+    "impact_idx": 41,
+    "n_pairs": 3,
+    "pair_offsets": [
+      -2,
+      0,
+      1
+    ],
+    "aoa_deg": -45.0,
+    "cam_speed_mph": 24.1,
+    "ops_club_mph": 81.86774420214843,
+    "match_scores": [
+      0.93,
+      0.77,
+      0.73
+    ],
+    "step_px": [
+      0.0,
+      18.6,
+      9.9
+    ],
+    "mm_per_px": 3.782
+  },
+  {
+    "shot": 11,
+    "impact_idx": 41,
+    "n_pairs": 3,
+    "pair_offsets": [
+      -1,
+      0,
+      1
+    ],
+    "aoa_deg": -47.35,
+    "cam_speed_mph": 27.7,
+    "ops_club_mph": 83.39512748950196,
+    "match_scores": [
+      0.74,
+      0.74,
+      0.74
+    ],
+    "step_px": [
+      22.8,
+      14.9,
+      7.8
+    ],
+    "mm_per_px": 3.726
+  },
+  {
+    "shot": 12,
+    "impact_idx": 41,
+    "n_pairs": 2,
+    "pair_offsets": [
+      0,
+      1
+    ],
+    "aoa_deg": -57.18,
+    "cam_speed_mph": 29.6,
+    "ops_club_mph": 82.5805230695801,
+    "match_scores": [
+      0.75,
+      0.77
+    ],
+    "step_px": [
+      15.3,
+      8.6
+    ],
+    "mm_per_px": 3.82
+  },
+  {
+    "shot": 13,
+    "impact_idx": 41,
+    "n_pairs": 4,
+    "pair_offsets": [
+      -2,
+      -1,
+      0,
+      1
+    ],
+    "aoa_deg": -49.31,
+    "cam_speed_mph": 53.8,
+    "ops_club_mph": 75.75821105273437,
+    "match_scores": [
+      0.68,
+      0.76,
+      0.75,
+      0.76
+    ],
+    "step_px": [
+      29.4,
+      23.6,
+      16.4,
+      8.5
+    ],
+    "mm_per_px": 3.639
+  },
+  {
+    "shot": 14,
+    "impact_idx": 41,
+    "n_pairs": 4,
+    "pair_offsets": [
+      -2,
+      -1,
+      0,
+      1
+    ],
+    "aoa_deg": -49.56,
+    "cam_speed_mph": 38.6,
+    "ops_club_mph": 74.94360663281252,
+    "match_scores": [
+      0.7,
+      0.78,
+      0.75,
+      0.72
+    ],
+    "step_px": [
+      26.4,
+      22.0,
+      14.9,
+      7.8
+    ],
+    "mm_per_px": 3.606
+  },
+  {
+    "shot": 15,
+    "impact_idx": 41,
+    "n_pairs": 3,
+    "pair_offsets": [
+      -1,
+      0,
+      1
+    ],
+    "aoa_deg": -52.43,
+    "cam_speed_mph": 41.5,
+    "ops_club_mph": 79.52575649487306,
+    "match_scores": [
+      0.77,
+      0.76,
+      0.73
+    ],
+    "step_px": [
+      21.4,
+      16.4,
+      10.6
+    ],
+    "mm_per_px": 3.726
+  },
+  {
+    "shot": 16,
+    "impact_idx": 40,
+    "n_pairs": 3,
+    "pair_offsets": [
+      -1,
+      0,
+      1
+    ],
+    "aoa_deg": -51.01,
+    "cam_speed_mph": 45.7,
+    "ops_club_mph": 59.567948206787115,
+    "match_scores": [
+      0.71,
+      0.75,
+      0.72
+    ],
+    "step_px": [
+      27.0,
+      19.8,
+      13.5
+    ],
+    "mm_per_px": 3.84
+  },
+  {
+    "shot": 17,
+    "impact_idx": 40,
+    "n_pairs": 4,
+    "pair_offsets": [
+      -2,
+      -1,
+      0,
+      1
+    ],
+    "aoa_deg": -50.42,
+    "cam_speed_mph": 31.7,
+    "ops_club_mph": 78.71115207495119,
+    "match_scores": [
+      0.94,
+      0.75,
+      0.76,
+      0.71
+    ],
+    "step_px": [
+      0.0,
+      23.6,
+      17.8,
+      12.0
+    ],
+    "mm_per_px": 3.622
+  },
+  {
+    "shot": 18,
+    "impact_idx": 41,
+    "n_pairs": 3,
+    "pair_offsets": [
+      -1,
+      0,
+      1
+    ],
+    "aoa_deg": -52.43,
+    "cam_speed_mph": 41.3,
+    "ops_club_mph": 79.22027983740236,
+    "match_scores": [
+      0.76,
+      0.73,
+      0.75
+    ],
+    "step_px": [
+      23.6,
+      16.4,
+      10.6
+    ],
+    "mm_per_px": 3.82
+  }
+]

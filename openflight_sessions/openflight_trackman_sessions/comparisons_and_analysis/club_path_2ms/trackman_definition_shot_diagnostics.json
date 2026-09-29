@@ -1,0 +1,162 @@
+[
+  {
+    "shot": 1,
+    "status": "ok",
+    "impact_ms": 16.097872746357933,
+    "ops_mph": 78.20202431250001,
+    "track_mode": "ops_speed_prior",
+    "speed_ratio": 0.9013846733001363,
+    "impact_error_m": 0.026374985175720678,
+    "track_rms_bins": 0.30431377078462507
+  },
+  {
+    "shot": 2,
+    "status": "ok",
+    "impact_ms": 15.839911543679055,
+    "ops_mph": 78.60932652246093,
+    "track_mode": "ops_speed_prior",
+    "speed_ratio": 0.8632397421385029,
+    "impact_error_m": 0.028394152302741116,
+    "track_rms_bins": 0.3229132554776381
+  },
+  {
+    "shot": 3,
+    "status": "ok",
+    "impact_ms": 12.679643867902902,
+    "ops_mph": 76.16551326269533,
+    "track_mode": "ops_speed_prior",
+    "speed_ratio": 0.8206944909741014,
+    "impact_error_m": 0.03365359734128348,
+    "track_rms_bins": 0.208843261753203
+  },
+  {
+    "shot": 4,
+    "status": "ok",
+    "impact_ms": 13.755075233470265,
+    "ops_mph": 74.94360663281252,
+    "track_mode": "ops_speed_prior",
+    "speed_ratio": 0.8342779856760677,
+    "impact_error_m": 0.027925347505888487,
+    "track_rms_bins": 0.27705922834951097
+  },
+  {
+    "shot": 5,
+    "status": "ok",
+    "impact_ms": 12.646933063594533,
+    "ops_mph": 60.891680389160165,
+    "track_mode": "ops_speed_prior",
+    "speed_ratio": 1.066715407016312,
+    "impact_error_m": 0.025082381081757088,
+    "track_rms_bins": 0.2942617751319325
+  },
+  {
+    "shot": 6,
+    "status": "ok",
+    "impact_ms": 15.715827842426718,
+    "ops_mph": 74.23082776538085,
+    "track_mode": "ops_speed_prior",
+    "speed_ratio": 0.9716373420674137,
+    "impact_error_m": 0.019055789998412953,
+    "track_rms_bins": 0.32718011037399297
+  },
+  {
+    "shot": 7,
+    "status": "ok",
+    "impact_ms": 14.69465961792854,
+    "ops_mph": 75.45273439526369,
+    "track_mode": "ops_speed_prior",
+    "speed_ratio": 0.8666115790896619,
+    "impact_error_m": 0.035897685268657664,
+    "track_rms_bins": 0.2324181634665331
+  },
+  {
+    "shot": 8,
+    "status": "ok",
+    "impact_ms": 15.8549809304847,
+    "ops_mph": 77.69289655004884,
+    "track_mode": "ops_speed_prior",
+    "speed_ratio": 0.8563856741527912,
+    "impact_error_m": 0.020569030488643003,
+    "track_rms_bins": 0.28576717485057057
+  },
+  {
+    "shot": 9,
+    "status": "ok",
+    "impact_ms": 13.681580934799916,
+    "ops_mph": 81.1549653347168,
+    "track_mode": "ops_speed_prior",
+    "speed_ratio": 0.9354800644169152,
+    "impact_error_m": 0.061352525026457494,
+    "track_rms_bins": 0.3116804337567626
+  },
+  {
+    "shot": 10,
+    "status": "ok",
+    "impact_ms": 20.72132067747549,
+    "ops_mph": 71.27788674316406,
+    "track_mode": "ops_speed_prior",
+    "speed_ratio": 1.0380941461866129,
+    "impact_error_m": 0.04693540783549244,
+    "track_rms_bins": 0.3071734483815039
+  },
+  {
+    "shot": 11,
+    "status": "ok",
+    "impact_ms": 11.94894707736607,
+    "ops_mph": 63.844621411376956,
+    "track_mode": "ops_speed_prior",
+    "speed_ratio": 1.1923467886170414,
+    "impact_error_m": 0.006114236407086526,
+    "track_rms_bins": 0.2893379068145056
+  },
+  {
+    "shot": 12,
+    "status": "ok",
+    "impact_ms": 17.73457225117868,
+    "ops_mph": 80.84948867724609,
+    "track_mode": "ops_speed_prior",
+    "speed_ratio": 0.9447959989766811,
+    "impact_error_m": 0.062411557604643786,
+    "track_rms_bins": 0.41111607368596886
+  },
+  {
+    "shot": 13,
+    "status": "ok",
+    "impact_ms": 15.060890497606142,
+    "ops_mph": 69.95415456079101,
+    "track_mode": "ops_speed_prior",
+    "speed_ratio": 1.0804708665371874,
+    "impact_error_m": 0.03609028011302495,
+    "track_rms_bins": 0.34052956934925427
+  },
+  {
+    "shot": 14,
+    "status": "ok",
+    "impact_ms": 14.893324904962045,
+    "ops_mph": 78.50750096997072,
+    "track_mode": "ops_speed_prior",
+    "speed_ratio": 0.9746667354753266,
+    "impact_error_m": 0.020603326640070918,
+    "track_rms_bins": 0.3899937848478136
+  },
+  {
+    "shot": 15,
+    "status": "ok",
+    "impact_ms": 13.853874119224447,
+    "ops_mph": 83.29330193701173,
+    "track_mode": "ops_speed_prior",
+    "speed_ratio": 0.841596649995093,
+    "impact_error_m": 0.040393283420524284,
+    "track_rms_bins": 0.2794879619246572
+  },
+  {
+    "shot": 16,
+    "status": "ok",
+    "impact_ms": 17.01038628654297,
+    "ops_mph": 80.44218646728517,
+    "track_mode": "ops_speed_prior",
+    "speed_ratio": 0.9133624835337444,
+    "impact_error_m": 0.03548187442398598,
+    "track_rms_bins": 0.34139087468225066
+  }
+]

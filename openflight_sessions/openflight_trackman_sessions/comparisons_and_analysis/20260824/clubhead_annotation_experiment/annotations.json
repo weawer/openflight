@@ -1,0 +1,614 @@
+{
+  "format_version": 1,
+  "source_csv": "/Users/john.pacino/openflight_sessions/trackman/20260824/camera_fusion_replay/baseline.csv",
+  "frame_offsets": [
+    -4,
+    -3,
+    -2,
+    -1,
+    0,
+    1
+  ],
+  "shots": {
+    "6": {
+      "dataset_row": 6,
+      "club": "9Iron",
+      "height_block": "low_2.875in",
+      "camera_directory": "/Users/john.pacino/openflight_sessions/trackman/camera/camera_20260824_115211_975_021",
+      "impact_frame": 72,
+      "auto_impact_frame": 81,
+      "ball_xy": [
+        141.6,
+        161.79
+      ],
+      "clubhead_xy_by_frame": {
+        "68": [
+          159.12,
+          151.41
+        ],
+        "69": [
+          151.98,
+          158.55
+        ],
+        "70": [
+          146.79,
+          161.79
+        ],
+        "71": [
+          144.19,
+          163.09
+        ],
+        "72": [
+          141.6,
+          161.79
+        ],
+        "73": [
+          141.6,
+          160.49
+        ]
+      },
+      "skipped_frames": [],
+      "complete": true
+    },
+    "12": {
+      "dataset_row": 12,
+      "club": "9Iron",
+      "height_block": "low_2.875in",
+      "camera_directory": "/Users/john.pacino/openflight_sessions/trackman/camera/camera_20260824_115508_005_027",
+      "impact_frame": 72,
+      "auto_impact_frame": 82,
+      "ball_xy": [
+        125.38,
+        163.74
+      ],
+      "clubhead_xy_by_frame": {
+        "68": [
+          135.76,
+          157.9
+        ],
+        "69": [
+          129.92,
+          163.09
+        ],
+        "70": [
+          126.03,
+          165.03
+        ],
+        "71": [
+          125.38,
+          165.03
+        ],
+        "72": [
+          123.43,
+          163.09
+        ],
+        "73": [
+          123.43,
+          161.14
+        ]
+      },
+      "skipped_frames": [],
+      "complete": true
+    },
+    "16": {
+      "dataset_row": 16,
+      "club": "9Iron",
+      "height_block": "high_5.25in",
+      "camera_directory": "/Users/john.pacino/openflight_sessions/trackman/camera/camera_20260824_120539_800_002",
+      "impact_frame": 73,
+      "auto_impact_frame": 81,
+      "ball_xy": [
+        130.57,
+        157.25
+      ],
+      "clubhead_xy_by_frame": {
+        "69": [
+          141.6,
+          159.84
+        ],
+        "70": [
+          137.06,
+          161.14
+        ],
+        "71": [
+          133.81,
+          159.84
+        ],
+        "72": [
+          130.57,
+          157.9
+        ],
+        "73": [
+          131.22,
+          157.25
+        ],
+        "74": [
+          130.57,
+          154.0
+        ]
+      },
+      "skipped_frames": [],
+      "complete": true
+    },
+    "18": {
+      "dataset_row": 18,
+      "club": "9Iron",
+      "height_block": "high_5.25in",
+      "camera_directory": "/Users/john.pacino/openflight_sessions/trackman/camera/camera_20260824_120638_798_004",
+      "impact_frame": 73,
+      "auto_impact_frame": 81,
+      "ball_xy": [
+        131.86,
+        162.44
+      ],
+      "clubhead_xy_by_frame": {
+        "69": [
+          142.9,
+          163.09
+        ],
+        "70": [
+          136.41,
+          165.68
+        ],
+        "71": [
+          131.22,
+          165.03
+        ],
+        "72": [
+          129.92,
+          164.38
+        ],
+        "73": [
+          129.27,
+          162.44
+        ],
+        "74": [
+          129.27,
+          161.14
+        ]
+      },
+      "skipped_frames": [],
+      "complete": true
+    },
+    "29": {
+      "dataset_row": 29,
+      "club": "9Iron",
+      "height_block": "high_5.25in",
+      "camera_directory": "/Users/john.pacino/openflight_sessions/trackman/camera/camera_20260824_121116_485_015",
+      "impact_frame": 72,
+      "auto_impact_frame": 81,
+      "ball_xy": [
+        133.81,
+        159.84
+      ],
+      "clubhead_xy_by_frame": {
+        "68": [
+          148.74,
+          157.9
+        ],
+        "69": [
+          141.6,
+          161.79
+        ],
+        "70": [
+          136.41,
+          162.44
+        ],
+        "71": [
+          133.16,
+          161.79
+        ],
+        "72": [
+          130.57,
+          160.49
+        ],
+        "73": [
+          131.22,
+          158.55
+        ]
+      },
+      "skipped_frames": [],
+      "complete": true
+    },
+    "35": {
+      "dataset_row": 35,
+      "club": "5Iron",
+      "height_block": "high_5.25in",
+      "camera_directory": "/Users/john.pacino/openflight_sessions/trackman/camera/camera_20260824_121425_990_021",
+      "impact_frame": 72,
+      "auto_impact_frame": 79,
+      "ball_xy": [
+        132.51,
+        163.09
+      ],
+      "clubhead_xy_by_frame": {
+        "68": [
+          146.14,
+          168.93
+        ],
+        "69": [
+          138.35,
+          170.87
+        ],
+        "70": [
+          133.16,
+          170.87
+        ],
+        "71": [
+          131.86,
+          166.33
+        ],
+        "72": [
+          131.22,
+          162.44
+        ],
+        "73": [
+          132.51,
+          160.49
+        ]
+      },
+      "skipped_frames": [],
+      "complete": true
+    },
+    "37": {
+      "dataset_row": 37,
+      "club": "5Iron",
+      "height_block": "high_5.25in",
+      "camera_directory": "/Users/john.pacino/openflight_sessions/trackman/camera/camera_20260824_121518_833_023",
+      "impact_frame": 72,
+      "auto_impact_frame": 79,
+      "ball_xy": [
+        129.27,
+        161.79
+      ],
+      "clubhead_xy_by_frame": {
+        "68": [
+          139.0,
+          163.09
+        ],
+        "69": [
+          132.51,
+          165.68
+        ],
+        "70": [
+          128.62,
+          165.68
+        ],
+        "71": [
+          124.08,
+          164.38
+        ],
+        "72": [
+          124.08,
+          161.14
+        ],
+        "73": [
+          122.13,
+          158.55
+        ]
+      },
+      "skipped_frames": [],
+      "complete": true
+    },
+    "45": {
+      "dataset_row": 45,
+      "club": "5Iron",
+      "height_block": "high_5.25in",
+      "camera_directory": "/Users/john.pacino/openflight_sessions/trackman/camera/camera_20260824_121837_765_031",
+      "impact_frame": 73,
+      "auto_impact_frame": 80,
+      "ball_xy": [
+        131.22,
+        160.49
+      ],
+      "clubhead_xy_by_frame": {
+        "69": [
+          135.11,
+          164.38
+        ],
+        "70": [
+          129.92,
+          165.03
+        ],
+        "71": [
+          126.67,
+          163.74
+        ],
+        "72": [
+          126.67,
+          161.79
+        ],
+        "73": [
+          126.03,
+          161.79
+        ],
+        "74": [
+          128.62,
+          157.25
+        ]
+      },
+      "skipped_frames": [],
+      "complete": true
+    },
+    "47": {
+      "dataset_row": 47,
+      "club": "5Iron",
+      "height_block": "low_2.875in",
+      "camera_directory": "/Users/john.pacino/openflight_sessions/trackman/camera/camera_20260824_122048_417_002",
+      "impact_frame": 73,
+      "auto_impact_frame": 66,
+      "ball_xy": [
+        138.35,
+        159.84
+      ],
+      "clubhead_xy_by_frame": {
+        "69": [
+          148.74,
+          157.9
+        ],
+        "70": [
+          141.6,
+          159.84
+        ],
+        "71": [
+          139.65,
+          161.14
+        ],
+        "72": [
+          138.35,
+          160.49
+        ],
+        "73": [
+          139.0,
+          159.19
+        ],
+        "74": [
+          139.65,
+          157.9
+        ]
+      },
+      "skipped_frames": [],
+      "complete": true
+    },
+    "48": {
+      "dataset_row": 48,
+      "club": "5Iron",
+      "height_block": "low_2.875in",
+      "camera_directory": "/Users/john.pacino/openflight_sessions/trackman/camera/camera_20260824_122118_819_003",
+      "impact_frame": 74,
+      "auto_impact_frame": 67,
+      "ball_xy": [
+        139.0,
+        161.79
+      ],
+      "clubhead_xy_by_frame": {
+        "70": [
+          144.84,
+          161.14
+        ],
+        "71": [
+          139.65,
+          164.38
+        ],
+        "72": [
+          137.7,
+          168.28
+        ],
+        "73": [
+          135.76,
+          168.28
+        ],
+        "74": [
+          133.81,
+          164.38
+        ],
+        "75": [
+          136.41,
+          160.49
+        ]
+      },
+      "skipped_frames": [],
+      "complete": true
+    },
+    "61": {
+      "dataset_row": 61,
+      "club": "Driver",
+      "height_block": "low_2.875in",
+      "camera_directory": "/Users/john.pacino/openflight_sessions/trackman/camera/camera_20260824_122841_611_017",
+      "impact_frame": 74,
+      "auto_impact_frame": 79,
+      "ball_xy": [
+        140.3,
+        148.16
+      ],
+      "clubhead_xy_by_frame": {
+        "70": [
+          151.98,
+          162.44
+        ],
+        "71": [
+          140.95,
+          162.44
+        ],
+        "72": [
+          136.41,
+          159.19
+        ],
+        "73": [
+          135.11,
+          154.65
+        ],
+        "74": [
+          135.11,
+          145.57
+        ],
+        "75": [
+          136.41,
+          141.03
+        ]
+      },
+      "skipped_frames": [],
+      "complete": true
+    },
+    "63": {
+      "dataset_row": 63,
+      "club": "Driver",
+      "height_block": "low_2.875in",
+      "camera_directory": "/Users/john.pacino/openflight_sessions/trackman/camera/camera_20260824_122953_432_019",
+      "impact_frame": 72,
+      "auto_impact_frame": 78,
+      "ball_xy": [
+        131.86,
+        147.51
+      ],
+      "clubhead_xy_by_frame": {
+        "68": [
+          131.22,
+          152.06
+        ],
+        "69": [
+          127.97,
+          153.35
+        ],
+        "70": [
+          124.73,
+          155.95
+        ],
+        "71": [
+          124.08,
+          152.71
+        ],
+        "72": [
+          123.43,
+          147.51
+        ],
+        "73": [
+          129.27,
+          141.68
+        ]
+      },
+      "skipped_frames": [],
+      "complete": true
+    },
+    "69": {
+      "dataset_row": 69,
+      "club": "Driver",
+      "height_block": "high_5.25in",
+      "camera_directory": "/Users/john.pacino/openflight_sessions/trackman/camera/camera_20260824_123439_993_026",
+      "impact_frame": 72,
+      "auto_impact_frame": 75,
+      "ball_xy": [
+        139.65,
+        162.44
+      ],
+      "clubhead_xy_by_frame": {
+        "68": [
+          166.25,
+          184.5
+        ],
+        "69": [
+          150.03,
+          182.55
+        ],
+        "70": [
+          140.95,
+          182.55
+        ],
+        "71": [
+          139.65,
+          176.06
+        ],
+        "72": [
+          137.7,
+          170.87
+        ],
+        "73": [
+          137.7,
+          165.03
+        ]
+      },
+      "skipped_frames": [],
+      "complete": true
+    },
+    "75": {
+      "dataset_row": 75,
+      "club": "Driver",
+      "height_block": "high_5.25in",
+      "camera_directory": "/Users/john.pacino/openflight_sessions/trackman/camera/camera_20260824_123728_441_032",
+      "impact_frame": 72,
+      "auto_impact_frame": 75,
+      "ball_xy": [
+        138.35,
+        162.44
+      ],
+      "clubhead_xy_by_frame": {
+        "68": [
+          159.77,
+          189.04
+        ],
+        "69": [
+          148.74,
+          186.45
+        ],
+        "70": [
+          144.84,
+          184.5
+        ],
+        "71": [
+          144.19,
+          180.61
+        ],
+        "72": [
+          140.95,
+          172.82
+        ],
+        "73": [
+          139.65,
+          166.98
+        ]
+      },
+      "skipped_frames": [],
+      "complete": true
+    },
+    "83": {
+      "dataset_row": 83,
+      "club": "Driver",
+      "height_block": "high_5.25in",
+      "camera_directory": "/Users/john.pacino/openflight_sessions/trackman/camera/camera_20260824_124123_978_040",
+      "impact_frame": 72,
+      "auto_impact_frame": 75,
+      "ball_xy": [
+        136.41,
+        161.79
+      ],
+      "clubhead_xy_by_frame": {
+        "68": [
+          138.35,
+          170.22
+        ],
+        "69": [
+          135.11,
+          176.71
+        ],
+        "70": [
+          129.27,
+          178.66
+        ],
+        "71": [
+          133.16,
+          174.77
+        ],
+        "72": [
+          133.16,
+          170.22
+        ],
+        "73": [
+          135.76,
+          165.68
+        ]
+      },
+      "skipped_frames": [],
+      "complete": true
+    }
+  }
+}

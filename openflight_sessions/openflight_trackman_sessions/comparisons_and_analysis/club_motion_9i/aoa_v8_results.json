@@ -1,0 +1,42 @@
+[
+  {
+    "shot": 2,
+    "impact_idx": 41,
+    "n_pts": 5,
+    "n_pre": 2,
+    "n_post": 3,
+    "aoa_quad_deg": -40.66,
+    "cam_speed_mph": 44.6,
+    "ops_club_mph": 80.34036091479491,
+    "fit_resid_px": 0.37,
+    "median_step_px": 15.5,
+    "mm_per_px": 3.424,
+    "head_track": [
+      {
+        "frame": 40,
+        "x": 236.8,
+        "y": 106.7
+      },
+      {
+        "frame": 41,
+        "x": 255.4,
+        "y": 125.2
+      },
+      {
+        "frame": 42,
+        "x": 269.8,
+        "y": 137.5
+      },
+      {
+        "frame": 43,
+        "x": 280.2,
+        "y": 143.7
+      },
+      {
+        "frame": 44,
+        "x": 287.0,
+        "y": 145.0
+      }
+    ]
+  }
+]

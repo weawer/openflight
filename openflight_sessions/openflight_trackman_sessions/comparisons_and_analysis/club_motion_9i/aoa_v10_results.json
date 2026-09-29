@@ -1,0 +1,260 @@
+[
+  {
+    "shot": 4,
+    "impact_idx": 41,
+    "n_pts": 4,
+    "n_pre": 3,
+    "n_post": 1,
+    "aoa_quad_deg": 12.68,
+    "cam_speed_mph": 1.1,
+    "ops_club_mph": 84.20973190942384,
+    "fit_resid_px": 0.24,
+    "steps_px": [
+      0.7,
+      0.5,
+      0.5
+    ],
+    "mm_per_px": 3.589,
+    "head_track": [
+      {
+        "frame": 38,
+        "x": 81.3,
+        "y": 84.0,
+        "head_px": 199
+      },
+      {
+        "frame": 39,
+        "x": 81.9,
+        "y": 83.7,
+        "head_px": 204
+      },
+      {
+        "frame": 40,
+        "x": 82.1,
+        "y": 83.2,
+        "head_px": 203
+      },
+      {
+        "frame": 44,
+        "x": 84.2,
+        "y": 83.2,
+        "head_px": 221
+      }
+    ]
+  },
+  {
+    "shot": 5,
+    "impact_idx": 41,
+    "n_pts": 4,
+    "n_pre": 3,
+    "n_post": 1,
+    "aoa_quad_deg": 56.87,
+    "cam_speed_mph": 2.7,
+    "ops_club_mph": 82.27504641210939,
+    "fit_resid_px": 0.76,
+    "steps_px": [
+      0.7,
+      0.6,
+      1.5
+    ],
+    "mm_per_px": 3.589,
+    "head_track": [
+      {
+        "frame": 38,
+        "x": 87.5,
+        "y": 92.9,
+        "head_px": 183
+      },
+      {
+        "frame": 39,
+        "x": 88.0,
+        "y": 93.4,
+        "head_px": 182
+      },
+      {
+        "frame": 40,
+        "x": 88.3,
+        "y": 93.0,
+        "head_px": 183
+      },
+      {
+        "frame": 44,
+        "x": 91.2,
+        "y": 87.7,
+        "head_px": 217
+      }
+    ]
+  },
+  {
+    "shot": 7,
+    "impact_idx": 41,
+    "n_pts": 4,
+    "n_pre": 3,
+    "n_post": 1,
+    "aoa_quad_deg": 26.33,
+    "cam_speed_mph": 1.4,
+    "ops_club_mph": 83.70060414697267,
+    "fit_resid_px": 0.44,
+    "steps_px": [
+      0.3,
+      0.5,
+      0.8
+    ],
+    "mm_per_px": 3.557,
+    "head_track": [
+      {
+        "frame": 38,
+        "x": 78.8,
+        "y": 87.9,
+        "head_px": 159
+      },
+      {
+        "frame": 39,
+        "x": 79.1,
+        "y": 87.9,
+        "head_px": 163
+      },
+      {
+        "frame": 40,
+        "x": 79.5,
+        "y": 88.1,
+        "head_px": 170
+      },
+      {
+        "frame": 44,
+        "x": 82.1,
+        "y": 86.3,
+        "head_px": 187
+      }
+    ]
+  },
+  {
+    "shot": 8,
+    "impact_idx": 43,
+    "n_pts": 4,
+    "n_pre": 2,
+    "n_post": 2,
+    "aoa_quad_deg": 55.57,
+    "cam_speed_mph": 4.2,
+    "ops_club_mph": 83.90425525195313,
+    "fit_resid_px": 0.42,
+    "steps_px": [
+      1.0,
+      1.9,
+      0.9
+    ],
+    "mm_per_px": 3.88,
+    "head_track": [
+      {
+        "frame": 40,
+        "x": 85.6,
+        "y": 85.6,
+        "head_px": 137
+      },
+      {
+        "frame": 41,
+        "x": 86.3,
+        "y": 84.9,
+        "head_px": 140
+      },
+      {
+        "frame": 45,
+        "x": 90.3,
+        "y": 78.3,
+        "head_px": 167
+      },
+      {
+        "frame": 46,
+        "x": 91.1,
+        "y": 78.0,
+        "head_px": 178
+      }
+    ]
+  },
+  {
+    "shot": 9,
+    "impact_idx": 41,
+    "n_pts": 4,
+    "n_pre": 3,
+    "n_post": 1,
+    "aoa_quad_deg": -66.29,
+    "cam_speed_mph": 2.3,
+    "ops_club_mph": 65.37200469873046,
+    "fit_resid_px": 1.13,
+    "steps_px": [
+      1.2,
+      0.6,
+      1.5
+    ],
+    "mm_per_px": 3.511,
+    "head_track": [
+      {
+        "frame": 38,
+        "x": 76.1,
+        "y": 77.1,
+        "head_px": 182
+      },
+      {
+        "frame": 39,
+        "x": 76.7,
+        "y": 76.0,
+        "head_px": 182
+      },
+      {
+        "frame": 40,
+        "x": 77.4,
+        "y": 76.0,
+        "head_px": 188
+      },
+      {
+        "frame": 44,
+        "x": 78.7,
+        "y": 81.8,
+        "head_px": 146
+      }
+    ]
+  },
+  {
+    "shot": 16,
+    "impact_idx": 40,
+    "n_pts": 4,
+    "n_pre": 3,
+    "n_post": 1,
+    "aoa_quad_deg": -67.44,
+    "cam_speed_mph": 27.6,
+    "ops_club_mph": 59.567948206787115,
+    "fit_resid_px": 8.84,
+    "steps_px": [
+      2.2,
+      1.4,
+      15.9
+    ],
+    "mm_per_px": 3.84,
+    "head_track": [
+      {
+        "frame": 37,
+        "x": 92.6,
+        "y": 22.1,
+        "head_px": 177
+      },
+      {
+        "frame": 38,
+        "x": 94.7,
+        "y": 21.8,
+        "head_px": 199
+      },
+      {
+        "frame": 39,
+        "x": 96.1,
+        "y": 21.9,
+        "head_px": 200
+      },
+      {
+        "frame": 43,
+        "x": 69.6,
+        "y": 79.7,
+        "head_px": 173
+      }
+    ]
+  }
+]

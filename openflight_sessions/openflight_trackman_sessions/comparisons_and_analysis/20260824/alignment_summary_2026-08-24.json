@@ -1,0 +1,67 @@
+{
+  "activity_id": "08862338-ca9f-f111-9edb-83ad45319c98",
+  "trackman_shots": 101,
+  "openflight_shots": 102,
+  "matched_shots": 90,
+  "unmatched_trackman": 0,
+  "unmatched_openflight": 1,
+  "match_delta_ms": {
+    "min": -660.23,
+    "max": -616.048,
+    "mean": -642.5210888888889
+  },
+  "coverage": {
+    "vertical_output": 1.0,
+    "vertical_radar": 1.0,
+    "vertical_estimated": 0.0,
+    "horizontal_launch": 0.8111111111111111,
+    "camera_horizontal": 0.6222222222222222,
+    "camera_fused_attack_angle": 0.06666666666666667,
+    "camera_fused_club_path": 0.12222222222222222
+  },
+  "mae": {
+    "ball_speed_mph": 1.304447482106328,
+    "club_speed_mph": 2.7476871161211274,
+    "vertical_output_deg": 2.39510092567272,
+    "vertical_radar_deg": 2.39510092567272,
+    "vertical_estimated_deg": null,
+    "horizontal_launch_deg": 5.682245983492816,
+    "camera_fused_attack_angle_deg": 13.667166666666667,
+    "camera_fused_club_path_deg": 5.132818181818182
+  },
+  "files": {
+    "activity_json": "/Users/john.pacino/openflight_sessions/trackman/20260824/trackman_activity_08862338-ca9f-f111-9edb-83ad45319c98.json",
+    "comparison_csv": "/Users/john.pacino/openflight_sessions/trackman/20260824/trackman_openflight_aligned_2026-08-24.csv",
+    "trackman_csv": "/Users/john.pacino/openflight_sessions/trackman/20260824/trackman_shots_2026-08-24.csv",
+    "artifact_manifest_csv": "/Users/john.pacino/openflight_sessions/trackman/20260824/artifact_manifest_2026-08-24.csv",
+    "excluded_screen_trigger_csv": "/Users/john.pacino/openflight_sessions/trackman/20260824/excluded_screen_trigger_shots_2026-08-24.csv"
+  },
+  "comparison_trackman_shots": 90,
+  "excluded_screen_trigger_shots": 11,
+  "geometry_context": {
+    "height_reference": "IWR6843LEVM TX2 antenna center above floor",
+    "physical_height_blocks": {
+      "low_2.875in": {
+        "height_in": 2.875,
+        "height_m": 0.073025,
+        "aligned_rows": 36
+      },
+      "high_5.25in": {
+        "height_in": 5.25,
+        "height_m": 0.13335,
+        "aligned_rows": 48
+      },
+      "unassigned_rows": 7
+    },
+    "live_config": {
+      "radar_height_in": 6.5,
+      "radar_height_m": 0.1651,
+      "ball_height_in": 1.5748031496062993,
+      "ball_height_m": 0.04,
+      "tee_slant_range_in": 60.0,
+      "tee_slant_range_m": 1.524
+    },
+    "warning": "The live configured radar height did not match either physical TX2 height; use the per-row physical_tx2_height_m for offline geometry replay.",
+    "context_file": "/Users/john.pacino/openflight_sessions/trackman/20260824/TRACKMAN_COMPARISON_CONTEXT_2026-08-24.md"
+  }
+}

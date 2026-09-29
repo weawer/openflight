@@ -1,0 +1,218 @@
+[0;32m[OpenFlight][0m Grafana Alloy already running (log shipping active)
+[0;32m[OpenFlight][0m Starting OpenFlight server on port 8080...
+[0;32m[OpenFlight][0m Trigger: sound
+[0;32m[OpenFlight][0m Debug mode enabled (verbose output)
+[0;32m[OpenFlight][0m Camera disabled
+[0;32m[OpenFlight][0m Ballistic carry model enabled (simulator + drag/Magnus)
+[0;32m[OpenFlight][0m Waiting for server to start...
+[0:08:25.819122814] [2566]  INFO Camera camera_manager.cpp:340 libcamera v0.7.0+rpt20260205
+[0:08:25.828211651] [2589]  INFO RPI pisp.cpp:720 libpisp version v1.4.0 23-03-2026 (13:29:05)
+[0:08:25.923012427] [2589]  INFO IPAProxy ipa_proxy.cpp:180 Using tuning file /usr/share/libcamera/ipa/rpi/pisp/ov9281_mono.json
+[0:08:25.924432732] [2589]  INFO Camera camera_manager.cpp:223 Adding camera '/base/axi/pcie@1000120000/rp1/i2c@88000/ov9281@60' for pipeline handler rpi/pisp
+[0:08:25.924446825] [2589]  INFO RPI pisp.cpp:1181 Registered camera /base/axi/pcie@1000120000/rp1/i2c@88000/ov9281@60 to CFE device /dev/media1 and ISP device /dev/media0 using PiSP variant BCM2712_D0
+2026-08-24 10:46:08,239 - picamera2.picamera2 - INFO - Initialization successful.
+2026-08-24 10:46:08,239 - picamera2.picamera2 - INFO - Camera now open.
+2026-08-24 10:46:08,241 - picamera2.picamera2 - INFO - Camera configuration has been adjusted!
+[0:08:25.927629835] [2566]  INFO Camera camera.cpp:1215 configuring streams: (0) 320x200-YUV420/SMPTE170M (1) 320x200-R16/RAW
+[0:08:25.927710778] [2589]  INFO RPI pisp.cpp:1485 Sensor: /base/axi/pcie@1000120000/rp1/i2c@88000/ov9281@60 - Selected sensor format: 320x200-Y8_1X8/RAW - Selected CFE format: 320x200-Y16 /RAW/Linear/Rec601/Limited
+2026-08-24 10:46:08,241 - picamera2.picamera2 - INFO - Configuration successful!
+2026-08-24 10:46:08,276 - picamera2.picamera2 - INFO - Camera started
+2026-08-24 10:46:08,490 - openflight.camera.capture_runtime - INFO - [CAMERA] Capture armed at 320x200 488.0fps (raw, 74 pre/25 post)
+2026-08-24 10:46:08,502 - openflight.server - INFO - [SERVER] Camera capture initialized: {'enabled': True, 'output_dir': '/home/pacinoj/openflight_sessions/trackman/camera', 'gpio_pin_bcm': 17, 'trigger_source': 'iwr6843_fanout', 'width': 320, 'height': 200, 'fps': 488.0, 'pre_ms': 150.0, 'post_ms': 50.0, 'pre_frames': 74, 'post_frames': 25, 'exposure_us': 500, 'gain': 15.0, 'stream': 'raw', 'rotate_180': False, 'mirror_horizontal': True, 'roll_correction_deg': 0.0, 'scaler_crop': None, 'mount_height_m': 0.2032, 'lateral_offset_m': -0.060325, 'horizontal_offset_deg': 0.0, 'alignment_x_pct': 50.0, 'alignment_y_pct': 50.0}
+2026-08-24 10:46:13,687 - openflight.gpio_factory - INFO - [GPIO] Pin factory: lgpio on /dev/gpiochip4
+2026-08-24 10:46:13,690 - openflight.iwr6843.monitor - INFO - [IWR6843] Configured on BCM17 using /dev/ttyUSB0 (iwr6843_l3dump_dense_36f2ms_53bin_iq8.cfg, waiting for OPS)
+2026-08-24 10:46:13,691 - openflight.server - INFO - [SERVER] IWR6843 initialized (port=/dev/ttyUSB0, BCM17, estimator=LCMF-v1, firmware boundary freeze)
+2026-08-24 10:46:13,698 - ops243 - INFO - [OPS] Transport=usb port=/dev/serial/by-id/usb-Infineon_IFX_CDC-if00 baud=57600 (nominal)
+2026-08-24 10:46:13,698 - ops243 - INFO - [OPS] USB serial latency_timer unavailable: port=/dev/serial/by-id/usb-Infineon_IFX_CDC-if00 resolved=/dev/ttyACM0 (latency_timer not exposed)
+2026-08-24 10:46:16,747 - ops243 - INFO - [OPS] Drained 40976 bytes of stale data from serial buffer
+2026-08-24 10:46:16,850 - ops243 - INFO - [OPS] Units: MPH
+2026-08-24 10:46:16,957 - ops243 - INFO - [OPS] Transmit power: level 3 (reduced to avoid clipping)
+2026-08-24 10:46:17,064 - ops243 - INFO - [OPS] Sample rate: 30ksps
+2026-08-24 10:46:17,265 - ops243 - INFO - [OPS] Re-arm drain: 0 bytes in 0.2s
+2026-08-24 10:46:17,616 - ops243 - INFO - [OPS] Rolling buffer re-armed (S#16)
+2026-08-24 10:46:17,616 - ops243 - INFO - [OPS] Persisted rolling buffer prepared (S#16, 30ksps)
+2026-08-24 10:46:17,616 - openflight.rolling_buffer.monitor - INFO - [MONITOR] Rolling buffer mode configured with S#16, S=30
+2026-08-24 10:46:17,616 - openflight.server - INFO - [SERVER] Starting monitor: mode=rolling-buffer, trigger=sound, sample_rate=30ksps
+2026-08-24 10:46:18,067 - ops243 - INFO - [OPS] Clock sync: method=integer_rollover offset=1787582248.062s best_read_latency=0.7ms spread=989.1ms rollover_uncertainty=10.9ms (29/29 valid)
+2026-08-24 10:46:18,068 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-08-24 10:46:18,068 - openflight.rolling_buffer.monitor - INFO - [MONITOR] Rolling buffer monitor started (trigger: sound)
+2026-08-24 10:46:18,069 - openflight.iwr6843.monitor - INFO - [IWR6843] Armed on BCM17
+2026-08-24 10:46:18,069 - openflight.server - INFO - [POWER] Battery monitoring enabled with provider=geekworm
+2026-08-24 10:46:18,070 - werkzeug - WARNING - Werkzeug appears to be used in a production deployment. Consider switching to a production web server instead.
+==================================================
+  OpenFlight UI Server
+==================================================
+
+Session logging enabled (location: trackman)
+Ballistic carry model: ENABLED (simulator + drag/Magnus)
+Camera capture enabled: /home/pacinoj/openflight_sessions/trackman/camera
+Camera disabled by --no-camera flag
+IWR6843 enabled (LCMF-v1 launch angle, BCM17, normal TX order)
+IWR6843 raw dumps enabled: /home/pacinoj/openflight_sessions/iwr6843
+[MODE] Rolling buffer mode (trigger: sound, sample_rate: 30ksps)
+[SESSION] Started logging: /home/pacinoj/openflight_sessions/session_20260824_104617_trackman.jsonl
+[SESSION] Mode: rolling-buffer (trigger: sound)
+[SESSION] Raw radar log: /home/pacinoj/openflight_sessions/radar_raw_20260824_104617.log
+Battery monitoring: ENABLED (geekworm)
+Server starting at http://0.0.0.0:8080
+
+ * Serving Flask app 'openflight.server'
+ * Debug mode: off
+2026-08-24 10:46:18,080 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8080
+ * Running on http://172.20.10.2:8080
+2026-08-24 10:46:18,080 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2026-08-24 10:46:18,178 - werkzeug - INFO - 127.0.0.1 - - [24/Aug/2026 10:46:18] "GET / HTTP/1.1" 200 -
+2026-08-24 10:46:18,194 - werkzeug - INFO - 127.0.0.1 - - [24/Aug/2026 10:46:18] "GET / HTTP/1.1" 200 -
+[0;32m[OpenFlight][0m Server is running!
+[0;32m[OpenFlight][0m Launching kiosk browser...
+[0;32m[OpenFlight][0m OpenFlight is running! Press Ctrl+C to stop.
+[2715:2715:0824/104620.207596:ERROR:base/memory/shared_memory_switch.cc:289] Failed global descriptor lookup: 7
+Error: unrecognized flag --no-decommit-pooled-pages
+Try --help for options
+Error: unrecognized flag --no-decommit-pooled-pages
+Try --help for options
+2026-08-24 10:46:22,221 - werkzeug - INFO - 127.0.0.1 - - [24/Aug/2026 10:46:22] "[36mGET / HTTP/1.1[0m" 304 -
+2026-08-24 10:46:22,581 - werkzeug - INFO - 127.0.0.1 - - [24/Aug/2026 10:46:22] "[36mGET /assets/index-h0PAR9Ke.css HTTP/1.1[0m" 304 -
+2026-08-24 10:46:22,582 - werkzeug - INFO - 127.0.0.1 - - [24/Aug/2026 10:46:22] "[36mGET /assets/index-DwvsTWOf.js HTTP/1.1[0m" 304 -
+[2645:2683:0824/104626.362858:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+[2801:2801:0824/104641.640662:ERROR:base/memory/shared_memory_switch.cc:289] Failed global descriptor lookup: 7
+2026-08-24 10:46:48,070 - ops243 - INFO - [OPS] Hardware trigger: no data received within 30s
+2026-08-24 10:46:48,071 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger timeout — no hardware trigger received
+2026-08-24 10:46:48,071 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+[2645:2683:0824/104654.334583:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+2026-08-24 10:47:18,077 - ops243 - INFO - [OPS] Hardware trigger: no data received within 30s
+2026-08-24 10:47:18,077 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger timeout — no hardware trigger received
+2026-08-24 10:47:18,077 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+[2645:2683:0824/104746.382938:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: QUOTA_EXCEEDED
+2026-08-24 10:47:47,544 - openflight.iwr6843.monitor - INFO - [IWR6843] Trigger #1: dumping firmware-frozen L3 ring
+2026-08-24 10:47:47,622 - ops243 - DEBUG - [OPS] Hardware trigger: first byte after 29.5s
+2026-08-24 10:47:47,656 - openflight.camera.capture_runtime - INFO - [CAMERA] Capture #1 saved: 99 frames, 467.6fps, gaps=0 -> /home/pacinoj/openflight_sessions/trackman/camera/camera_20260824_104747_544_001
+2026-08-24 10:47:50,357 - ops243 - INFO - [OPS] Hardware trigger: 41035 bytes in 32.3s
+2026-08-24 10:47:50,358 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger fired, 41035 bytes received
+2026-08-24 10:47:51,054 - ops243 - INFO - [OPS] Clock sync: method=integer_rollover offset=1787582248.049s best_read_latency=0.2ms spread=989.2ms rollover_uncertainty=10.8ms (62/62 valid)
+2026-08-24 10:47:51,059 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] OPS clock sync selected: fresh offset=1787582248.048613s age=0.0ms (fresh=valid_integer_rollover, previous=valid_integer_rollover, delta=-13.2ms)
+2026-08-24 10:47:51,259 - ops243 - INFO - [OPS] Re-arm drain: 0 bytes in 0.2s
+2026-08-24 10:47:51,612 - ops243 - INFO - [OPS] Rolling buffer re-armed (S#16)
+2026-08-24 10:47:51,612 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger wall time 1787582867.542 (source=ops_clock_sync, first byte 1787582867.622, post-trigger 68.5ms)
+2026-08-24 10:47:51,612 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger accepted — peak 101.8 mph, 58 outbound readings
+2026-08-24 10:47:51,634 - openflight.rolling_buffer.processor - INFO - [PROCESSOR] Ball speed: 101.8 mph (mode-based, 58 outbound readings)
+2026-08-24 10:47:51,705 - openflight.rolling_buffer.processor - INFO - [PROCESSOR] Club speed: 78.3 mph at 13.9ms before ball
+2026-08-24 10:47:51,708 - openflight.rolling_buffer.processor - INFO - [PROCESSOR] Impact estimate: OPS transition 59.2ms (club 79.9 mph @ 55.5ms -> ball 99.1 mph @ 62.9ms, delta=19.1 mph)
+2026-08-24 10:47:51,711 - openflight.rolling_buffer.processor - INFO - [PROCESSOR] Multitaper repaired 0.12% clipped I/Q samples
+2026-08-24 10:47:51,810 - openflight.rolling_buffer.processor - INFO - [PROCESSOR] Ungated multitaper spin: 2197 RPM, evidence=14.81, fade=25.00 Hz, window=71.9ms
+2026-08-24 10:47:51,810 - openflight.rolling_buffer.processor - INFO - [PROCESSOR] Spin result: 2197 RPM, SNR=14.81, quality=experimental
+2026-08-24 10:47:51,811 - openflight.rolling_buffer.monitor - INFO - [MONITOR] process_capture: 198.3ms
+2026-08-24 10:47:51,811 - openflight.rolling_buffer.monitor - INFO - [MONITOR] Shot detected: ball=101.8 mph, club=78.3, spin=2197
+2026-08-24 10:47:51,814 - openflight.server - INFO - [SERVER] Shot callback: 101.8 mph
+2026-08-24 10:47:52,883 - openflight.iwr6843.monitor - INFO - [IWR6843] Capture #1 complete: 549764 bytes in 5.34s
+2026-08-24 10:47:53,644 - openflight.iwr6843.club - INFO - [CLUB] track=ops_speed_prior OPS=78.3 mph radial=34.0 m/s ratio=0.97 impact_error=0.053 m inliers=66 rms=0.29 bins
+2026-08-24 10:47:53,778 - openflight.server - INFO - [SERVER] IWR6843 LCMF-v1 launch: 21.63° (28 snapshots/9 frames, component std 8.02°)
+2026-08-24 10:47:53,779 - openflight.server - INFO - [SERVER] Camera capture #1 matched -> /home/pacinoj/openflight_sessions/trackman/camera/camera_20260824_104747_544_001
+2026-08-24 10:47:57,097 - openflight.server - INFO - [SERVER] Camera-assisted horizontal: selected=-1.7186556690575543 camera=-1.7186556690575543 IWR=None delta=None status=camera_assisted_high support=16/27
+2026-08-24 10:47:57,241 - openflight.server - INFO - [SERVER] Camera/IWR chained club delivery: AoA None path 6.92 (status=approach_path_only, features=0, speed_ratio=None, velocity_mad=None mph, path_windows=1, path_mad=0.0 deg, impact_frame=65)
+2026-08-24 10:47:57,241 - openflight.server - INFO - [SERVER] Ball speed cosine correction: 101.8 -> 104.9 mph (LA 21.6)
+2026-08-24 10:47:57,241 - openflight.server - INFO - [SERVER] Calculated spin: 5384 rpm (v=104.9 mph, LA=21.6 deg, measured was 2197 rpm)
+2026-08-24 10:47:57,270 - openflight.server - INFO - [SERVER] Ballistic carry: 156 yds (spin: 5384 rpm, source: measured)
+2026-08-24 10:47:57,271 - openflight.server - INFO - [SERVER] Shot: ball=104.9 mph, carry=144 yds, Launch: 21.6°
+2026-08-24 10:47:57,271 - openflight.rolling_buffer.monitor - INFO - [SHOT] #1: ball=104.9 mph, club=78.3, carry=144 yds | trigger=33535ms, process=198ms, callback=5458ms, total=39194ms
+2026-08-24 10:47:57,272 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-08-24 10:48:11,873 - werkzeug - INFO - 127.0.0.1 - - [24/Aug/2026 10:48:11] "GET /api/camera/preview.jpg?t=1787582891853 HTTP/1.1" 200 -
+2026-08-24 10:48:11,919 - werkzeug - INFO - 127.0.0.1 - - [24/Aug/2026 10:48:11] "GET /api/camera/exposure-quality?t=1787582891915 HTTP/1.1" 200 -
+2026-08-24 10:48:16,511 - openflight.camera.capture_runtime - INFO - [CAMERA] Live controls updated: exposure=500us gain=12.00
+2026-08-24 10:48:16,857 - werkzeug - INFO - 127.0.0.1 - - [24/Aug/2026 10:48:16] "GET /api/camera/preview.jpg?t=1787582896853 HTTP/1.1" 200 -
+2026-08-24 10:48:16,869 - werkzeug - INFO - 127.0.0.1 - - [24/Aug/2026 10:48:16] "GET /api/camera/exposure-quality?t=1787582896860 HTTP/1.1" 200 -
+2026-08-24 10:48:18,264 - openflight.camera.capture_runtime - INFO - [CAMERA] Live controls updated: exposure=650us gain=15.00
+2026-08-24 10:48:21,857 - werkzeug - INFO - 127.0.0.1 - - [24/Aug/2026 10:48:21] "GET /api/camera/preview.jpg?t=1787582901853 HTTP/1.1" 200 -
+2026-08-24 10:48:21,868 - werkzeug - INFO - 127.0.0.1 - - [24/Aug/2026 10:48:21] "GET /api/camera/exposure-quality?t=1787582901861 HTTP/1.1" 200 -
+2026-08-24 10:48:23,268 - openflight.camera.capture_runtime - INFO - [CAMERA] Live controls updated: exposure=1000us gain=20.00
+2026-08-24 10:48:26,856 - werkzeug - INFO - 127.0.0.1 - - [24/Aug/2026 10:48:26] "GET /api/camera/preview.jpg?t=1787582906853 HTTP/1.1" 200 -
+2026-08-24 10:48:26,867 - werkzeug - INFO - 127.0.0.1 - - [24/Aug/2026 10:48:26] "GET /api/camera/exposure-quality?t=1787582906862 HTTP/1.1" 200 -
+2026-08-24 10:48:27,292 - ops243 - INFO - [OPS] Hardware trigger: no data received within 30s
+2026-08-24 10:48:27,292 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger timeout — no hardware trigger received
+2026-08-24 10:48:27,292 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-08-24 10:48:31,859 - werkzeug - INFO - 127.0.0.1 - - [24/Aug/2026 10:48:31] "GET /api/camera/preview.jpg?t=1787582911853 HTTP/1.1" 200 -
+2026-08-24 10:48:31,868 - werkzeug - INFO - 127.0.0.1 - - [24/Aug/2026 10:48:31] "GET /api/camera/exposure-quality?t=1787582911862 HTTP/1.1" 200 -
+2026-08-24 10:48:35,843 - openflight.camera.capture_runtime - INFO - [CAMERA] Live controls updated: exposure=800us gain=18.00
+2026-08-24 10:48:36,858 - werkzeug - INFO - 127.0.0.1 - - [24/Aug/2026 10:48:36] "GET /api/camera/preview.jpg?t=1787582916853 HTTP/1.1" 200 -
+2026-08-24 10:48:36,866 - werkzeug - INFO - 127.0.0.1 - - [24/Aug/2026 10:48:36] "GET /api/camera/exposure-quality?t=1787582916862 HTTP/1.1" 200 -
+2026-08-24 10:48:41,857 - werkzeug - INFO - 127.0.0.1 - - [24/Aug/2026 10:48:41] "GET /api/camera/preview.jpg?t=1787582921853 HTTP/1.1" 200 -
+2026-08-24 10:48:41,865 - werkzeug - INFO - 127.0.0.1 - - [24/Aug/2026 10:48:41] "GET /api/camera/exposure-quality?t=1787582921860 HTTP/1.1" 200 -
+2026-08-24 10:48:46,857 - werkzeug - INFO - 127.0.0.1 - - [24/Aug/2026 10:48:46] "GET /api/camera/preview.jpg?t=1787582926853 HTTP/1.1" 200 -
+2026-08-24 10:48:46,865 - werkzeug - INFO - 127.0.0.1 - - [24/Aug/2026 10:48:46] "GET /api/camera/exposure-quality?t=1787582926859 HTTP/1.1" 200 -
+2026-08-24 10:48:47,521 - openflight.camera.capture_runtime - INFO - [CAMERA] Live controls updated: exposure=1000us gain=20.00
+2026-08-24 10:48:51,856 - werkzeug - INFO - 127.0.0.1 - - [24/Aug/2026 10:48:51] "GET /api/camera/preview.jpg?t=1787582931854 HTTP/1.1" 200 -
+2026-08-24 10:48:51,864 - werkzeug - INFO - 127.0.0.1 - - [24/Aug/2026 10:48:51] "GET /api/camera/exposure-quality?t=1787582931859 HTTP/1.1" 200 -
+2026-08-24 10:48:57,303 - ops243 - INFO - [OPS] Hardware trigger: no data received within 30s
+2026-08-24 10:48:57,303 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger timeout — no hardware trigger received
+2026-08-24 10:48:57,303 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-08-24 10:49:07,741 - openflight.iwr6843.monitor - INFO - [IWR6843] Trigger #2: dumping firmware-frozen L3 ring
+2026-08-24 10:49:07,829 - ops243 - DEBUG - [OPS] Hardware trigger: first byte after 10.5s
+2026-08-24 10:49:07,881 - openflight.camera.capture_runtime - INFO - [CAMERA] Capture #2 saved: 99 frames, 467.6fps, gaps=0 -> /home/pacinoj/openflight_sessions/trackman/camera/camera_20260824_104907_741_002
+2026-08-24 10:49:10,553 - ops243 - INFO - [OPS] Hardware trigger: 41033 bytes in 13.2s
+2026-08-24 10:49:10,553 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger fired, 41033 bytes received
+2026-08-24 10:49:11,048 - ops243 - INFO - [OPS] Clock sync: method=integer_rollover offset=1787582248.042s best_read_latency=0.2ms spread=989.1ms rollover_uncertainty=10.9ms (44/44 valid)
+2026-08-24 10:49:11,048 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] OPS clock sync selected: fresh offset=1787582248.042287s age=0.0ms (fresh=valid_integer_rollover, previous=valid_integer_rollover, delta=-6.3ms)
+2026-08-24 10:49:11,248 - ops243 - INFO - [OPS] Re-arm drain: 0 bytes in 0.2s
+2026-08-24 10:49:11,600 - ops243 - INFO - [OPS] Rolling buffer re-armed (S#16)
+2026-08-24 10:49:11,600 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger wall time 1787582947.738 (source=ops_clock_sync, first byte 1787582947.830, post-trigger 68.5ms)
+2026-08-24 10:49:11,600 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger accepted — peak 101.0 mph, 51 outbound readings
+2026-08-24 10:49:11,619 - openflight.rolling_buffer.processor - INFO - [PROCESSOR] Ball speed: 101.0 mph (mode-based, 51 outbound readings)
+2026-08-24 10:49:11,681 - openflight.rolling_buffer.processor - INFO - [PROCESSOR] Club speed: 77.1 mph at 12.8ms before ball
+2026-08-24 10:49:11,682 - openflight.rolling_buffer.processor - INFO - [PROCESSOR] Impact estimate: OPS transition 61.3ms (club 78.3 mph @ 56.5ms -> ball 98.2 mph @ 66.1ms, delta=19.9 mph)
+2026-08-24 10:49:11,683 - openflight.rolling_buffer.processor - INFO - [PROCESSOR] Multitaper repaired 0.07% clipped I/Q samples
+2026-08-24 10:49:11,749 - openflight.rolling_buffer.processor - INFO - [PROCESSOR] Ungated multitaper spin: 2142 RPM, evidence=7.10, fade=25.00 Hz, window=69.7ms
+2026-08-24 10:49:11,749 - openflight.rolling_buffer.processor - INFO - [PROCESSOR] Spin result: 2142 RPM, SNR=7.10, quality=experimental
+2026-08-24 10:49:11,749 - openflight.rolling_buffer.monitor - INFO - [MONITOR] process_capture: 148.6ms
+2026-08-24 10:49:11,750 - openflight.rolling_buffer.monitor - INFO - [MONITOR] Shot detected: ball=101.0 mph, club=77.1, spin=2142
+2026-08-24 10:49:11,751 - openflight.server - INFO - [SERVER] Shot callback: 101.0 mph
+2026-08-24 10:49:13,079 - openflight.iwr6843.monitor - INFO - [IWR6843] Capture #2 complete: 549764 bytes in 5.34s
+2026-08-24 10:49:13,671 - openflight.iwr6843.club - INFO - [CLUB] track=ops_speed_prior OPS=77.1 mph radial=33.0 m/s ratio=0.96 impact_error=0.059 m inliers=66 rms=0.22 bins
+2026-08-24 10:49:13,772 - openflight.server - INFO - [SERVER] IWR6843 TX2 horizontal proxy: 3.70° (coherence 91%, status=hlcmf_v1_accepted)
+2026-08-24 10:49:13,772 - openflight.server - INFO - [SERVER] IWR6843 LCMF-v1 launch: 21.17° (22 snapshots/7 frames, component std 0.33°)
+2026-08-24 10:49:13,773 - openflight.server - INFO - [SERVER] Camera capture #2 matched -> /home/pacinoj/openflight_sessions/trackman/camera/camera_20260824_104907_741_002
+2026-08-24 10:49:17,330 - openflight.server - INFO - [SERVER] Camera-assisted horizontal: selected=-1.8575285416522433 camera=-1.8575285416522433 IWR=3.702176112497246 delta=-5.559704654149499 status=camera_assisted_high support=27/27
+2026-08-24 10:49:17,398 - openflight.server - INFO - [SERVER] Camera/IWR chained club delivery: AoA None path None (status=rejected_no_impact, features=0, speed_ratio=None, velocity_mad=None mph, path_windows=0, path_mad=None deg, impact_frame=None)
+2026-08-24 10:49:17,398 - openflight.server - INFO - [SERVER] Ball speed cosine correction: 101.0 -> 104.0 mph (LA 21.2)
+2026-08-24 10:49:17,398 - openflight.server - INFO - [SERVER] Calculated spin: 5209 rpm (v=104.0 mph, LA=21.2 deg, measured was 2142 rpm)
+2026-08-24 10:49:17,425 - openflight.server - INFO - [SERVER] Ballistic carry: 153 yds (spin: 5209 rpm, source: measured)
+2026-08-24 10:49:17,426 - openflight.server - INFO - [SERVER] Shot: ball=104.0 mph, carry=139 yds, Launch: 21.2°
+2026-08-24 10:49:17,426 - openflight.rolling_buffer.monitor - INFO - [SHOT] #2: ball=104.0 mph, club=77.1, carry=139 yds | trigger=14297ms, process=149ms, callback=5674ms, total=20122ms
+2026-08-24 10:49:17,426 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-08-24 10:49:47,439 - ops243 - INFO - [OPS] Hardware trigger: no data received within 30s
+2026-08-24 10:49:47,439 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger timeout — no hardware trigger received
+2026-08-24 10:49:47,439 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-08-24 10:50:17,451 - ops243 - INFO - [OPS] Hardware trigger: no data received within 30s
+2026-08-24 10:50:17,451 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger timeout — no hardware trigger received
+2026-08-24 10:50:17,451 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-08-24 10:50:47,467 - ops243 - INFO - [OPS] Hardware trigger: no data received within 30s
+2026-08-24 10:50:47,467 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger timeout — no hardware trigger received
+2026-08-24 10:50:47,467 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-08-24 10:51:17,473 - ops243 - INFO - [OPS] Hardware trigger: no data received within 30s
+2026-08-24 10:51:17,473 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger timeout — no hardware trigger received
+2026-08-24 10:51:17,473 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-08-24 10:51:47,478 - ops243 - INFO - [OPS] Hardware trigger: no data received within 30s
+2026-08-24 10:51:47,478 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger timeout — no hardware trigger received
+2026-08-24 10:51:47,478 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-08-24 10:52:13,001 - openflight.server - INFO - [SERVER] Shutdown requested via REST API
+2026-08-24 10:52:13,001 - werkzeug - INFO - 127.0.0.1 - - [24/Aug/2026 10:52:13] "POST /api/shutdown HTTP/1.1" 200 -
+2026-08-24 10:52:14,153 - openflight.iwr6843.monitor - INFO - [IWR6843] Firmware capture stopped and verified inactive
+2026-08-24 10:52:17,491 - ops243 - INFO - [OPS] Hardware trigger: no data received within 30s
+2026-08-24 10:52:17,492 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger timeout — no hardware trigger received
+2026-08-24 10:52:17,492 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-08-24 10:52:19,334 - openflight.iwr6843.monitor - INFO - [IWR6843] Capture monitor stopped
+2026-08-24 10:52:19,334 - openflight.server - INFO - [SERVER] Shutdown step IWR6843 stop completed in 5833.3ms
+2026-08-24 10:52:19,335 - openflight.server - INFO - [SERVER] Shutdown step battery monitor stop completed in 0.3ms
+2026-08-24 10:52:19,338 - picamera2.picamera2 - INFO - Camera stopped
+2026-08-24 10:52:19,740 - picamera2.picamera2 - INFO - Camera closed successfully.
+2026-08-24 10:52:19,740 - openflight.server - INFO - [SERVER] Shutdown step camera capture stop completed in 405.5ms
+2026-08-24 10:52:19,740 - openflight.server - INFO - [SERVER] Shutdown step camera thread stop completed in 0.0ms
+2026-08-24 10:52:19,766 - ops243 - INFO - [OPS] Hardware trigger wait cancelled before capture
+2026-08-24 10:52:19,766 - ops243 - INFO - [OPS] Hardware trigger: no data received within 30s
+2026-08-24 10:52:19,766 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger timeout — no hardware trigger received
+2026-08-24 10:52:19,766 - openflight.rolling_buffer.monitor - INFO - [MONITOR] Rolling buffer monitor stopped
+2026-08-24 10:52:19,766 - openflight.rolling_buffer.monitor - INFO - [MONITOR] Rolling buffer monitor stopped
+2026-08-24 10:52:19,770 - openflight.server - INFO - [SERVER] Shutdown step launch monitor stop completed in 29.9ms
+2026-08-24 10:52:19,770 - openflight.server - INFO - [SERVER] Goodbye
+[0;32m[OpenFlight][0m Shutting down...

@@ -1,0 +1,40 @@
+{
+  "synthetic": {
+    "head_speed_ms": 35.0,
+    "shaft_speed_ms": 22.0,
+    "head_elevation_deg": -14.368777455601878,
+    "joint_selected_speed_ms": 34.999999999999915,
+    "joint_strongest_speed_ms": 21.899999999999963,
+    "joint_peak_ratio": 0.6856516259668239,
+    "joint_half_power_width_ms": 2.8999999999999915,
+    "same_tx_top_peaks_ms": [
+      22.0,
+      39.9,
+      35.0,
+      17.1
+    ]
+  },
+  "trackman": {
+    "coverage": "18/18",
+    "speed_truth_coverage": "15/18",
+    "joint_speed_mae_mph": 6.788239733333431,
+    "strongest_speed_mae_mph": 15.935219799999803,
+    "ops_speed_mae_mph": 8.219999999999999,
+    "joint_speed_bias_mph": -5.247933466666847,
+    "joint_speed_correlation": 0.11938727614774623,
+    "ops_speed_correlation": 0.17227373211828803,
+    "median_peak_contrast": 5.381828056964958,
+    "median_second_peak_ratio": 0.39254946529064727,
+    "median_half_power_width_ms": 15.724999999999945,
+    "median_parity_speed_delta_ms": 1.7499999999999911
+  },
+  "home_2ms": {
+    "coverage": "16/16",
+    "median_selected_speed_mph": 82.31939199999981,
+    "median_ops_speed_mph": 76.92920490637209,
+    "median_peak_contrast": 113.75130738367235,
+    "median_second_peak_ratio": 0.4244676693892324,
+    "median_half_power_width_ms": 12.949999999999955,
+    "median_parity_speed_delta_ms": 0.9999999999999929
+  }
+}

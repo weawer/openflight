@@ -1,0 +1,842 @@
+[
+  {
+    "club": "9Iron",
+    "block": "low_2.875in",
+    "shot": "12",
+    "tm": 20.59999999999998,
+    "live": 19.16947302902478,
+    "physical": 15.682117770415987,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "low_2.875in",
+    "shot": "13",
+    "tm": 20.493999999999986,
+    "live": 18.51491749080421,
+    "physical": 15.373317847980356,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "low_2.875in",
+    "shot": "14",
+    "tm": 10.839000000000008,
+    "live": 11.797917506420255,
+    "physical": 10.167870710628696,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "low_2.875in",
+    "shot": "15",
+    "tm": 23.566999999999982,
+    "live": 22.87144284795398,
+    "physical": 20.82469359908716,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "low_2.875in",
+    "shot": "16",
+    "tm": 17.37199999999999,
+    "live": 17.00075164428125,
+    "physical": 14.560645193637233,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "low_2.875in",
+    "shot": "17",
+    "tm": 23.767,
+    "live": 24.46306788939069,
+    "physical": 22.200132999438374,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "low_2.875in",
+    "shot": "18",
+    "tm": 20.540999999999997,
+    "live": 19.733444686196748,
+    "physical": 17.592385391959944,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "low_2.875in",
+    "shot": "19",
+    "tm": 22.767,
+    "live": 22.83031138760412,
+    "physical": 20.134085712937917,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "low_2.875in",
+    "shot": "20",
+    "tm": 23.742999999999988,
+    "live": 23.46594166047511,
+    "physical": 21.0197624834669,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "low_2.875in",
+    "shot": "21",
+    "tm": 19.701999999999995,
+    "live": 20.382366673127116,
+    "physical": 17.985576162533548,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "low_2.875in",
+    "shot": "22",
+    "tm": 23.390999999999988,
+    "live": 22.922638874623004,
+    "physical": 19.901766194796807,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "low_2.875in",
+    "shot": "23",
+    "tm": 23.193000000000005,
+    "live": 22.969703070776138,
+    "physical": 19.983449942384947,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "low_2.875in",
+    "shot": "24",
+    "tm": 22.739999999999995,
+    "live": 22.76552687603848,
+    "physical": 20.81026487248754,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "low_2.875in",
+    "shot": "25",
+    "tm": 18.903999999999975,
+    "live": 16.305924207513325,
+    "physical": 12.57447384111682,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "high_5.25in",
+    "shot": "1",
+    "tm": 22.89699999999999,
+    "live": 22.565027065140885,
+    "physical": 22.427765396069724,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "high_5.25in",
+    "shot": "2",
+    "tm": 23.125999999999994,
+    "live": 23.820893863906043,
+    "physical": 24.192218590689173,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "high_5.25in",
+    "shot": "3",
+    "tm": 21.408000000000012,
+    "live": 16.385239276117318,
+    "physical": 20.440500577113134,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "high_5.25in",
+    "shot": "4",
+    "tm": 20.792000000000005,
+    "live": 21.258395736664447,
+    "physical": 21.260986111045547,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "high_5.25in",
+    "shot": "5",
+    "tm": 15.137000000000002,
+    "live": 11.867875295142824,
+    "physical": 11.113940092095117,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "high_5.25in",
+    "shot": "6",
+    "tm": 21.271999999999995,
+    "live": 20.07539501411962,
+    "physical": 20.43710180080921,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "high_5.25in",
+    "shot": "7",
+    "tm": 22.065000000000005,
+    "live": 21.620425209746134,
+    "physical": 22.057793140076683,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "high_5.25in",
+    "shot": "8",
+    "tm": 21.045,
+    "live": 19.374505208059716,
+    "physical": 19.78869208420721,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "high_5.25in",
+    "shot": "9",
+    "tm": 23.75,
+    "live": 24.1588201847793,
+    "physical": 24.289283389593944,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "high_5.25in",
+    "shot": "10",
+    "tm": 20.669999999999998,
+    "live": 18.757050158245356,
+    "physical": 18.930887542408826,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "high_5.25in",
+    "shot": "11",
+    "tm": 24.896999999999984,
+    "live": 23.80115831440805,
+    "physical": 24.107320618908894,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "high_5.25in",
+    "shot": "12",
+    "tm": 18.14899999999999,
+    "live": 18.475250429202408,
+    "physical": 18.314354373351158,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "high_5.25in",
+    "shot": "13",
+    "tm": 21.017999999999997,
+    "live": 18.114223350938726,
+    "physical": 18.130371244505085,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "high_5.25in",
+    "shot": "14",
+    "tm": 22.69499999999999,
+    "live": 21.573925285802993,
+    "physical": 21.456140748181205,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "high_5.25in",
+    "shot": "15",
+    "tm": 21.487999999999992,
+    "live": 21.019906569956444,
+    "physical": 21.383353706456013,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "9Iron",
+    "block": "high_5.25in",
+    "shot": "16",
+    "tm": 22.95899999999999,
+    "live": 23.523212403923356,
+    "physical": 23.900623926786267,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "5Iron",
+    "block": "high_5.25in",
+    "shot": "17",
+    "tm": 12.645999999999962,
+    "live": 11.139704252265918,
+    "physical": 10.56619394571222,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "5Iron",
+    "block": "high_5.25in",
+    "shot": "18",
+    "tm": 12.951000000000041,
+    "live": 10.764124690389668,
+    "physical": 9.788302631679962,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "5Iron",
+    "block": "high_5.25in",
+    "shot": "19",
+    "tm": 14.73399999999999,
+    "live": 13.415130392861077,
+    "physical": 12.69347502462795,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "5Iron",
+    "block": "high_5.25in",
+    "shot": "20",
+    "tm": 13.445999999999975,
+    "live": 6.6399755143369,
+    "physical": 6.048351672531574,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "5Iron",
+    "block": "high_5.25in",
+    "shot": "21",
+    "tm": 14.641999999999975,
+    "live": 14.882160922470895,
+    "physical": 14.354883415714998,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "5Iron",
+    "block": "high_5.25in",
+    "shot": "22",
+    "tm": 15.292999999999994,
+    "live": 9.864332062261926,
+    "physical": 7.938392647744747,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "5Iron",
+    "block": "high_5.25in",
+    "shot": "23",
+    "tm": 12.148999999999976,
+    "live": 12.853624806075109,
+    "physical": 11.29675028332239,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "5Iron",
+    "block": "high_5.25in",
+    "shot": "24",
+    "tm": 13.886999999999997,
+    "live": 13.067759843764819,
+    "physical": 12.504924808851001,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "5Iron",
+    "block": "high_5.25in",
+    "shot": "25",
+    "tm": 0.669999999999999,
+    "live": -1.6404306934527977,
+    "physical": -1.5791935951516796,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "5Iron",
+    "block": "high_5.25in",
+    "shot": "26",
+    "tm": 16.00899999999998,
+    "live": 15.269371864031381,
+    "physical": 15.14903392598155,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "5Iron",
+    "block": "high_5.25in",
+    "shot": "27",
+    "tm": 12.701999999999998,
+    "live": 9.069779514363066,
+    "physical": 7.784942453649338,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "5Iron",
+    "block": "high_5.25in",
+    "shot": "28",
+    "tm": 12.355000000000029,
+    "live": 8.835886758394377,
+    "physical": 8.157615891609971,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "5Iron",
+    "block": "high_5.25in",
+    "shot": "29",
+    "tm": 13.308999999999976,
+    "live": 9.443341500574721,
+    "physical": 8.716835450598285,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "5Iron",
+    "block": "high_5.25in",
+    "shot": "30",
+    "tm": 15.307999999999982,
+    "live": 18.45672965738972,
+    "physical": 18.23042479199584,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "5Iron",
+    "block": "high_5.25in",
+    "shot": "31",
+    "tm": 14.625999999999978,
+    "live": 12.831183888015305,
+    "physical": 11.765349975708558,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "5Iron",
+    "block": "low_2.875in",
+    "shot": "1",
+    "tm": 11.811000000000005,
+    "live": 13.675152355412653,
+    "physical": 8.927520070994115,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "5Iron",
+    "block": "low_2.875in",
+    "shot": "2",
+    "tm": 13.066999999999979,
+    "live": 13.060506223411618,
+    "physical": 8.505956112996763,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "5Iron",
+    "block": "low_2.875in",
+    "shot": "3",
+    "tm": 12.243999999999973,
+    "live": 11.950544776460067,
+    "physical": 8.455808179058362,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "5Iron",
+    "block": "low_2.875in",
+    "shot": "4",
+    "tm": 14.141000000000004,
+    "live": 12.491016193072,
+    "physical": 9.104618260767932,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "5Iron",
+    "block": "low_2.875in",
+    "shot": "5",
+    "tm": 2.005999999999998,
+    "live": 8.459453568131542,
+    "physical": 11.251539184372739,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "5Iron",
+    "block": "low_2.875in",
+    "shot": "6",
+    "tm": 3.534999999999999,
+    "live": 7.557253089663961,
+    "physical": 9.531785923541868,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "5Iron",
+    "block": "low_2.875in",
+    "shot": "7",
+    "tm": 10.851999999999991,
+    "live": 12.46646963882898,
+    "physical": 10.476417140630405,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "5Iron",
+    "block": "low_2.875in",
+    "shot": "8",
+    "tm": 17.65999999999999,
+    "live": 20.0139310847242,
+    "physical": 17.22283350512196,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "5Iron",
+    "block": "low_2.875in",
+    "shot": "9",
+    "tm": 13.530999999999992,
+    "live": 10.911883722336697,
+    "physical": 10.129331234165269,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "5Iron",
+    "block": "low_2.875in",
+    "shot": "10",
+    "tm": 10.684999999999974,
+    "live": 10.768619335670461,
+    "physical": 8.39939110471989,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "5Iron",
+    "block": "low_2.875in",
+    "shot": "11",
+    "tm": 11.318000000000016,
+    "live": 10.774948098521437,
+    "physical": 7.1137428499511355,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "5Iron",
+    "block": "low_2.875in",
+    "shot": "12",
+    "tm": 13.710999999999995,
+    "live": 11.565643541175028,
+    "physical": 7.881460035732683,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "5Iron",
+    "block": "low_2.875in",
+    "shot": "13",
+    "tm": 14.118999999999998,
+    "live": 13.835334648449095,
+    "physical": 10.933247749884373,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "Driver",
+    "block": "low_2.875in",
+    "shot": "15",
+    "tm": 11.080999999999968,
+    "live": 9.814557261083731,
+    "physical": 20.569431266691304,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "Driver",
+    "block": "low_2.875in",
+    "shot": "16",
+    "tm": 11.159999999999961,
+    "live": 10.64397338222597,
+    "physical": 22.848302271508988,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "Driver",
+    "block": "low_2.875in",
+    "shot": "17",
+    "tm": 10.941999999999961,
+    "live": 27.68959175208109,
+    "physical": 25.40914324925907,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "Driver",
+    "block": "low_2.875in",
+    "shot": "18",
+    "tm": 15.639,
+    "live": 18.154961218540173,
+    "physical": 22.45172094145492,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "Driver",
+    "block": "low_2.875in",
+    "shot": "19",
+    "tm": 12.836999999999996,
+    "live": 14.07149838657311,
+    "physical": 10.681227024912822,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "Driver",
+    "block": "low_2.875in",
+    "shot": "20",
+    "tm": 11.88999999999998,
+    "live": 25.445368957950045,
+    "physical": 22.485103407120736,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "Driver",
+    "block": "low_2.875in",
+    "shot": "21",
+    "tm": 2.788000000000009,
+    "live": 2.8790465546918456,
+    "physical": 3.2846734133215487,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "Driver",
+    "block": "low_2.875in",
+    "shot": "22",
+    "tm": 8.688000000000006,
+    "live": 28.731197909753057,
+    "physical": 27.851604664100446,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "Driver",
+    "block": "low_2.875in",
+    "shot": "23",
+    "tm": 6.836999999999965,
+    "live": 25.513234311565782,
+    "physical": 23.08067257693547,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "Driver",
+    "block": "high_5.25in",
+    "shot": "24",
+    "tm": 9.506999999999971,
+    "live": 11.681477597053663,
+    "physical": 10.859711197218694,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "Driver",
+    "block": "high_5.25in",
+    "shot": "25",
+    "tm": 13.555999999999989,
+    "live": 12.416777880969203,
+    "physical": 11.744955643089362,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "Driver",
+    "block": "high_5.25in",
+    "shot": "26",
+    "tm": 3.609999999999994,
+    "live": 11.798206383662665,
+    "physical": 11.716115654683984,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "Driver",
+    "block": "high_5.25in",
+    "shot": "27",
+    "tm": 4.880000000000008,
+    "live": 8.96204351707525,
+    "physical": 8.315590323127347,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "Driver",
+    "block": "high_5.25in",
+    "shot": "28",
+    "tm": 15.597999999999992,
+    "live": 14.193544965996091,
+    "physical": 15.115940718249409,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "Driver",
+    "block": "high_5.25in",
+    "shot": "29",
+    "tm": 15.775999999999962,
+    "live": 18.23495034641823,
+    "physical": 17.721474201284472,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "Driver",
+    "block": "high_5.25in",
+    "shot": "30",
+    "tm": 12.73999999999998,
+    "live": 12.174589907074715,
+    "physical": 23.681559442514075,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "Driver",
+    "block": "high_5.25in",
+    "shot": "31",
+    "tm": 16.595,
+    "live": 17.103814263394348,
+    "physical": 22.430943989686206,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "Driver",
+    "block": "high_5.25in",
+    "shot": "32",
+    "tm": 11.795999999999983,
+    "live": 7.191408795449481,
+    "physical": 5.756453527716641,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "Driver",
+    "block": "high_5.25in",
+    "shot": "33",
+    "tm": 12.783999999999999,
+    "live": 13.228699310753601,
+    "physical": 22.391895188023074,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "Driver",
+    "block": "high_5.25in",
+    "shot": "34",
+    "tm": 16.462999999999987,
+    "live": 18.268489974835674,
+    "physical": 16.555634841722707,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "Driver",
+    "block": "high_5.25in",
+    "shot": "35",
+    "tm": 0.765999999999999,
+    "live": 5.928531653388377,
+    "physical": 22.920387210191294,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "Driver",
+    "block": "high_5.25in",
+    "shot": "36",
+    "tm": 9.414999999999983,
+    "live": 7.97155464545723,
+    "physical": 22.073297654958317,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "Driver",
+    "block": "high_5.25in",
+    "shot": "37",
+    "tm": 13.74799999999998,
+    "live": 14.071101046289105,
+    "physical": 13.782153044331722,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "Driver",
+    "block": "high_5.25in",
+    "shot": "38",
+    "tm": 14.638999999999966,
+    "live": 14.96551827902912,
+    "physical": 22.233070327838448,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "Driver",
+    "block": "high_5.25in",
+    "shot": "39",
+    "tm": 11.029000000000005,
+    "live": 11.563688418481096,
+    "physical": 11.021178587883888,
+    "status": "accepted",
+    "error": null
+  },
+  {
+    "club": "Driver",
+    "block": "high_5.25in",
+    "shot": "40",
+    "tm": 10.312000000000001,
+    "live": 14.379647798277167,
+    "physical": 20.09342680785777,
+    "status": "accepted",
+    "error": null
+  }
+]

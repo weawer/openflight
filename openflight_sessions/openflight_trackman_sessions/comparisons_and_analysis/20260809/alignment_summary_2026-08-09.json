@@ -1,0 +1,11 @@
+{
+  "trackman_strokes": 104,
+  "openflight_shots_in_trackman_window": 100,
+  "matched": 100,
+  "trackman_only": 4,
+  "openflight_only": 0,
+  "match_delta_ms_min": -808.6843490600586,
+  "match_delta_ms_max": -676.9804954528809,
+  "artifact_count": 844,
+  "artifact_bytes": 1508090881
+}

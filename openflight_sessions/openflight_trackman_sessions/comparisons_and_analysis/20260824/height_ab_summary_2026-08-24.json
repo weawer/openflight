@@ -1,0 +1,65 @@
+{
+  "assignment_note": "Session 20260824_111222 shots 12-25 low; session 20260824_120337 high; session 20260824_121914 shots 1-23 low and 24+ high. OF shot 14 in the latter session was unmatched and excluded.",
+  "groups": {
+    "9Iron": {
+      "low_2.875in": {
+        "shots": 14,
+        "coverage": 1.0,
+        "mae_deg": 0.8053537729237149,
+        "p50_abs_error_deg": 0.6879619125865624,
+        "p75_abs_error_deg": 0.9210769582659979,
+        "p90_abs_error_deg": 1.8145158477296048,
+        "bias_deg": -0.45904086826933455
+      },
+      "high_5.25in": {
+        "shots": 16,
+        "coverage": 1.0,
+        "mae_deg": 1.3686151169248424,
+        "p50_abs_error_deg": 0.8953677747489923,
+        "p75_abs_error_deg": 1.7311085543938747,
+        "p90_abs_error_deg": 3.086450676959225,
+        "bias_deg": -1.0610435396153952
+      }
+    },
+    "5Iron": {
+      "low_2.875in": {
+        "shots": 13,
+        "coverage": 1.0,
+        "mae_deg": 1.8410001437696812,
+        "p50_abs_error_deg": 1.6499838069280042,
+        "p75_abs_error_deg": 2.353931084724209,
+        "p90_abs_error_deg": 3.74162572726383,
+        "bias_deg": 0.6808274058352173
+      },
+      "high_5.25in": {
+        "shots": 15,
+        "coverage": 1.0,
+        "mae_deg": 2.534757053208623,
+        "p50_abs_error_deg": 2.1868753096103735,
+        "p75_abs_error_deg": 3.575666863621292,
+        "p90_abs_error_deg": 4.803464162412942,
+        "bias_deg": -1.9889550017505178
+      }
+    },
+    "Driver": {
+      "low_2.875in": {
+        "shots": 9,
+        "coverage": 1.0,
+        "mae_deg": 8.29404093864949,
+        "p50_abs_error_deg": 2.5159612185401734,
+        "p75_abs_error_deg": 16.747591752081128,
+        "p90_abs_error_deg": 18.949627031203264,
+        "bias_deg": 7.897936637162773
+      },
+      "high_5.25in": {
+        "shots": 17,
+        "coverage": 1.0,
+        "mae_deg": 2.307899552571272,
+        "p50_abs_error_deg": 1.443445354542753,
+        "p75_abs_error_deg": 4.067647798277166,
+        "p90_abs_error_deg": 4.827767384085653,
+        "bias_deg": 1.2305908696238363
+      }
+    }
+  }
+}
