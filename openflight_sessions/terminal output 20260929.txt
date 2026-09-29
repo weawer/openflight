@@ -1,0 +1,810 @@
+jamorro@Openflight:~/openflight_test/openflight $ scripts/start-kiosk.sh -d -l range   --iwr6843 --iwr6843-self-trigger --trigger sound   --iwr6843-config config/iwr6843_l3dump_adaptive_47f3ms_53bin_a16.cfg   --iwr6843-tee-m 1.845  --radar-port /dev/ttyAMA0   --log-dir "$(pwd)/openflight_sessions"
+[OpenFlight] Starting OpenFlight server on port 8080
+[OpenFlight] Waiting for server to start...
+==================================================
+  OpenFlight UI Server
+==================================================
+
+Session logging enabled (location: range)
+Ballistic carry model: ENABLED (simulator + drag/Magnus)
+2026-09-29 17:26:40,463 - openflight.server - WARNING - [IWR6843] Self-trigger drives the OPS with S!. Disconnect the SEN-14262 GATE from OPS HOST_INT, or both will trigger it.
+2026-09-29 17:26:40,463 - openflight.iwr6843.monitor - INFO - [IWR6843] Capture windows on the tee (bin 39): phaseCaptureCfg 20 53 24 35 53 7 35 53 61 16 1
+2026-09-29 17:26:40,463 - openflight.iwr6843.monitor - INFO - [IWR6843] adaptive16 capture: the detect path reads the IQ16 scratch and L3 keeps the retained windows; needs firmware with the compact formats
+2026-09-29 17:26:40,842 - openflight.iwr6843.monitor - INFO - [IWR6843] On-chip tracker armed: trackCfg 0.00013499999999999997 0.046875 4.3499999999999996 1.2450000000000001 1.895
+2026-09-29 17:26:40,843 - openflight.iwr6843.monitor - INFO - [IWR6843] Configured on BCM17 using /dev/ttyUSB0 (iwr6843_l3dump_adaptive_47f3ms_53bin_a16.cfg, waiting for OPS, self-trigger 'triggerCfg 41 6.0 2')
+2026-09-29 17:26:40,843 - openflight.server - INFO - [SERVER] IWR6843 initialized (port=/dev/ttyUSB0, BCM17, estimator=LCMF-v1, firmware boundary freeze)
+IWR6843 enabled (LCMF-v1 launch angle, BCM17, normal TX order)
+IWR6843 raw dumps enabled: /home/jamorro/openflight_test/openflight/openflight_sessions/iwr6843
+[MODE] Rolling buffer mode (trigger: sound, sample_rate: 30ksps)
+2026-09-29 17:26:40,950 - ops243 - INFO - [OPS] UART answered at 230400 baud (firmware 1.3.2)
+2026-09-29 17:26:40,950 - ops243 - INFO - [OPS] Transport=uart port=/dev/ttyAMA0 baud=230400 (dump ~2.0s)
+2026-09-29 17:26:41,144 - openflight.server - INFO - [IWR6843] Ball detector on (on); setup poll every 1.0s
+2026-09-29 17:26:41,144 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job ball-cfg finished in 0.00s
+2026-09-29 17:26:41,152 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:26:41,557 - ops243 - INFO - [OPS] Units: MPH
+2026-09-29 17:26:41,663 - ops243 - INFO - [OPS] Transmit power: level 3 (reduced to avoid clipping)
+2026-09-29 17:26:41,769 - ops243 - INFO - [OPS] Sample rate: 30ksps
+2026-09-29 17:26:41,970 - ops243 - INFO - [OPS] Re-arm drain: 0 bytes in 0.2s
+2026-09-29 17:26:42,347 - ops243 - INFO - [OPS] Rolling buffer re-armed (S#24)
+2026-09-29 17:26:42,347 - ops243 - INFO - [OPS] Persisted rolling buffer prepared (S#24, 30ksps)
+2026-09-29 17:26:42,347 - openflight.rolling_buffer.monitor - INFO - [MONITOR] Rolling buffer mode configured with S#24, S=30
+2026-09-29 17:26:42,347 - openflight.server - INFO - [SERVER] Starting monitor: mode=rolling-buffer, trigger=sound, sample_rate=30ksps
+2026-09-29 17:26:42,362 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+[SESSION] Started logging: /home/jamorro/openflight_test/openflight/openflight_sessions/session_20260929_172642_range.jsonl
+[SESSION] Mode: rolling-buffer (trigger: sound)
+[SESSION] Raw radar log: /home/jamorro/openflight_test/openflight/openflight_sessions/radar_raw_20260929_172642.log
+2026-09-29 17:26:42,946 - ops243 - INFO - [OPS] Clock sync: method=integer_rollover offset=1790695285.941s best_read_latency=1.1ms spread=988.8ms rollover_uncertainty=11.2ms (43/43 valid)
+2026-09-29 17:26:42,947 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-09-29 17:26:42,947 - openflight.rolling_buffer.monitor - INFO - [MONITOR] Rolling buffer monitor started (trigger: sound)
+2026-09-29 17:26:42,947 - openflight.iwr6843.monitor - INFO - [IWR6843] Armed on firmware self-trigger
+Server starting at http://0.0.0.0:8080
+
+2026-09-29 17:26:42,948 - werkzeug - WARNING - Werkzeug appears to be used in a production deployment. Consider switching to a production web server instead.
+ * Serving Flask app 'openflight.server'
+ * Debug mode: off
+2026-09-29 17:26:42,952 - werkzeug - INFO - WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8080
+ * Running on http://172.22.127.10:8080
+2026-09-29 17:26:42,952 - werkzeug - INFO - Press CTRL+C to quit
+2026-09-29 17:26:43,101 - werkzeug - INFO - 127.0.0.1 - - [29/Sep/2026 17:26:43] "GET / HTTP/1.1" 200 -
+2026-09-29 17:26:43,112 - werkzeug - INFO - 127.0.0.1 - - [29/Sep/2026 17:26:43] "GET / HTTP/1.1" 200 -
+[OpenFlight] Launching kiosk shell (Electron)...
+[OpenFlight] OpenFlight is running. Press Ctrl+C to stop.
+2026-09-29 17:26:43,271 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:26:44,180 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:26:45,389 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:26:46,297 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:26:46,304 - werkzeug - INFO - 127.0.0.1 - - [29/Sep/2026 17:26:46] "GET / HTTP/1.1" 304 -
+2026-09-29 17:26:46,426 - werkzeug - INFO - 127.0.0.1 - - [29/Sep/2026 17:26:46] "GET /assets/index-BPoO-d9c.js HTTP/1.1" 304 -
+2026-09-29 17:26:46,427 - werkzeug - INFO - 127.0.0.1 - - [29/Sep/2026 17:26:46] "GET /assets/index-DlTYIGur.css HTTP/1.1" 304 -
+Client connected
+[1901:0929/172647.020443:ERROR:ui/gl/angle_platform_impl.cc:48] Display.cpp:1115 (initialize): ANGLE Display::initialize error 12289: Could not create a backing OpenGL context.
+ERR: Display.cpp:1115 (initialize): ANGLE Display::initialize error 12289: Could not create a backing OpenGL context.
+[1901:0929/172647.020578:ERROR:ui/gl/egl_util.cc:92] EGL Driver message (Critical) eglInitialize: Could not create a backing OpenGL context.
+[1901:0929/172647.020619:ERROR:ui/gl/gl_display.cc:630] eglInitialize OpenGL failed with error EGL_NOT_INITIALIZED, trying next display type
+2026-09-29 17:26:47,206 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:26:48,415 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:26:49,323 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:26:50,232 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+[1901:0929/172650.453531:ERROR:ui/gl/gl_surface_presentation_helper.cc:260] GetVSyncParametersIfAvailable() failed for 1 times!
+2026-09-29 17:26:51,441 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:26:52,350 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:26:53,259 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:26:54,168 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:26:55,377 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:26:56,285 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:26:57,194 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:26:58,403 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:26:59,311 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:27:00,221 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:27:01,430 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:27:02,338 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:27:03,247 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:27:04,156 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:27:05,365 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:27:05,524 - ops243 - DEBUG - [OPS] Hardware trigger: first byte after 22.6s
+2026-09-29 17:27:05,592 - openflight.iwr6843.monitor - INFO - [IWR6843] Trigger #1: reading track samples
+[1901:0929/172705.610685:ERROR:ui/gl/gl_surface_presentation_helper.cc:260] GetVSyncParametersIfAvailable() failed for 2 times!
+2026-09-29 17:27:07,304 - ops243 - INFO - [OPS] Hardware trigger: 41028 bytes in 24.4s
+2026-09-29 17:27:07,304 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger fired, 41028 bytes received
+2026-09-29 17:27:07,306 - openflight.rolling_buffer.processor - WARNING - [PROCESSOR] Incomplete capture (missing: Q). Response (41028 bytes): '{"sample_time":339.450}\r\n{"trigger_time":339.552}\r\n{"I":[   5,   4,   6,   6,   4,   4,   5,   5,   5,   4,   5,   6,   4,   5,   6,   6,   5,   4,   6,   5,   4,   4,   5,   5,   5,   4,   5,   5,   5,   4,   6,   6,   4,   5,   5,   5,   4,   4,   5,   5,   5,   4,   5,   6,   4,   4,   5,   5,   4,   4,   5,   6,   4,   4,   5,   5,   4,   4,   5,   5,   4,  36,  73, 159, 221, 313, 409, 469, 582, 687, 773, 840, 941,1033,1136,1216,1311,1352,1484,1597,1712,1808,1867,2013,2140,2324,2446,2491,261'...
+2026-09-29 17:27:07,506 - ops243 - INFO - [OPS] Re-arm drain: 5 bytes in 0.2s
+2026-09-29 17:27:07,879 - ops243 - INFO - [OPS] Rolling buffer re-armed (S#24)
+2026-09-29 17:27:07,879 - openflight.rolling_buffer.trigger - WARNING - [TRIGGER] Sound trigger parse failed (41028 bytes received)
+2026-09-29 17:27:07,880 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-09-29 17:27:13,704 - openflight.iwr6843.driver - WARNING - [IWR6843] Dump stream stalled >= 8.0s, giving up (18/None bytes received)
+2026-09-29 17:27:13,704 - openflight.iwr6843.monitor - WARNING - [IWR6843] Capture #1 failed: short IWR6843 dump: 18 bytes
+Traceback (most recent call last):
+  File "/home/jamorro/openflight_test/openflight/src/openflight/iwr6843/monitor.py", line 763, in _capture
+    metadata = self._validate_dump(raw)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jamorro/openflight_test/openflight/src/openflight/iwr6843/monitor.py", line 615, in _validate_dump
+    raise ValueError(f"short IWR6843 dump: {len(raw)} bytes")
+ValueError: short IWR6843 dump: 18 bytes
+2026-09-29 17:27:13,706 - openflight.iwr6843.monitor - INFO - [IWR6843] Capture #1 complete: short IWR6843 dump: 18 bytes in 8.21s
+2026-09-29 17:27:13,711 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:14,316 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:15,222 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:16,428 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:17,333 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:18,239 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:19,445 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:20,351 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+[1901:0929/172720.961100:ERROR:ui/gl/gl_surface_presentation_helper.cc:260] GetVSyncParametersIfAvailable() failed for 3 times!
+2026-09-29 17:27:21,256 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:22,162 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:23,368 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:24,273 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:25,179 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:26,385 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:27,291 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:28,197 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:29,403 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:30,309 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:31,214 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:32,420 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:33,326 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:34,232 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:35,438 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:36,344 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:37,250 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:37,926 - ops243 - INFO - [OPS] Hardware trigger: no data received within 30s
+2026-09-29 17:27:37,927 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger timeout — no hardware trigger received
+2026-09-29 17:27:37,927 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-09-29 17:27:38,155 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:39,361 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:40,267 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:41,173 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:42,379 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:43,285 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:44,190 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:45,396 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:46,302 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:47,208 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:48,414 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:49,319 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:50,225 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:51,431 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:52,337 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:53,242 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:54,449 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:55,354 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:56,260 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:57,166 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:58,372 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:27:59,277 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:00,183 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:01,389 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:02,295 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:03,200 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:04,406 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:05,311 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:06,217 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:07,423 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:07,973 - ops243 - INFO - [OPS] Hardware trigger: no data received within 30s
+2026-09-29 17:28:07,973 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger timeout — no hardware trigger received
+2026-09-29 17:28:07,973 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-09-29 17:28:08,329 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:09,234 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:10,440 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:11,346 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:12,251 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:13,457 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:14,363 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:15,269 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:16,174 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:17,380 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:18,286 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:19,191 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:20,397 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:21,303 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:22,209 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:23,415 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:24,320 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:25,226 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:26,432 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:27,337 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:28,243 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:29,449 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:30,355 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:31,261 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:32,166 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:33,372 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:34,278 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:35,183 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:36,389 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:37,295 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:38,014 - ops243 - INFO - [OPS] Hardware trigger: no data received within 30s
+2026-09-29 17:28:38,015 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger timeout — no hardware trigger received
+2026-09-29 17:28:38,015 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-09-29 17:28:38,200 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:39,406 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:40,312 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:41,218 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:42,424 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:43,329 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:44,235 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:45,441 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:46,347 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:47,252 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:48,458 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:49,364 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:50,270 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:51,175 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:52,381 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:53,287 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:54,193 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:55,399 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:56,304 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:57,210 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:58,416 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:28:59,322 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:29:00,227 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:29:01,433 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:29:02,339 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:29:03,245 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:29:04,451 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:29:05,356 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:29:06,262 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:29:07,168 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:29:08,056 - ops243 - INFO - [OPS] Hardware trigger: no data received within 30s
+2026-09-29 17:29:08,056 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger timeout — no hardware trigger received
+2026-09-29 17:29:08,056 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-09-29 17:29:08,374 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:29:09,279 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:29:10,185 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:29:11,391 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:29:12,296 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:29:13,202 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:29:14,408 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:29:15,314 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:29:16,219 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:29:17,426 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:29:18,331 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:29:19,237 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:29:20,443 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:29:21,349 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:29:22,255 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:29:23,461 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:29:24,366 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:29:25,272 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+^C[OpenFlight] Shutting down...
+[OpenFlight] Requesting graceful hardware shutdown...
+2026-09-29 17:29:26,002 - openflight.server - INFO - [SERVER] Shutdown requested via REST API
+2026-09-29 17:29:26,003 - werkzeug - INFO - 127.0.0.1 - - [29/Sep/2026 17:29:26] "POST /api/shutdown HTTP/1.1" 200 -
+2026-09-29 17:29:26,178 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:29:26,503 - openflight.server - INFO - [SERVER] Shutdown step IWR6843 setup poll stop completed in 0.1ms
+2026-09-29 17:29:26,798 - openflight.iwr6843.monitor - INFO - [IWR6843] Firmware capture stopped and verified inactive
+2026-09-29 17:29:31,834 - openflight.iwr6843.monitor - INFO - [IWR6843] Capture monitor stopped
+2026-09-29 17:29:31,834 - openflight.server - INFO - [SERVER] Shutdown step IWR6843 stop completed in 5331.2ms
+[SESSION] Ended. Total shots: 0
+[SESSION] Logs saved to: /home/jamorro/openflight_test/openflight/openflight_sessions/session_20260929_172642_range.jsonl
+2026-09-29 17:29:31,840 - ops243 - INFO - [OPS] Hardware trigger wait cancelled before capture
+2026-09-29 17:29:31,840 - ops243 - INFO - [OPS] Hardware trigger: no data received within 30s
+2026-09-29 17:29:31,840 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger timeout — no hardware trigger received
+2026-09-29 17:29:31,840 - openflight.rolling_buffer.monitor - INFO - [MONITOR] Rolling buffer monitor stopped
+2026-09-29 17:29:31,840 - openflight.rolling_buffer.monitor - INFO - [MONITOR] Rolling buffer monitor stopped
+2026-09-29 17:29:31,840 - openflight.server - INFO - [SERVER] Shutdown step launch monitor stop completed in 6.1ms
+2026-09-29 17:29:31,840 - openflight.server - INFO - [SERVER] Goodbye
+[OpenFlight] Closing kiosk shell...
+/home/jamorro/openflight_test/openflight/ui/node_modules/electron/dist/electron exited with signal SIGTERM
+jamorro@Openflight:~/openflight_test/openflight $ scripts/start-kiosk.sh -d -l range \
+  --iwr6843 --iwr6843-self-trigger --trigger sound \
+  --iwr6843-config config/iwr6843_l3dump_adaptive_47f3ms_53bin_a16_hann.cfg \
+  --iwr6843-tee-m 1.845 \
+  --radar-port /dev/ttyAMA0 \
+  --log-dir "$(pwd)/openflight_sessions"
+[OpenFlight] Starting OpenFlight server on port 8080
+[OpenFlight] Waiting for server to start...
+==================================================
+  OpenFlight UI Server
+==================================================
+
+Session logging enabled (location: range)
+Ballistic carry model: ENABLED (simulator + drag/Magnus)
+2026-09-29 17:29:44,086 - openflight.server - WARNING - [IWR6843] Self-trigger drives the OPS with S!. Disconnect the SEN-14262 GATE from OPS HOST_INT, or both will trigger it.
+2026-09-29 17:29:44,087 - openflight.iwr6843.monitor - INFO - [IWR6843] Capture windows on the tee (bin 39): phaseCaptureCfg 20 53 24 35 53 7 35 53 61 16 1
+2026-09-29 17:29:44,087 - openflight.iwr6843.monitor - INFO - [IWR6843] adaptive16 capture: the detect path reads the IQ16 scratch and L3 keeps the retained windows; needs firmware with the compact formats
+2026-09-29 17:29:44,466 - openflight.iwr6843.monitor - INFO - [IWR6843] On-chip tracker armed: trackCfg 0.00013499999999999997 0.046875 4.3499999999999996 1.2450000000000001 1.895
+2026-09-29 17:29:44,467 - openflight.iwr6843.monitor - INFO - [IWR6843] Configured on BCM17 using /dev/ttyUSB0 (iwr6843_l3dump_adaptive_47f3ms_53bin_a16_hann.cfg, waiting for OPS, self-trigger 'triggerCfg 41 6.0 2')
+2026-09-29 17:29:44,467 - openflight.server - INFO - [SERVER] IWR6843 initialized (port=/dev/ttyUSB0, BCM17, estimator=LCMF-v1, firmware boundary freeze)
+IWR6843 enabled (LCMF-v1 launch angle, BCM17, normal TX order)
+IWR6843 raw dumps enabled: /home/jamorro/openflight_test/openflight/openflight_sessions/iwr6843
+[MODE] Rolling buffer mode (trigger: sound, sample_rate: 30ksps)
+2026-09-29 17:29:44,574 - ops243 - INFO - [OPS] UART answered at 230400 baud (firmware 1.3.2)
+2026-09-29 17:29:44,574 - ops243 - INFO - [OPS] Transport=uart port=/dev/ttyAMA0 baud=230400 (dump ~2.0s)
+2026-09-29 17:29:44,771 - openflight.server - INFO - [IWR6843] Ball detector on (on); setup poll every 1.0s
+2026-09-29 17:29:44,771 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job ball-cfg finished in 0.00s
+2026-09-29 17:29:44,780 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:29:45,181 - ops243 - INFO - [OPS] Units: MPH
+2026-09-29 17:29:45,287 - ops243 - INFO - [OPS] Transmit power: level 3 (reduced to avoid clipping)
+2026-09-29 17:29:45,394 - ops243 - INFO - [OPS] Sample rate: 30ksps
+2026-09-29 17:29:45,594 - ops243 - INFO - [OPS] Re-arm drain: 0 bytes in 0.2s
+2026-09-29 17:29:45,971 - ops243 - INFO - [OPS] Rolling buffer re-armed (S#24)
+2026-09-29 17:29:45,971 - ops243 - INFO - [OPS] Persisted rolling buffer prepared (S#24, 30ksps)
+2026-09-29 17:29:45,971 - openflight.rolling_buffer.monitor - INFO - [MONITOR] Rolling buffer mode configured with S#24, S=30
+2026-09-29 17:29:45,971 - openflight.server - INFO - [SERVER] Starting monitor: mode=rolling-buffer, trigger=sound, sample_rate=30ksps
+2026-09-29 17:29:45,989 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+[SESSION] Started logging: /home/jamorro/openflight_test/openflight/openflight_sessions/session_20260929_172946_range.jsonl
+[SESSION] Mode: rolling-buffer (trigger: sound)
+[SESSION] Raw radar log: /home/jamorro/openflight_test/openflight/openflight_sessions/radar_raw_20260929_172946.log
+2026-09-29 17:29:46,898 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:29:46,906 - ops243 - INFO - [OPS] Clock sync: method=integer_rollover offset=1790695285.900s best_read_latency=1.1ms spread=988.8ms rollover_uncertainty=11.2ms (73/73 valid)
+2026-09-29 17:29:46,907 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-09-29 17:29:46,907 - openflight.rolling_buffer.monitor - INFO - [MONITOR] Rolling buffer monitor started (trigger: sound)
+2026-09-29 17:29:46,907 - openflight.iwr6843.monitor - INFO - [IWR6843] Armed on firmware self-trigger
+Server starting at http://0.0.0.0:8080
+
+2026-09-29 17:29:46,908 - werkzeug - WARNING - Werkzeug appears to be used in a production deployment. Consider switching to a production web server instead.
+ * Serving Flask app 'openflight.server'
+ * Debug mode: off
+2026-09-29 17:29:46,910 - werkzeug - INFO - WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8080
+ * Running on http://172.22.127.10:8080
+2026-09-29 17:29:46,910 - werkzeug - INFO - Press CTRL+C to quit
+2026-09-29 17:29:47,323 - werkzeug - INFO - 127.0.0.1 - - [29/Sep/2026 17:29:47] "GET / HTTP/1.1" 200 -
+2026-09-29 17:29:47,333 - werkzeug - INFO - 127.0.0.1 - - [29/Sep/2026 17:29:47] "GET / HTTP/1.1" 200 -
+[OpenFlight] Launching kiosk shell (Electron)...
+[OpenFlight] OpenFlight is running. Press Ctrl+C to stop.
+2026-09-29 17:29:47,751 - werkzeug - INFO - 127.0.0.1 - - [29/Sep/2026 17:29:47] "GET / HTTP/1.1" 304 -
+[2114:0929/172947.764392:ERROR:ui/gl/angle_platform_impl.cc:48] Display.cpp:1115 (initialize): ANGLE Display::initialize error 12289: Could not create a backing OpenGL context.
+ERR: Display.cpp:1115 (initialize): ANGLE Display::initialize error 12289: Could not create a backing OpenGL context.
+[2114:0929/172947.764610:ERROR:ui/gl/egl_util.cc:92] EGL Driver message (Critical) eglInitialize: Could not create a backing OpenGL context.
+[2114:0929/172947.764901:ERROR:ui/gl/gl_display.cc:630] eglInitialize OpenGL failed with error EGL_NOT_INITIALIZED, trying next display type
+2026-09-29 17:29:47,771 - werkzeug - INFO - 127.0.0.1 - - [29/Sep/2026 17:29:47] "GET /assets/index-BPoO-d9c.js HTTP/1.1" 304 -
+2026-09-29 17:29:47,772 - werkzeug - INFO - 127.0.0.1 - - [29/Sep/2026 17:29:47] "GET /assets/index-DlTYIGur.css HTTP/1.1" 304 -
+2026-09-29 17:29:47,810 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+Client connected
+2026-09-29 17:29:49,019 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:29:49,928 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:29:50,837 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+[2114:0929/172951.772377:ERROR:ui/gl/gl_surface_presentation_helper.cc:260] GetVSyncParametersIfAvailable() failed for 1 times!
+2026-09-29 17:29:52,046 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:29:52,955 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+[2114:0929/172953.800553:ERROR:ui/gl/gl_surface_presentation_helper.cc:260] GetVSyncParametersIfAvailable() failed for 2 times!
+2026-09-29 17:29:53,864 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:29:55,073 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:29:55,991 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.02s
+2026-09-29 17:29:56,915 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.02s
+2026-09-29 17:29:57,746 - ops243 - DEBUG - [OPS] Hardware trigger: first byte after 10.8s
+2026-09-29 17:29:57,820 - openflight.iwr6843.monitor - INFO - [IWR6843] Trigger #1: reading track samples
+[2114:0929/172957.830993:ERROR:ui/gl/gl_surface_presentation_helper.cc:260] GetVSyncParametersIfAvailable() failed for 3 times!
+2026-09-29 17:29:59,527 - ops243 - INFO - [OPS] Hardware trigger: 41033 bytes in 12.6s
+2026-09-29 17:29:59,527 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger fired, 41033 bytes received
+2026-09-29 17:29:59,738 - ops243 - INFO - [OPS] Re-arm drain: 0 bytes in 0.2s
+2026-09-29 17:30:00,119 - ops243 - INFO - [OPS] Rolling buffer re-armed (S#24)
+2026-09-29 17:30:00,120 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger rejected — no outbound speed >= 15 mph (peak=0.0 mph, 0 readings)
+2026-09-29 17:30:00,120 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-09-29 17:30:05,932 - openflight.iwr6843.driver - WARNING - [IWR6843] Dump stream stalled >= 8.0s, giving up (18/None bytes received)
+2026-09-29 17:30:05,933 - openflight.iwr6843.monitor - WARNING - [IWR6843] Capture #1 failed: short IWR6843 dump: 18 bytes
+Traceback (most recent call last):
+  File "/home/jamorro/openflight_test/openflight/src/openflight/iwr6843/monitor.py", line 763, in _capture
+    metadata = self._validate_dump(raw)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jamorro/openflight_test/openflight/src/openflight/iwr6843/monitor.py", line 615, in _validate_dump
+    raise ValueError(f"short IWR6843 dump: {len(raw)} bytes")
+ValueError: short IWR6843 dump: 18 bytes
+2026-09-29 17:30:05,933 - openflight.iwr6843.monitor - INFO - [IWR6843] Capture #1 complete: short IWR6843 dump: 18 bytes in 8.22s
+2026-09-29 17:30:05,938 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:06,844 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:08,050 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:08,956 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:09,861 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:11,068 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:11,974 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:12,879 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:13,785 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:14,991 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:15,897 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:16,802 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:18,009 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:18,914 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:19,820 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:21,026 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:21,932 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:22,838 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:24,044 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:24,950 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:25,856 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:27,062 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:27,968 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:28,873 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:30,079 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:30,168 - ops243 - INFO - [OPS] Hardware trigger: no data received within 30s
+2026-09-29 17:30:30,169 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger timeout — no hardware trigger received
+2026-09-29 17:30:30,169 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-09-29 17:30:30,985 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:31,890 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:32,796 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:34,002 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:34,908 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:35,813 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+^C[OpenFlight] Shutting down...
+[OpenFlight] Requesting graceful hardware shutdown...
+2026-09-29 17:30:36,634 - openflight.server - INFO - [SERVER] Shutdown requested via REST API
+2026-09-29 17:30:36,635 - werkzeug - INFO - 127.0.0.1 - - [29/Sep/2026 17:30:36] "POST /api/shutdown HTTP/1.1" 200 -
+2026-09-29 17:30:37,019 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:30:37,135 - openflight.server - INFO - [SERVER] Shutdown step IWR6843 setup poll stop completed in 0.1ms
+2026-09-29 17:30:37,339 - openflight.iwr6843.monitor - INFO - [IWR6843] Firmware capture stopped and verified inactive
+2026-09-29 17:30:41,641 - openflight.iwr6843.monitor - INFO - [IWR6843] Capture monitor stopped
+2026-09-29 17:30:41,641 - openflight.server - INFO - [SERVER] Shutdown step IWR6843 stop completed in 4506.6ms
+[SESSION] Ended. Total shots: 0
+[SESSION] Logs saved to: /home/jamorro/openflight_test/openflight/openflight_sessions/session_20260929_172946_range.jsonl
+2026-09-29 17:30:41,686 - ops243 - INFO - [OPS] Hardware trigger wait cancelled before capture
+2026-09-29 17:30:41,686 - ops243 - INFO - [OPS] Hardware trigger: no data received within 30s
+2026-09-29 17:30:41,687 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger timeout — no hardware trigger received
+2026-09-29 17:30:41,687 - openflight.rolling_buffer.monitor - INFO - [MONITOR] Rolling buffer monitor stopped
+2026-09-29 17:30:41,687 - openflight.rolling_buffer.monitor - INFO - [MONITOR] Rolling buffer monitor stopped
+2026-09-29 17:30:41,687 - openflight.server - INFO - [SERVER] Shutdown step launch monitor stop completed in 45.4ms
+2026-09-29 17:30:41,687 - openflight.server - INFO - [SERVER] Goodbye
+^[[A[OpenFlight] Closing kiosk shell...
+[2072:0929/173041.923356:ERROR:content/browser/network_service_instance_impl.cc:650] Network service crashed or was terminated, restarting service.
+[2072:0929/173041.928502:ERROR:content/common/zygote/zygote_communication_linux.cc:291] Failed to send GetTerminationStatus message to zygote
+[2072:0929/173041.930944:ERROR:content/common/zygote/zygote_communication_linux.cc:291] Failed to send GetTerminationStatus message to zygote
+[2072:0929/173041.937320:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002
+[2072:0929/173041.939534:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002
+[2072:0929/173041.940366:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002
+[2072:0929/173041.941255:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002
+[2072:0929/173041.942318:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002
+[2072:0929/173041.943132:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002
+[2072:0929/173041.943153:FATAL:content/browser/gpu/gpu_data_manager_impl_private.cc:417] GPU process isn't usable. Goodbye.
+/home/jamorro/openflight_test/openflight/ui/node_modules/electron/dist/electron exited with signal SIGTRAP
+jamorro@Openflight:~/openflight_test/openflight $ scripts/start-kiosk.sh -d -l range   --iwr6843 --iwr6843-self-trigger --trigger sound   --iwr6843-config config/iwr6843_l3dump_adaptive_47f3ms_53bin_a16_hann.cfg   --iwr6843-tee-m 1.845   --radar-port /dev/ttyAMA0   --log-dir "$(pwd)/openflight_sessions"
+[OpenFlight] Starting OpenFlight server on port 8080
+[OpenFlight] Waiting for server to start...
+==================================================
+  OpenFlight UI Server
+==================================================
+
+Session logging enabled (location: range)
+Ballistic carry model: ENABLED (simulator + drag/Magnus)
+2026-09-29 17:31:04,115 - openflight.server - WARNING - [IWR6843] Self-trigger drives the OPS with S!. Disconnect the SEN-14262 GATE from OPS HOST_INT, or both will trigger it.
+2026-09-29 17:31:04,116 - openflight.iwr6843.monitor - INFO - [IWR6843] Capture windows on the tee (bin 39): phaseCaptureCfg 20 53 24 35 53 7 35 53 61 16 1
+2026-09-29 17:31:04,116 - openflight.iwr6843.monitor - INFO - [IWR6843] adaptive16 capture: the detect path reads the IQ16 scratch and L3 keeps the retained windows; needs firmware with the compact formats
+2026-09-29 17:31:04,495 - openflight.iwr6843.monitor - INFO - [IWR6843] On-chip tracker armed: trackCfg 0.00013499999999999997 0.046875 4.3499999999999996 1.2450000000000001 1.895
+2026-09-29 17:31:04,496 - openflight.iwr6843.monitor - INFO - [IWR6843] Configured on BCM17 using /dev/ttyUSB0 (iwr6843_l3dump_adaptive_47f3ms_53bin_a16_hann.cfg, waiting for OPS, self-trigger 'triggerCfg 41 6.0 2')
+2026-09-29 17:31:04,496 - openflight.server - INFO - [SERVER] IWR6843 initialized (port=/dev/ttyUSB0, BCM17, estimator=LCMF-v1, firmware boundary freeze)
+IWR6843 enabled (LCMF-v1 launch angle, BCM17, normal TX order)
+IWR6843 raw dumps enabled: /home/jamorro/openflight_test/openflight/openflight_sessions/iwr6843
+[MODE] Rolling buffer mode (trigger: sound, sample_rate: 30ksps)
+2026-09-29 17:31:04,603 - ops243 - INFO - [OPS] UART answered at 230400 baud (firmware 1.3.2)
+2026-09-29 17:31:04,603 - ops243 - INFO - [OPS] Transport=uart port=/dev/ttyAMA0 baud=230400 (dump ~2.0s)
+2026-09-29 17:31:04,797 - openflight.server - INFO - [IWR6843] Ball detector on (on); setup poll every 1.0s
+2026-09-29 17:31:04,797 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job ball-cfg finished in 0.00s
+2026-09-29 17:31:04,806 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:31:05,210 - ops243 - INFO - [OPS] Units: MPH
+2026-09-29 17:31:05,316 - ops243 - INFO - [OPS] Transmit power: level 3 (reduced to avoid clipping)
+2026-09-29 17:31:05,422 - ops243 - INFO - [OPS] Sample rate: 30ksps
+2026-09-29 17:31:05,623 - ops243 - INFO - [OPS] Re-arm drain: 0 bytes in 0.2s
+2026-09-29 17:31:05,995 - ops243 - INFO - [OPS] Rolling buffer re-armed (S#24)
+2026-09-29 17:31:05,995 - ops243 - INFO - [OPS] Persisted rolling buffer prepared (S#24, 30ksps)
+2026-09-29 17:31:05,995 - openflight.rolling_buffer.monitor - INFO - [MONITOR] Rolling buffer mode configured with S#24, S=30
+2026-09-29 17:31:05,995 - openflight.server - INFO - [SERVER] Starting monitor: mode=rolling-buffer, trigger=sound, sample_rate=30ksps
+2026-09-29 17:31:06,015 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+[SESSION] Started logging: /home/jamorro/openflight_test/openflight/openflight_sessions/session_20260929_173106_range.jsonl
+[SESSION] Mode: rolling-buffer (trigger: sound)
+[SESSION] Raw radar log: /home/jamorro/openflight_test/openflight/openflight_sessions/radar_raw_20260929_173106.log
+2026-09-29 17:31:06,897 - ops243 - INFO - [OPS] Clock sync: method=integer_rollover offset=1790695285.891s best_read_latency=1.1ms spread=988.8ms rollover_uncertainty=11.2ms (70/70 valid)
+2026-09-29 17:31:06,898 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-09-29 17:31:06,898 - openflight.rolling_buffer.monitor - INFO - [MONITOR] Rolling buffer monitor started (trigger: sound)
+2026-09-29 17:31:06,898 - openflight.iwr6843.monitor - INFO - [IWR6843] Armed on firmware self-trigger
+Server starting at http://0.0.0.0:8080
+
+2026-09-29 17:31:06,898 - werkzeug - WARNING - Werkzeug appears to be used in a production deployment. Consider switching to a production web server instead.
+ * Serving Flask app 'openflight.server'
+ * Debug mode: off
+2026-09-29 17:31:06,901 - werkzeug - INFO - WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8080
+ * Running on http://172.22.127.10:8080
+2026-09-29 17:31:06,901 - werkzeug - INFO - Press CTRL+C to quit
+2026-09-29 17:31:06,931 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+2026-09-29 17:31:07,346 - werkzeug - INFO - 127.0.0.1 - - [29/Sep/2026 17:31:07] "GET / HTTP/1.1" 200 -
+2026-09-29 17:31:07,355 - werkzeug - INFO - 127.0.0.1 - - [29/Sep/2026 17:31:07] "GET / HTTP/1.1" 200 -
+[OpenFlight] Launching kiosk shell (Electron)...
+[OpenFlight] OpenFlight is running. Press Ctrl+C to stop.
+2026-09-29 17:31:07,778 - werkzeug - INFO - 127.0.0.1 - - [29/Sep/2026 17:31:07] "GET / HTTP/1.1" 304 -
+[2320:0929/173107.801196:ERROR:ui/gl/angle_platform_impl.cc:48] Display.cpp:1115 (initialize): ANGLE Display::initialize error 12289: Could not create a backing OpenGL context.
+ERR: Display.cpp:1115 (initialize): ANGLE Display::initialize error 12289: Could not create a backing OpenGL context.
+[2320:0929/173107.801714:ERROR:ui/gl/egl_util.cc:92] EGL Driver message (Critical) eglInitialize: Could not create a backing OpenGL context.
+[2320:0929/173107.801932:ERROR:ui/gl/gl_display.cc:630] eglInitialize OpenGL failed with error EGL_NOT_INITIALIZED, trying next display type
+2026-09-29 17:31:07,806 - werkzeug - INFO - 127.0.0.1 - - [29/Sep/2026 17:31:07] "GET /assets/index-BPoO-d9c.js HTTP/1.1" 304 -
+2026-09-29 17:31:07,806 - werkzeug - INFO - 127.0.0.1 - - [29/Sep/2026 17:31:07] "GET /assets/index-DlTYIGur.css HTTP/1.1" 304 -
+2026-09-29 17:31:07,839 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.01s
+Client connected
+2026-09-29 17:31:08,664 - ops243 - DEBUG - [OPS] Hardware trigger: first byte after 1.8s
+2026-09-29 17:31:08,739 - openflight.iwr6843.monitor - INFO - [IWR6843] Trigger #1: reading track samples
+2026-09-29 17:31:10,444 - ops243 - INFO - [OPS] Hardware trigger: 41033 bytes in 3.5s
+2026-09-29 17:31:10,444 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger fired, 41033 bytes received
+2026-09-29 17:31:10,651 - ops243 - INFO - [OPS] Re-arm drain: 0 bytes in 0.2s
+2026-09-29 17:31:11,023 - ops243 - INFO - [OPS] Rolling buffer re-armed (S#24)
+2026-09-29 17:31:11,024 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger rejected — no outbound speed >= 15 mph (peak=0.0 mph, 0 readings)
+2026-09-29 17:31:11,024 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+[2320:0929/173114.928670:ERROR:ui/gl/gl_surface_presentation_helper.cc:260] GetVSyncParametersIfAvailable() failed for 1 times!
+[2320:0929/173116.015422:ERROR:ui/gl/gl_surface_presentation_helper.cc:260] GetVSyncParametersIfAvailable() failed for 2 times!
+2026-09-29 17:31:16,851 - openflight.iwr6843.driver - WARNING - [IWR6843] Dump stream stalled >= 8.0s, giving up (18/None bytes received)
+2026-09-29 17:31:16,851 - openflight.iwr6843.monitor - WARNING - [IWR6843] Capture #1 failed: short IWR6843 dump: 18 bytes
+Traceback (most recent call last):
+  File "/home/jamorro/openflight_test/openflight/src/openflight/iwr6843/monitor.py", line 763, in _capture
+    metadata = self._validate_dump(raw)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jamorro/openflight_test/openflight/src/openflight/iwr6843/monitor.py", line 615, in _validate_dump
+    raise ValueError(f"short IWR6843 dump: {len(raw)} bytes")
+ValueError: short IWR6843 dump: 18 bytes
+2026-09-29 17:31:16,852 - openflight.iwr6843.monitor - INFO - [IWR6843] Capture #1 complete: short IWR6843 dump: 18 bytes in 8.21s
+2026-09-29 17:31:16,856 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:18,062 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:18,967 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:19,873 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:21,079 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:21,985 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:22,891 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:24,097 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:25,003 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:25,909 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:26,815 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:28,021 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:28,927 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:29,833 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:31,039 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:31,945 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:32,851 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:34,057 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:34,963 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:35,869 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:37,075 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:37,981 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:38,887 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:40,093 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:40,999 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:41,072 - ops243 - INFO - [OPS] Hardware trigger: no data received within 30s
+2026-09-29 17:31:41,072 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger timeout — no hardware trigger received
+2026-09-29 17:31:41,072 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-09-29 17:31:41,904 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:42,810 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:44,016 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:44,922 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:45,828 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:47,034 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:47,940 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:48,846 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:50,052 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:50,957 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:51,863 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:53,069 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:53,975 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:54,881 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:56,087 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:56,992 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:57,898 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:31:59,104 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:00,010 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:00,916 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:01,821 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:03,028 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:03,933 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:04,839 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:06,045 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:06,951 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:07,857 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:09,063 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:09,969 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:10,875 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:11,119 - ops243 - INFO - [OPS] Hardware trigger: no data received within 30s
+2026-09-29 17:32:11,119 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger timeout — no hardware trigger received
+2026-09-29 17:32:11,119 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-09-29 17:32:12,081 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:12,987 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+[2320:0929/173213.266740:ERROR:ui/gl/gl_surface_presentation_helper.cc:260] GetVSyncParametersIfAvailable() failed for 3 times!
+2026-09-29 17:32:13,892 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:15,099 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:16,004 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:16,910 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:17,816 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:19,022 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:19,928 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:20,834 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:22,040 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:22,945 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:23,851 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:25,057 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:25,963 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:26,869 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:28,074 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:28,980 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:29,886 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:31,092 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:31,998 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:32,903 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:34,109 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:35,015 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:35,921 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:36,827 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:38,033 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:38,938 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:39,844 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:41,050 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:41,162 - ops243 - INFO - [OPS] Hardware trigger: no data received within 30s
+2026-09-29 17:32:41,162 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger timeout — no hardware trigger received
+2026-09-29 17:32:41,162 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-09-29 17:32:41,956 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:42,862 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:44,068 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:44,974 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:45,880 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:47,085 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:47,991 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:48,897 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:50,103 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:51,009 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:51,914 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:52,820 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:54,026 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:54,931 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:55,837 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:57,043 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:57,949 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:32:58,855 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:00,061 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:00,967 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:01,873 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:03,080 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:03,986 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:04,892 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:06,098 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:07,004 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:07,910 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:09,117 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:10,023 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:10,929 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:11,171 - ops243 - INFO - [OPS] Hardware trigger: no data received within 30s
+2026-09-29 17:33:11,172 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger timeout — no hardware trigger received
+2026-09-29 17:33:11,172 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-09-29 17:33:11,834 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:13,040 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:13,946 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:14,852 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:16,058 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:16,964 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:17,870 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:19,076 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:19,981 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:20,887 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:22,094 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:22,999 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:23,905 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:25,111 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:26,017 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:26,923 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:27,829 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:29,035 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:29,941 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:30,846 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:32,053 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:32,959 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:33,864 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:35,071 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:35,976 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:36,882 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:38,088 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:38,994 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:39,899 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:41,105 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:41,173 - ops243 - INFO - [OPS] Hardware trigger: no data received within 30s
+2026-09-29 17:33:41,173 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger timeout — no hardware trigger received
+2026-09-29 17:33:41,173 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-09-29 17:33:42,011 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:42,917 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:43,823 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:45,029 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:45,934 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:46,840 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:48,046 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:48,952 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:49,858 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:51,064 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:51,970 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:52,875 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:54,081 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:54,987 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:55,893 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:57,099 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:58,005 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:33:58,910 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:00,116 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:01,022 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:01,928 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:02,833 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:04,040 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:04,945 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:05,851 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:07,057 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:07,963 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:08,869 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:10,075 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:10,981 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:11,223 - ops243 - INFO - [OPS] Hardware trigger: no data received within 30s
+2026-09-29 17:34:11,223 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger timeout — no hardware trigger received
+2026-09-29 17:34:11,223 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-09-29 17:34:11,886 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:13,092 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:13,998 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:14,903 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:16,110 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:17,015 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:17,921 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:18,827 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:20,033 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:20,939 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:21,845 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:23,051 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:23,957 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:24,862 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:26,068 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:26,974 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:27,880 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:29,086 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:29,992 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:30,897 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:32,104 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:33,009 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:33,915 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:35,121 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:36,027 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:36,933 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:37,838 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:39,045 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:39,950 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:40,856 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:41,269 - ops243 - INFO - [OPS] Hardware trigger: no data received within 30s
+2026-09-29 17:34:41,269 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger timeout — no hardware trigger received
+2026-09-29 17:34:41,269 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-09-29 17:34:42,062 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:42,968 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:43,874 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:45,080 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:45,985 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:46,891 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:48,097 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:49,003 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:49,909 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:51,115 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:52,020 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:52,926 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:53,832 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:55,038 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:55,943 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:56,849 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:58,055 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:58,961 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:34:59,867 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:35:01,073 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:35:01,979 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:35:02,884 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:35:04,090 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:35:04,996 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:35:05,902 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:35:07,108 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:35:08,014 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:35:08,919 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:35:10,125 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:35:11,031 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:35:11,316 - ops243 - INFO - [OPS] Hardware trigger: no data received within 30s
+2026-09-29 17:35:11,316 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger timeout — no hardware trigger received
+2026-09-29 17:35:11,316 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Waiting for sound trigger (timeout=30s)...
+2026-09-29 17:35:11,937 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:35:12,842 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:35:14,048 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:35:14,954 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:35:15,860 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:35:17,066 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:35:17,972 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:35:18,877 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:35:20,083 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:35:20,989 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:35:21,895 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:35:23,101 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:35:24,006 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:35:24,912 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:35:26,118 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+2026-09-29 17:35:27,024 - openflight.iwr6843.monitor - INFO - [IWR6843] Serial job setup-poll finished in 0.00s
+^C[OpenFlight] Shutting down...
+[OpenFlight] Requesting graceful hardware shutdown...
+2026-09-29 17:35:27,180 - openflight.server - INFO - [SERVER] Shutdown requested via REST API
+2026-09-29 17:35:27,181 - werkzeug - INFO - 127.0.0.1 - - [29/Sep/2026 17:35:27] "POST /api/shutdown HTTP/1.1" 200 -
+2026-09-29 17:35:27,680 - openflight.server - INFO - [SERVER] Shutdown step IWR6843 setup poll stop completed in 0.1ms
+2026-09-29 17:35:27,944 - openflight.iwr6843.monitor - INFO - [IWR6843] Firmware capture stopped and verified inactive
+2026-09-29 17:35:33,049 - openflight.iwr6843.monitor - INFO - [IWR6843] Capture monitor stopped
+2026-09-29 17:35:33,050 - openflight.server - INFO - [SERVER] Shutdown step IWR6843 stop completed in 5369.1ms
+[SESSION] Ended. Total shots: 0
+[SESSION] Logs saved to: /home/jamorro/openflight_test/openflight/openflight_sessions/session_20260929_173106_range.jsonl
+2026-09-29 17:35:33,099 - ops243 - INFO - [OPS] Hardware trigger wait cancelled before capture
+2026-09-29 17:35:33,100 - ops243 - INFO - [OPS] Hardware trigger: no data received within 30s
+2026-09-29 17:35:33,100 - openflight.rolling_buffer.trigger - INFO - [TRIGGER] Sound trigger timeout — no hardware trigger received
+2026-09-29 17:35:33,100 - openflight.rolling_buffer.monitor - INFO - [MONITOR] Rolling buffer monitor stopped
+2026-09-29 17:35:33,100 - openflight.rolling_buffer.monitor - INFO - [MONITOR] Rolling buffer monitor stopped
+2026-09-29 17:35:33,100 - openflight.server - INFO - [SERVER] Shutdown step launch monitor stop completed in 50.3ms
+2026-09-29 17:35:33,100 - openflight.server - INFO - [SERVER] Goodbye
+[OpenFlight] Closing kiosk shell...
