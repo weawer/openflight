@@ -110,18 +110,26 @@ def run_acceptance(radar: IWR6843Radar, args: argparse.Namespace) -> bool:
 
     def restart() -> None:
         radar.send_config(args.config)
+        if args.dss_only:
+            # Before arming: on a profile the MSS cannot score in time, an
+            # armed MSS detector starves the CLI and the board stops answering.
+            radar.detect_core("dss")
         arm()
 
+    if args.dss_only:
+        radar.detect_core("dss")
     if not arm():
         return False
     restarts = 0
-    print(f"acceptance: verify for {args.seconds:.0f} s: swing now")
-    radar.detect_core("verify")
-    fired, stopped = hold(radar, args.seconds, restart)
-    restarts += stopped
-    print(f"  fired on {fired} swings")
-    verify = radar.detect_core()
-    report(radar, "verify")
+    verify = None
+    if not args.dss_only:
+        print(f"acceptance: verify for {args.seconds:.0f} s: swing now")
+        radar.detect_core("verify")
+        fired, stopped = hold(radar, args.seconds, restart)
+        restarts += stopped
+        print(f"  fired on {fired} swings")
+        verify = radar.detect_core()
+        report(radar, "verify")
     print(f"acceptance: dss for {args.seconds:.0f} s: swing again")
     radar.detect_core("dss")
     fired, stopped = hold(radar, args.seconds, restart)
@@ -130,13 +138,15 @@ def run_acceptance(radar: IWR6843Radar, args: argparse.Namespace) -> bool:
     dss = radar.detect_core()
     timing, stats = report(radar, "dss")
     checks = evaluate_acceptance(
-        verify=verify,
+        verify=dss if verify is None else verify,
         dss=dss,
         timing=timing,
         stats_text=stats,
         perf_text=radar.cmd("triggerLog perf", 2.0),
         recoveries=restarts,
     )
+    if verify is None:
+        checks = [check for check in checks if not check.name.startswith("verify")]
     for check in checks:
         print(f"  {'pass' if check.passed else 'FAIL'} {check.name}: {check.detail}")
     radar.detect_core("mss")
@@ -151,6 +161,11 @@ def main() -> int:
     parser.add_argument("--settle-s", type=float, default=1.0, help="seconds after sensorStart")
     parser.add_argument(
         "--acceptance", action="store_true", help="then run verify and dss while you swing"
+    )
+    parser.add_argument(
+        "--dss-only",
+        action="store_true",
+        help="skip verify and arm on the DSS (profiles the MSS cannot score in time, e.g. 2 ms)",
     )
     parser.add_argument("--seconds", type=float, default=60.0, help="each acceptance phase")
     parser.add_argument("--trigger-bin", type=int, default=DEFAULT_TRIGGER_BIN)
