@@ -1192,6 +1192,7 @@ def init_iwr6843(
     setup_poll_s: float = 1.0,
     tee_band_bins: float | None = None,
     ball_snr: float | None = None,
+    detect_core: str = "auto",
 ) -> bool:
     """Initialize GPIO-triggered TI capture and the frozen LCMF-v1 estimator.
 
@@ -1205,7 +1206,9 @@ def init_iwr6843(
     trackers ignore; the firmware places it on the noisiest idle bins near the
     tee and freezes it while the club swings; None is the default width, 0
     turns it off. ``ball_snr`` is the ball tracker's threshold apart from the
-    trigger's; None keeps the firmware's.
+    trigger's; None keeps the firmware's. ``detect_core`` is the core that
+    scores the self-trigger's bins: auto (the DSS on an iq16 profile, else
+    the MSS), mss or dss.
     """
     global iwr6843_runtime, iwr6843_runtime_config  # pylint: disable=global-statement
     from .iwr6843.setup_poll import BALL_DETECTOR_MODES  # pylint: disable=import-outside-toplevel
@@ -1276,6 +1279,7 @@ def init_iwr6843(
             tee_band_bins=tee_band_bins,
             ball_snr=ball_snr,
             board_calibration=board_calibration,
+            detect_core=detect_core,
         )
         if self_trigger is not None:
             logger.warning(
@@ -1323,6 +1327,7 @@ def init_iwr6843(
             "array_depth_m": ARRAY_DEPTH_M,
             "tee_band_bins": tee_band_bins,
             "ball_snr": ball_snr,
+            "detect_core": capture_monitor.detect_core,
             "board_calibration": board_calibration.to_dict(),
             "net_range_m": net_from_front_m,
             "flight": flight,
@@ -4795,6 +4800,18 @@ def _add_iwr6843_ball_snr_argument(parser):
     )
 
 
+def _add_iwr6843_detect_core_argument(parser):
+    """Add the core that scores the self-trigger's bins."""
+    parser.add_argument(
+        "--iwr6843-detect-core",
+        choices=("auto", "mss", "dss"),
+        default="auto",
+        help="Core that scores the self-trigger's bins: dss is ~6.5x faster and needed "
+        "at 2 ms but reads only captureFormat iq16 profiles; auto picks dss on those "
+        "and mss otherwise (default: auto)",
+    )
+
+
 def _add_battery_arguments(parser):
     """Add explicit battery-provider selection."""
     parser.add_argument(
@@ -5145,6 +5162,7 @@ def main():
     )
     _add_iwr6843_tee_band_argument(parser)
     _add_iwr6843_ball_snr_argument(parser)
+    _add_iwr6843_detect_core_argument(parser)
     parser.add_argument(
         "--iwr6843-net-m",
         type=float,
@@ -5554,6 +5572,7 @@ def main():
             setup_poll_s=args.iwr6843_setup_poll_s,
             tee_band_bins=args.iwr6843_tee_band_bins,
             ball_snr=args.iwr6843_ball_snr,
+            detect_core=args.iwr6843_detect_core,
         ):
             calibration = iwr6843_runtime.calibration
             ball_speed_correction_distance_ft = _iwr6843_tee_range_m(args) * 3.28084

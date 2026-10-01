@@ -14,6 +14,7 @@ import pytest
 
 import openflight.iwr6843.monitor as iwr_monitor
 from openflight.iwr6843.board_calibration import BoardCalibration
+from openflight.iwr6843.dsp_link import DspLinkError
 from openflight.iwr6843.dump import pack_dump
 from openflight.iwr6843.firmware_version import FirmwareVersion
 from openflight.iwr6843.monitor import (
@@ -25,6 +26,7 @@ from openflight.iwr6843.monitor import (
     SelfTriggerConfig,
     measure_trigger_level,
     read_capture_config,
+    resolve_detect_core,
     tee_global_bin,
     tx_order_from_config,
 )
@@ -1670,4 +1672,178 @@ def test_an_edge_while_the_board_is_being_rearmed_is_rejected_as_busy(tmp_path):
     finally:
         release.set()
     assert _wait_until(lambda: len(radar.configs) == 2)
+    monitor.stop()
+
+
+# --- the self-trigger's detect core (trackCfg detectCore) ----------------------
+
+
+class DetectCoreRadar(SelfTriggerRadar):
+    """SelfTriggerRadar that also takes ``trackCfg detectCore``, logged in the
+    same command list so the order against triggerCfg is visible."""
+
+    def __init__(self, raw: bytes, *, takes: str | None = None, error: Exception | None = None):
+        super().__init__(raw)
+        self.takes = takes  # what the board reports as requested; None: what was asked
+        self.core_error = error
+
+    def detect_core(self, core=None):
+        self.commands.append((f"trackCfg detectCore {core}", threading.current_thread().name))
+        if self.core_error is not None:
+            raise self.core_error
+        return SimpleNamespace(requested=self.takes or core)
+
+
+def _core_monitor(tmp_path, radar, capture_format: str | None, **kwargs):
+    config = tmp_path / "radar.cfg"
+    lines = ([f"captureFormat {capture_format}"] if capture_format else []) + ["sensorStart"]
+    config.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return IWR6843CaptureMonitor(
+        config_path=config,
+        output_dir=tmp_path / "dumps",
+        radar=radar,
+        button_factory=FakeButton,
+        self_trigger=SelfTriggerConfig(tee_bin=12, snr=6.0),
+        **kwargs,
+    )
+
+
+def _lines(radar) -> list[str]:
+    return [line for line, _thread in radar.commands]
+
+
+@pytest.mark.parametrize(
+    "choice,capture_format,core",
+    [
+        ("auto", "iq16", "dss"),
+        ("auto", "adaptive16", "mss"),
+        ("auto", "compact16", "mss"),
+        ("auto", "iq8", "mss"),
+        ("auto", None, "mss"),
+        ("mss", "iq16", "mss"),
+        ("mss", "adaptive16", "mss"),
+        ("dss", "iq16", "dss"),
+    ],
+)
+def test_resolve_detect_core(choice, capture_format, core):
+    assert resolve_detect_core(choice, capture_format) == core
+
+
+@pytest.mark.parametrize("capture_format", ["adaptive16", "compact16", "iq8", None])
+def test_dss_on_a_profile_the_dss_cannot_read_is_refused(capture_format):
+    with pytest.raises(ValueError, match="needs a captureFormat iq16 profile"):
+        resolve_detect_core("dss", capture_format)
+
+
+@pytest.mark.parametrize("choice", ["verify", "DSS", "", "gpu"])
+def test_an_unknown_detect_core_is_refused(tmp_path, choice):
+    with pytest.raises(ValueError, match="detect core must be one of"):
+        resolve_detect_core(choice, "iq16")
+    with pytest.raises(ValueError, match="detect core must be one of"):
+        _core_monitor(tmp_path, DetectCoreRadar(_raw_dump()), "iq16", detect_core=choice)
+
+
+def test_auto_on_an_iq16_profile_scores_on_the_dss_before_arming(tmp_path):
+    """At 2 ms an armed MSS detector starves the CLI (2026-10-01 rig), so the
+    core is chosen before triggerCfg, not after."""
+    radar = DetectCoreRadar(_raw_dump())
+    monitor = _core_monitor(tmp_path, radar, "iq16", detect_core="auto")
+    monitor.start(armed=False)
+
+    assert monitor.detect_core == "dss"
+    assert _lines(radar) == ["trackCfg detectCore dss", "triggerCfg 12 6.0 1"]
+    monitor.stop()
+
+
+def test_auto_on_a_compacting_profile_keeps_the_mss_explicitly(tmp_path):
+    radar = DetectCoreRadar(_raw_dump())
+    monitor = _core_monitor(tmp_path, radar, "adaptive16", detect_core="auto")
+    monitor.start(armed=False)
+
+    assert monitor.detect_core == "mss"
+    assert _lines(radar) == ["trackCfg detectCore mss", "triggerCfg 12 6.0 1"]
+    monitor.stop()
+
+
+def test_dss_on_a_compacting_profile_fails_start_before_touching_the_board(tmp_path):
+    radar = DetectCoreRadar(_raw_dump())
+    monitor = _core_monitor(tmp_path, radar, "adaptive16", detect_core="dss")
+
+    with pytest.raises(ValueError, match="needs a captureFormat iq16 profile"):
+        monitor.start(armed=False)
+    assert radar.commands == [] and radar.configs == []
+
+
+def test_no_choice_leaves_the_board_alone(tmp_path):
+    radar = DetectCoreRadar(_raw_dump())
+    monitor = _core_monitor(tmp_path, radar, "iq16")
+    monitor.start(armed=False)
+
+    assert monitor.detect_core is None
+    assert _lines(radar) == ["triggerCfg 12 6.0 1"]
+    monitor.stop()
+
+
+def test_without_a_self_trigger_no_core_is_chosen(tmp_path):
+    """The detect core only scores the self-trigger's bins."""
+    radar = DetectCoreRadar(_raw_dump())
+    config = tmp_path / "radar.cfg"
+    config.write_text("captureFormat iq16\nsensorStart\n", encoding="utf-8")
+    monitor = IWR6843CaptureMonitor(
+        config_path=config,
+        output_dir=tmp_path / "dumps",
+        radar=radar,
+        button_factory=FakeButton,
+        detect_core="dss",
+    )
+    monitor.start(armed=False)
+
+    assert monitor.detect_core is None
+    assert radar.commands == []
+    monitor.stop()
+
+
+def test_a_board_that_does_not_take_the_core_fails_start(tmp_path):
+    radar = DetectCoreRadar(_raw_dump(), takes="mss")
+    monitor = _core_monitor(tmp_path, radar, "iq16", detect_core="dss")
+
+    with pytest.raises(RuntimeError, match="detect core dss not taken: requested=mss"):
+        monitor.start(armed=False)
+    assert "triggerCfg 12 6.0 1" not in _lines(radar), "never armed on the wrong core"
+
+
+def test_a_refused_detect_core_fails_start_and_never_arms(tmp_path):
+    """An image without the DSS link answers Error (dsp_link raises)."""
+    radar = DetectCoreRadar(
+        _raw_dump(), error=DspLinkError("trackCfg detectCore: Error: detectCore dss needs ...")
+    )
+    monitor = _core_monitor(tmp_path, radar, "iq16", detect_core="dss")
+
+    with pytest.raises(DspLinkError):
+        monitor.start(armed=False)
+    assert "triggerCfg 12 6.0 1" not in _lines(radar)
+
+
+def test_a_restart_chooses_the_core_again_before_arming(tmp_path):
+    """A board found stopped is restarted on the worker thread; the core is
+    sent again ahead of triggerCfg, as at start."""
+    radar = DetectCoreRadar(b"x" * 18)
+    radar.stats_replies = [STOPPED_STATS]
+    radar.release_error = RuntimeError("refused")
+    monitor = _core_monitor(tmp_path, radar, "iq16", detect_core="auto")
+    monitor.start(armed=False)
+    monitor.arm()
+
+    _self_triggered_capture(monitor, radar)
+
+    assert _wait_until(lambda: _lines(radar).count("triggerCfg 12 6.0 1") == 2)
+    lines = _lines(radar)
+    assert lines == [
+        "trackCfg detectCore dss",
+        "triggerCfg 12 6.0 1",
+        "trackCfg detectCore dss",
+        "triggerCfg 12 6.0 1",
+    ]
+    restart_thread = [t for line, t in radar.commands if line == "trackCfg detectCore dss"][1]
+    assert restart_thread == "iwr6843-capture"
     monitor.stop()
