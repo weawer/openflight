@@ -17,6 +17,7 @@ from typing import Callable
 from openflight.gpio_factory import ensure_lgpio_pin_factory
 from openflight.iwr6843.board_calibration import BoardCalibration
 from openflight.iwr6843.driver import IWR6843Radar, UnsupportedCommand
+from openflight.iwr6843.dsp_link import DspLinkError
 from openflight.iwr6843.dump import HEADER, parse_header, payload_nbytes
 from openflight.iwr6843.firmware_version import FirmwareVersion
 from openflight.iwr6843.self_trigger import (
@@ -279,28 +280,13 @@ class SelfTriggerConfig:
 # on=0 disables the firmware trigger (see l3_cli_triggerCfg).
 SELF_TRIGGER_OFF_COMMAND = "triggerCfg 0 0 0"
 
-# Which core scores the self-trigger's bins (``trackCfg detectCore``). The
-# DSS scores a frame ~6.5x faster than the MSS (2026-10-01 rig: 570 us mean,
-# 1383 us max a frame at 2 ms, against ~2.6 ms on the MSS at 3 ms) but only
-# reads a plain IQ16 ring: the compacting formats (compact16, adaptive16)
-# keep the MSS. "auto" takes the DSS whenever the profile allows it.
-DETECT_CORE_CHOICES = ("auto", "mss", "dss")
-
-
-def resolve_detect_core(choice: str, capture_format: str | None) -> str:
-    """The core (``mss`` or ``dss``) for ``choice`` on a profile with this
-    ``captureFormat``. ``dss`` on a profile the DSS cannot read is refused
-    here rather than by the board at startup."""
-    if choice not in DETECT_CORE_CHOICES:
-        raise ValueError(f"detect core must be one of {DETECT_CORE_CHOICES}, got {choice!r}")
-    dss_ok = capture_format == "iq16"
-    if choice == "auto":
-        return "dss" if dss_ok else "mss"
-    if choice == "dss" and not dss_ok:
-        raise ValueError(
-            f"detect core dss needs a captureFormat iq16 profile, not {capture_format or 'none'}"
-        )
-    return choice
+# The self-trigger's bins are scored on the DSS (``trackCfg detectCore dss``,
+# the firmware's boot default): ~6.5x faster than the MSS (2026-10-01 rig:
+# 570 us mean, 1383 us max a frame at 2 ms, against ~2.6 ms on the MSS at
+# 3 ms). The DSS only reads a plain IQ16 ring; on these formats the firmware
+# counts every frame ineligible and the MSS scores it.
+MSS_SCORED_CAPTURE_FORMATS = ("iq8", "compact16", "adaptive16")
+DETECT_CORE = "dss"
 
 
 def measure_trigger_level(
@@ -413,7 +399,6 @@ class IWR6843CaptureMonitor:
         tee_band_bins: float = TEE_BAND_DEFAULT_BINS,
         ball_snr: float | None = None,
         board_calibration: BoardCalibration | None = None,
-        detect_core: str | None = None,
     ):
         # "not <=" also refuses NaN.
         if not 0.0 <= tee_band_bins <= TEE_BAND_MAX_BINS:
@@ -432,13 +417,8 @@ class IWR6843CaptureMonitor:
         self.board_calibration = board_calibration or BoardCalibration.identity()
         self.calibration_applied = False
         self.config_path = Path(config_path)
-        # The self-trigger's detect core (DETECT_CORE_CHOICES), resolved
-        # against the profile at start(); None leaves the board's choice.
-        if detect_core is not None and detect_core not in DETECT_CORE_CHOICES:
-            raise ValueError(
-                f"detect core must be one of {DETECT_CORE_CHOICES}, got {detect_core!r}"
-            )
-        self.detect_core_choice = detect_core
+        # What the board reported after ``trackCfg detectCore dss`` at the
+        # last (re)start; None without a self-trigger or on older firmware.
         self.detect_core: str | None = None
         # With the tee known, the impact and ball windows are placed on it
         # (tee_relative_config) instead of the cfg's fixed ones.
@@ -546,10 +526,13 @@ class IWR6843CaptureMonitor:
                     "the retained windows; needs firmware with the compact formats",
                     capture_format,
                 )
-        if self.detect_core_choice is not None and self.self_trigger is not None:
-            self.detect_core = resolve_detect_core(
-                self.detect_core_choice, read_capture_config(self.config_path).capture_format
-            )
+            if capture_format in MSS_SCORED_CAPTURE_FORMATS:
+                logger.warning(
+                    "[IWR6843] %s capture: the DSS cannot read this ring, so the MSS scores "
+                    "the self-trigger's bins (~6.5x slower; it overran a 3 ms frame and "
+                    "cannot keep up at 2 ms). Use a captureFormat iq16 profile for the DSS",
+                    capture_format,
+                )
         if self.save_dumps:
             self.output_dir.mkdir(parents=True, exist_ok=True)
         self._log_firmware_version()
@@ -633,8 +616,8 @@ class IWR6843CaptureMonitor:
             )
         if self._onboard_track_config is not None:
             self._configure_onboard_tracking(self._onboard_track_config)
-        # Before triggerCfg: an armed detector the MSS cannot keep up with
-        # (any 2 ms profile) starves the CLI, and the board stops answering.
+        # Before triggerCfg: an armed detector latched on the MSS cannot keep
+        # up at 2 ms, starves the CLI, and the board stops answering.
         self._apply_detect_core()
         self._apply_self_trigger()
 
@@ -752,17 +735,35 @@ class IWR6843CaptureMonitor:
         return True
 
     def _apply_detect_core(self) -> None:
-        """Send ``trackCfg detectCore`` for the resolved core, if any. The
-        firmware keeps it across sensorStart, so a restart sends it again
-        to stay explicit. A refusal (no DSS link, older image) raises."""
-        if self.detect_core is None:
+        """Send ``trackCfg detectCore dss`` when the self-trigger is used.
+
+        dss is the firmware's boot default, but three DSS failures in a row
+        latch the MSS for every frame until dss is chosen again, and the
+        firmware keeps that across sensorStart: sent at every (re)start so an
+        armed board never begins on a latched MSS. Firmware without the
+        command (it scores on the MSS) is left as it is.
+        """
+        self.detect_core = None
+        if self.self_trigger is None:
             return
-        status = self.radar.detect_core(self.detect_core)
-        if status.requested != self.detect_core:
-            raise RuntimeError(
-                f"IWR6843 detect core {self.detect_core} not taken: requested={status.requested}"
+        try:
+            status = self.radar.detect_core(DETECT_CORE)
+        except DspLinkError as error:
+            logger.warning(
+                "[IWR6843] Firmware did not take trackCfg detectCore %s (%s); the "
+                "self-trigger's bins are scored where this image scores them",
+                DETECT_CORE,
+                error,
             )
-        logger.info("[IWR6843] Self-trigger detect core: %s", self.detect_core)
+            return
+        if status.requested != DETECT_CORE:
+            raise RuntimeError(
+                f"IWR6843 detect core {DETECT_CORE} not taken: requested={status.requested}"
+            )
+        self.detect_core = status.requested
+        logger.info(
+            "[IWR6843] Self-trigger detect core: %s (active=%s)", status.requested, status.active
+        )
 
     def _apply_self_trigger(self) -> None:
         """Send ``triggerCfg`` for the configured self-trigger, if any."""
@@ -1142,7 +1143,8 @@ __all__ = [
     "SELF_TRIGGER_DEFAULT_BIN",
     "SELF_TRIGGER_TEE_LEAD_BINS",
     "DEFAULT_IWR6843_CONFIG",
-    "DETECT_CORE_CHOICES",
+    "DETECT_CORE",
+    "MSS_SCORED_CAPTURE_FORMATS",
     "SELF_TRIGGER_DEFAULT_SNR",
     "TEE_BAND_DEFAULT_BINS",
     "TEE_BAND_MAX_BINS",
@@ -1151,7 +1153,6 @@ __all__ = [
     "IWR6843Capture",
     "IWR6843CaptureMonitor",
     "SelfTriggerConfig",
-    "resolve_detect_core",
     "check_first_window_bin",
     "measure_trigger_level",
     "read_capture_config",

@@ -4545,8 +4545,13 @@ int32_t l3_cli_sparse(int32_t argc, char *argv[])
 }
 
 /* Firmware ball tracker (track_select.c). trackCfg supplies the rig limits;
- * the algorithm constants live in l3track_default_params. */
-static L3TrackWorkspace gTrackWorkspace;
+ * the algorithm constants live in l3track_default_params.
+ *
+ * The workspace (17.4 KB) lives in HS-RAM: DATA_RAM is full, and only
+ * l3track uses it, on a frozen ring, beside powerRow which is there already.
+ * HS-RAM is not zeroed at boot; l3track_select clears detCount, cellMask
+ * and nOrder on every call and writes the rest before reading it. */
+static L3TrackWorkspace gTrackWorkspace L3_HSRAM_DIAG;
 static L3TrackParams gTrackParams;
 static double gTrackLoopPeriodS;
 static double gTrackRangeResM;

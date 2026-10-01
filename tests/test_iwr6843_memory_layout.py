@@ -164,3 +164,19 @@ def test_tracked_reference_map_agrees_with_the_live_map():
         "live DATA_RAM geometry no longer matches the tracked reference map; "
         "regenerate baseline/l3_dump_mss.map.current from a fresh build"
     )
+
+
+def test_the_l3track_workspace_lives_in_hs_ram_and_is_cleared_before_use():
+    """DATA_RAM was down to 926 B (2026-10-01 build of the reconstruction).
+    The 17.4 KB l3track workspace is only used on a frozen ring, so it sits in
+    HS-RAM with the other MSS diagnostics. HS-RAM is not zeroed at boot: the
+    selector must clear what it reads before it scans."""
+    source = FIRMWARE.read_text(encoding="utf-8")
+    assert "static L3TrackWorkspace gTrackWorkspace L3_HSRAM_DIAG;" in source
+
+    selector = (FIRMWARE.parent / "track_select.c").read_text(encoding="utf-8")
+    select = selector[selector.index("int32_t l3track_select(") :]
+    scan = select.index("l3track_scan(layout")
+    for cleared in ("memset(ws->detCount, 0,", "memset(ws->cellMask, 0,"):
+        assert 0 <= select.find(cleared) < scan, f"{cleared} must precede the scan"
+    assert "ws->nOrder = 0U;" in selector

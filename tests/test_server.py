@@ -653,19 +653,11 @@ class TestIWR6843ShotIntegration:
         assert server_module.iwr6843_runtime_config["ball_snr"] is None
         server_module.iwr6843_runtime = None
 
-    def test_init_iwr6843_lets_the_monitor_pick_the_detect_core_by_default(
-        self, monkeypatch, tmp_path
-    ):
+    def test_init_iwr6843_records_the_detect_core_the_monitor_reports(self, monkeypatch, tmp_path):
         captured = self._init_capturing_monitor_kwargs(monkeypatch, tmp_path)
 
-        assert captured["detect_core"] == "auto"
-        assert "detect_core" in server_module.iwr6843_runtime_config
-        server_module.iwr6843_runtime = None
-
-    def test_init_iwr6843_passes_the_detect_core_to_the_monitor(self, monkeypatch, tmp_path):
-        captured = self._init_capturing_monitor_kwargs(monkeypatch, tmp_path, detect_core="mss")
-
-        assert captured["detect_core"] == "mss"
+        assert "detect_core" not in captured, "not a monitor option: the firmware default is dss"
+        assert server_module.iwr6843_runtime_config["detect_core"] is None
         server_module.iwr6843_runtime = None
 
     def test_init_iwr6843_passes_the_ball_snr_to_the_monitor(self, monkeypatch, tmp_path):
@@ -4864,31 +4856,6 @@ class TestIWR6843TeeBandArgument:
         # code 2: argparse's parser.error(), not the later hardware-init exit.
         assert exc_info.value.code == 2
         assert "--iwr6843-tee-band-bins must be 0..64" in capsys.readouterr().err
-
-
-class TestIWR6843DetectCoreArgument:
-    """--iwr6843-detect-core picks the core that scores the self-trigger."""
-
-    def test_cli_default_is_auto(self):
-        parser = argparse.ArgumentParser()
-        server_module._add_iwr6843_detect_core_argument(parser)
-
-        assert parser.parse_args([]).iwr6843_detect_core == "auto"
-
-    @pytest.mark.parametrize("core", ["auto", "mss", "dss"])
-    def test_cli_accepts_each_core(self, core):
-        parser = argparse.ArgumentParser()
-        server_module._add_iwr6843_detect_core_argument(parser)
-
-        assert parser.parse_args(["--iwr6843-detect-core", core]).iwr6843_detect_core == core
-
-    @pytest.mark.parametrize("core", ["verify", "DSS", "gpu"])
-    def test_cli_refuses_other_values(self, core):
-        parser = argparse.ArgumentParser()
-        server_module._add_iwr6843_detect_core_argument(parser)
-
-        with pytest.raises(SystemExit):
-            parser.parse_args(["--iwr6843-detect-core", core])
 
 
 class TestIWR6843BallSnrArgument:
