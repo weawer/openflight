@@ -184,7 +184,6 @@ def evaluate(
     ball_hypotheses: bool | None = None,
     tuning: fr.BallTuning | None = None,
     fast_ball_from_club: bool = False,
-    joint_search: bool = False,
     band_bins: float | None = None,
     impact: bool = False,
 ) -> Outcome:
@@ -196,17 +195,12 @@ def evaluate(
     tuning = tuning_for(case, tuning, fast_ball_from_club=fast_ball_from_club)
     if tuning is not None:
         config = replace(config, ball_tuning=tuning)
-    if joint_search:
-        config = replace(config, joint_search=True)
     if band_bins is not None:
         config = replace(config, band_bins=band_bins)
     result = fr.replay_dump(case.path.read_bytes(), config, lib=lib)
     split = split_frame(result)
     post = [f for f in result.frames if split is not None and f.frame >= split]
-    if joint_search:
-        launch = joint_launch_mps(result)
-    else:
-        launch = None if result.launch is None else float(result.launch.speed_mps)
+    launch = None if result.launch is None else float(result.launch.speed_mps)
     return Outcome(
         name=case.path.name,
         club=club_verdict(result.points, split),
@@ -214,19 +208,9 @@ def evaluate(
         ball_present=ball_present(post, case.ops_mps, bin_width_m()),
         launch_mps=launch,
         ops_mps=case.ops_mps,
-        launch_hla_deg=(None if joint_search or result.launch is None else result.launch.hla_deg),
+        launch_hla_deg=None if result.launch is None else result.launch.hla_deg,
         impact=impact_eval.impact_outcome(case.path.name, result) if impact else None,
     )
-
-
-def joint_launch_mps(result) -> float | None:
-    """The joint search's launch speed: the mean resolved speed of its confirmed
-    ball points, points[0] excluded (it is the from-rest first touch), same
-    definition as the firmware's own l3_joint_launch."""
-    if not result.joint_confirmed or len(result.joint_ball_points) < 2:
-        return None
-    speeds = [p.doppler_mps for p in result.joint_ball_points[1:]]
-    return sum(speeds) / len(speeds) if speeds else None
 
 
 def summarize(outcomes: Iterable[Outcome]) -> dict:
@@ -308,11 +292,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--far-window-bins", type=float, help="Hypothesis points only this far beyond the tee"
     )
     parser.add_argument(
-        "--joint-search",
-        action="store_true",
-        help="Score the joint club/ball path search's launch instead of the firmware default",
-    )
-    parser.add_argument(
         "--band-bins",
         type=float,
         help="Tee band total width in bins for every capture, placed on the noisiest "
@@ -333,7 +312,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             ball_hypotheses=search,
             tuning=tuning,
             fast_ball_from_club=from_club,
-            joint_search=args.joint_search,
             band_bins=args.band_bins,
             impact=args.impact,
         )

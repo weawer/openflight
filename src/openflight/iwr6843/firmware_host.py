@@ -35,15 +35,16 @@ HOST_SOURCES = (
     "l3_band.c",
     "l3_trigger.c",
     "l3_club_track.c",
+    "l3_track_kf.c",
     "l3_impact_fit.c",
     "l3_launch.c",
-    "l3_joint_search.c",
     "l3_ball_hyp.c",
     "l3_impact.c",
     "l3_leave.c",
     "l3_scan.c",
     "l3_shot.c",
     "l3_ball_track.c",
+    "l3_ball_fit.c",
     "l3_result.c",
     "l3_profile.c",
     "l3_adaptive.c",
@@ -83,9 +84,6 @@ ANGLE_GRID_STEPS = 161
 
 # l3_observation.h anglesValid bits
 ANGLE_AZIMUTH, ANGLE_ELEVATION = 1, 2
-
-# l3_launch.h: lateFrom when no late fit gave angles
-LAUNCH_NO_LATE = 0xFF
 
 # l3_impact.h
 IMPACT_WHY_NAMES = ("none", "nodelivery", "pending", "passed", "fired")
@@ -230,6 +228,7 @@ PROFILE_STAGE_NAMES = (
     "impact",
     "balldetect",
     "balltrack",
+    "reconstruct",
     "dspwait",
 )
 
@@ -249,25 +248,6 @@ TRACK_FOLLOW_UNKNOWN_APPROACH_MPS = 70.0
 # A tentative point is confirmed by the next point this far downrange of it.
 TRACK_TENTATIVE_ADVANCE_BINS = 1.0
 TRACK_WHY_NAMES = ("none", "acquired", "associated", "coasted", "dropped", "idle", "released")
-
-# l3_joint_search.h
-JOINT_CLUB_BEAM = 4
-JOINT_BALL_BEAM = 4
-JOINT_BEAM = 8
-JOINT_WINDOW = 8
-JOINT_BALL_POINTS = 8
-JOINT_NONE = 0xFF
-JOINT_UNSTARTED, JOINT_ACTIVE, JOINT_ENDED = 0, 1, 2
-JOINT_USE_NONE, JOINT_USE_CLUB, JOINT_USE_BALL = 0, 1, 2
-JOINT_CNT_NAMES = (
-    "pairings",
-    "confirmed",
-    "forced_out",
-    "skipped",
-    "nonfinite",
-    "angle_est",
-)
-JOINT_N_COUNTERS = len(JOINT_CNT_NAMES)
 
 # l3_ball_hyp.h
 BALL_HYP_MAX = 4
@@ -499,6 +479,39 @@ class Trig(ctypes.Structure):
     ]
 
 
+# l3_club_track.h L3_FILTER_HYP_*
+FILTER_HYP_NAMES = ("none", "direct", "image", "ambiguous", "unfiltered")
+FILTER_HYP_UNFILTERED = FILTER_HYP_NAMES.index("unfiltered")
+
+
+# l3_track_kf.h
+TRACK_KF_WHY_NAMES = ("none", "ok", "few_points", "diverged")
+
+
+class TrackKfResult(ctypes.Structure):
+    """``l3_track_kf_result_t``."""
+
+    _fields_ = [
+        ("points", ctypes.c_uint32),
+        ("accepted", ctypes.c_uint32),
+        ("why", ctypes.c_uint8),
+    ]
+
+
+class TrackKfCfg(ctypes.Structure):
+    """``l3_track_kf_cfg_t``."""
+
+    _fields_ = [
+        ("accelSigmaMps2", ctypes.c_float),
+        ("rangeSigmaM", ctypes.c_float),
+        ("angleSigmaRad", ctypes.c_float),
+        ("minAngleConfidence", ctypes.c_float),
+        ("chi2Gate", ctypes.c_float),
+        ("initPositionSigmaM", ctypes.c_float),
+        ("initVelocitySigmaMps", ctypes.c_float),
+    ]
+
+
 class TrackCfg(ctypes.Structure):
     """``l3_track_cfg_t``."""
 
@@ -526,6 +539,7 @@ class TrackCfg(ctypes.Structure):
         ("acquireDopplerTolMps", ctypes.c_float),
         ("acquireMinConfidence", ctypes.c_float),
         ("acquireExpectedStepBins", ctypes.c_float),
+        ("kf", TrackKfCfg),
     ]
 
 
@@ -546,6 +560,10 @@ class TrackPoint(ctypes.Structure):
         ("coherence", ctypes.c_float),
         ("confidence", ctypes.c_float),
         ("position", Vec3),
+        ("angleConfidence", ctypes.c_float),
+        ("filteredPosition", Vec3),
+        ("filterAccepted", ctypes.c_uint8),
+        ("filterHypothesis", ctypes.c_uint8),
     ]
 
 
@@ -1096,6 +1114,7 @@ class BallHypPoint(ctypes.Structure):
         ("azimuthRad", ctypes.c_float),
         ("elevationRad", ctypes.c_float),
         ("anglesValid", ctypes.c_uint8),
+        ("angleConfidence", ctypes.c_float),
     ]
 
 
@@ -1166,6 +1185,28 @@ class BallHyps(ctypes.Structure):
     ]
 
 
+class BallFitCfg(ctypes.Structure):
+    """``l3_ball_fit_cfg_t``."""
+
+    _fields_ = [
+        ("angleSigmaRad", ctypes.c_float),
+        ("gateK", ctypes.c_float),
+        ("huberK", ctypes.c_float),
+        ("minAccepted", ctypes.c_uint32),
+        ("maxRmsRad", ctypes.c_float),
+        ("imageSepMinRad", ctypes.c_float),
+        ("radarHeightM", ctypes.c_float),
+        ("teeBallHeightM", ctypes.c_float),
+        ("hlaMinRad", ctypes.c_float),
+        ("hlaMaxRad", ctypes.c_float),
+        ("vlaMinRad", ctypes.c_float),
+        ("vlaMaxRad", ctypes.c_float),
+        ("gridSteps", ctypes.c_uint32),
+        ("gridLevels", ctypes.c_uint32),
+        ("maxAngleSigmaRad", ctypes.c_float),
+    ]
+
+
 class BallTrackCfg(ctypes.Structure):
     """``l3_ball_track_cfg_t``."""
 
@@ -1180,7 +1221,7 @@ class BallTrackCfg(ctypes.Structure):
         ("snr", ctypes.c_float),
         ("useHypotheses", ctypes.c_uint32),
         ("skipClubClaim", ctypes.c_uint32),
-        ("lateRangeM", ctypes.c_float),
+        ("fit", BallFitCfg),
         ("hyps", BallHypsCfg),
     ]
 
@@ -1218,207 +1259,12 @@ class Launch(ctypes.Structure):
         ("vlaRad", ctypes.c_float),
         ("residualM", ctypes.c_float),
         ("confidence", ctypes.c_float),
+        ("angleRmsRad", ctypes.c_float),
         ("speedValid", ctypes.c_uint8),
         ("hlaValid", ctypes.c_uint8),
         ("vlaValid", ctypes.c_uint8),
-        ("lateFrom", ctypes.c_uint8),
-    ]
-
-
-class JointCfg(ctypes.Structure):
-    """``l3_joint_cfg_t``."""
-
-    _fields_ = [
-        ("binWidthM", ctypes.c_float),
-        ("velocitySpanMps", ctypes.c_float),
-        ("startBehindBins", ctypes.c_float),
-        ("startBeyondBins", ctypes.c_float),
-        ("ballMinSpeedMps", ctypes.c_float),
-        ("ballMaxSpeedMps", ctypes.c_float),
-        ("ballAccelMps2", ctypes.c_float),
-        ("ballMaxMisses", ctypes.c_uint32),
-        ("ballMinPoints", ctypes.c_uint32),
-        ("clubMinSpeedMps", ctypes.c_float),
-        ("clubMaxSpeedMps", ctypes.c_float),
-        ("clubDecelMps2", ctypes.c_float),
-        ("clubAccelMps2", ctypes.c_float),
-        ("clubMaxMisses", ctypes.c_uint32),
-        ("rangeSigmaBins", ctypes.c_float),
-        ("coastSigmaGrowBins", ctypes.c_float),
-        ("termCap", ctypes.c_float),
-        ("missCost", ctypes.c_float),
-        ("clubStrongerBonus", ctypes.c_float),
-        ("confirmMargin", ctypes.c_float),
-        ("maxOriginCrossMs", ctypes.c_float),
-        ("maxResidualBins", ctypes.c_float),
-        ("cal", RadarCal),
-        ("tangentBonus", ctypes.c_float),
-        ("neutralBonus", ctypes.c_float),
-        ("tangentToleranceRad", ctypes.c_float),
-    ]
-
-
-class JointKin(ctypes.Structure):
-    """``l3_joint_kin_t``: kinematic seed from pre-impact club track."""
-
-    _fields_ = [
-        ("rangeBin", ctypes.c_float),
-        ("speedMps", ctypes.c_float),
-        ("timestampUs", ctypes.c_uint32),
-    ]
-
-
-class JointClubNode(ctypes.Structure):
-    """``l3_joint_club_node_t``: one club-beam explanation (12 bytes)."""
-
-    _fields_ = [
-        ("target", ctypes.c_uint8),
-        ("parent", ctypes.c_uint8),
-        ("misses", ctypes.c_uint8),
-        ("state", ctypes.c_uint8),
-        ("score", ctypes.c_float),
-        ("speedMps", ctypes.c_float),
-    ]
-
-
-class JointBallNode(ctypes.Structure):
-    """``l3_joint_ball_node_t``: one ball-beam explanation (16 bytes)."""
-
-    _fields_ = [
-        ("target", ctypes.c_uint8),
-        ("parent", ctypes.c_uint8),
-        ("misses", ctypes.c_uint8),
-        ("state", ctypes.c_uint8),
-        ("speedKnown", ctypes.c_uint8),
-        ("hits", ctypes.c_uint8),
-        ("_pad", ctypes.c_uint8 * 2),
-        ("score", ctypes.c_float),
-        ("speedMps", ctypes.c_float),
-    ]
-
-
-class JointPoint(ctypes.Structure):
-    """``l3_joint_point_t``: one finished club point."""
-
-    _fields_ = [
-        ("rangeBin", ctypes.c_float),
-        ("speedMps", ctypes.c_float),
-        ("azimuthRad", ctypes.c_float),
-        ("elevationRad", ctypes.c_float),
-        ("timestampUs", ctypes.c_uint32),
-        ("anglesValid", ctypes.c_uint8),
-        ("_pad", ctypes.c_uint8 * 3),
-    ]
-
-
-class JointBallPoint(ctypes.Structure):
-    """``l3_joint_ball_point_t``: one finished ball point."""
-
-    _fields_ = [
-        ("rangeBin", ctypes.c_float),
-        ("speedMps", ctypes.c_float),
-        ("azimuthRad", ctypes.c_float),
-        ("elevationRad", ctypes.c_float),
-        ("timestampUs", ctypes.c_uint32),
-        ("anglesValid", ctypes.c_uint8),
-        ("_pad", ctypes.c_uint8 * 3),
-    ]
-
-
-class JointClubLink(ctypes.Structure):
-    """``l3_joint_club_link_t``: club beam for one window slot."""
-
-    _fields_ = [
-        ("nodes", JointClubNode * JOINT_CLUB_BEAM),
-        ("count", ctypes.c_uint32),
-        ("frame", ctypes.c_uint32),
-        ("timestampUs", ctypes.c_uint32),
-    ]
-
-
-class JointBallLink(ctypes.Structure):
-    """``l3_joint_ball_link_t``: ball beam for one window slot."""
-
-    _fields_ = [
-        ("nodes", JointBallNode * JOINT_BALL_BEAM),
-        ("count", ctypes.c_uint32),
-        ("frame", ctypes.c_uint32),
-        ("timestampUs", ctypes.c_uint32),
-    ]
-
-
-class JointFrameTarget(ctypes.Structure):
-    """``l3_joint_frame_target_t``: compact target copy for the window."""
-
-    _fields_ = [
-        ("rangeBin", ctypes.c_float),
-        ("dopplerAliasMps", ctypes.c_float),
-        ("snr", ctypes.c_float),
-        ("azimuthRad", ctypes.c_float),
-        ("elevationRad", ctypes.c_float),
-        ("anglesValid", ctypes.c_uint8),
-        ("_pad", ctypes.c_uint8 * 3),
-    ]
-
-
-class JointFrame(ctypes.Structure):
-    """``l3_joint_frame_t``: targets stored for one window slot."""
-
-    _fields_ = [
-        ("targets", JointFrameTarget * OBS_MAX_TARGETS),
-        ("count", ctypes.c_uint32),
-        ("timestampUs", ctypes.c_uint32),
-    ]
-
-
-class JointAngleReq(ctypes.Structure):
-    """``l3_joint_angle_req_t``."""
-
-    _fields_ = [
-        ("frameSlot", ctypes.c_uint8),
-        ("targetIdx", ctypes.c_uint8),
-        ("needed", ctypes.c_uint8),
-        ("_pad", ctypes.c_uint8),
-    ]
-
-
-class JointNow(ctypes.Structure):
-    """``l3_joint_now_t``: current best-explanation snapshot."""
-
-    _fields_ = [
-        ("clubBin", ctypes.c_float),
-        ("ballBin", ctypes.c_float),
-        ("clubPredBin", ctypes.c_float),
-        ("ballPredBin", ctypes.c_float),
-        ("bestScore", ctypes.c_float),
-        ("beamSize", ctypes.c_uint32),
-        ("ballConfirmed", ctypes.c_uint8),
-        ("_pad", ctypes.c_uint8 * 3),
-    ]
-
-
-class Joint(ctypes.Structure):
-    """``l3_joint_t``: full joint search state."""
-
-    _fields_ = [
-        ("cfg", JointCfg),
-        ("clubLinks", JointClubLink * JOINT_WINDOW),
-        ("ballLinks", JointBallLink * JOINT_WINDOW),
-        ("frames", JointFrame * JOINT_WINDOW),
-        ("winHead", ctypes.c_uint32),
-        ("winSize", ctypes.c_uint32),
-        ("clubPoints", JointPoint * JOINT_BALL_POINTS),
-        ("clubCount", ctypes.c_uint32),
-        ("ballPoints", JointBallPoint * JOINT_BALL_POINTS),
-        ("ballCount", ctypes.c_uint32),
-        ("ballConfirmed", ctypes.c_uint8),
-        ("_pad", ctypes.c_uint8 * 3),
-        ("confirmFirstBallTarget", ctypes.c_uint32 * 4),
-        ("gateTimestampUs", ctypes.c_uint32),
-        ("seed", JointKin),
-        ("seedValid", ctypes.c_uint8),
-        ("_pad2", ctypes.c_uint8 * 3),
-        ("counters", ctypes.c_uint32 * JOINT_N_COUNTERS),
+        ("anglesAccepted", ctypes.c_uint8),
+        ("angleWhy", ctypes.c_uint8),
     ]
 
 
@@ -1633,6 +1479,28 @@ class AdaptiveWindows(ctypes.Structure):
     ]
 
 
+# l3_ball_fit.h
+BALL_FIT_WHY_NAMES = ("none", "ok", "few_angles", "scatter", "grid_edge", "no_tee", "uncertain")
+
+
+class BallFit(ctypes.Structure):
+    """``l3_ball_fit_t``."""
+
+    _fields_ = [
+        ("hlaRad", ctypes.c_float),
+        ("vlaRad", ctypes.c_float),
+        ("rmsRad", ctypes.c_float),
+        ("hlaSigmaRad", ctypes.c_float),
+        ("vlaSigmaRad", ctypes.c_float),
+        ("tee", Vec3),
+        ("used", ctypes.c_uint32),
+        ("accepted", ctypes.c_uint32),
+        ("evaluations", ctypes.c_uint32),
+        ("valid", ctypes.c_uint8),
+        ("why", ctypes.c_uint8),
+    ]
+
+
 _U32 = ctypes.c_uint32
 _F32 = ctypes.c_float
 _P = ctypes.POINTER
@@ -1820,9 +1688,10 @@ _SIGNATURES: dict[str, tuple[list, object]] = {
         ctypes.c_int32,
     ),
     "l3_track_recent_rate": ([_P(ClubTrack)], _F32),
-    "l3_track_set_angles": ([_P(ClubTrack), _F32, _F32, ctypes.c_uint8], ctypes.c_int32),
+    "l3_track_set_angles": ([_P(ClubTrack), _F32, _F32, ctypes.c_uint8, _F32], ctypes.c_int32),
+    "l3_track_unfilter_all": ([_P(ClubTrack)], None),
     "l3_track_set_point_angles": (
-        [_P(ClubTrack), _U32, _F32, _F32, ctypes.c_uint8],
+        [_P(ClubTrack), _U32, _F32, _F32, ctypes.c_uint8, _F32],
         ctypes.c_int32,
     ),
     "l3_track_point": ([_P(ClubTrack), _U32, _P(TrackPoint)], ctypes.c_int32),
@@ -1915,21 +1784,12 @@ _SIGNATURES: dict[str, tuple[list, object]] = {
     # l3_launch.h
     "l3_launch_from_delivery": ([_P(Delivery), _U32, _P(Launch)], None),
     "l3_track_append_point": ([_P(ClubTrack), _P(TrackPoint)], None),
-    # l3_joint_search.h
-    "l3_joint_cfg_defaults": ([_P(JointCfg)], None),
-    "l3_joint_init": ([_P(Joint), _P(JointCfg)], None),
-    "l3_joint_reset": ([_P(Joint)], None),
-    "l3_joint_arm": ([_P(Joint), _P(JointKin), _U32], None),
-    "l3_joint_update": ([_P(Joint), _U32, _U32, _P(TargetObs), _U32], ctypes.c_int32),
-    "l3_joint_finish": ([_P(Joint)], None),
-    "l3_joint_angle_requests": ([_P(Joint), _P(JointAngleReq), _U32], _U32),
-    "l3_joint_set_angles": ([_P(Joint), _P(JointAngleReq), _U32], None),
-    "l3_joint_now": ([_P(Joint)], JointNow),
-    "l3_joint_target_use": ([_P(Joint), _U32], _U32),
-    "l3_joint_window_ball": ([_P(Joint), _P(JointBallPoint), _U32], _U32),
-    "l3_joint_ball_point": ([_P(Joint), _U32, _P(JointBallPoint)], ctypes.c_int32),
-    "l3_joint_launch": ([_P(Joint), _P(Delivery), _U32, _P(Launch)], ctypes.c_int32),
-    "l3_joint_struct_bytes": ([], _U32),
+    # l3_track_kf.h
+    "l3_track_kf_cfg_defaults": ([_P(TrackKfCfg)], None),
+    "l3_track_kf_work_bytes": ([], _U32),
+    "l3_track_kf_run": ([_P(TrackKfCfg), _P(ClubTrack), ctypes.c_void_p, _P(TrackKfResult)], _U32),
+    "l3_track_delivery_filtered": ([_P(ClubTrack), _U32, _P(Delivery)], _U32),
+    "l3_track_kf_why_name": ([ctypes.c_uint8], ctypes.c_char_p),
     # l3_ball_track.h
     "l3_ball_hyps_cfg_defaults": ([_P(BallHypsCfg)], None),
     "l3_ball_hyps_init": ([_P(BallHyps), _P(BallHypsCfg)], None),
@@ -1940,11 +1800,17 @@ _SIGNATURES: dict[str, tuple[list, object]] = {
         ctypes.c_int32,
     ),
     "l3_ball_hyps_set_angles": (
-        [_P(BallHyps), _U32, ctypes.c_float, ctypes.c_float, ctypes.c_uint8],
+        [_P(BallHyps), _U32, ctypes.c_float, ctypes.c_float, ctypes.c_uint8, ctypes.c_float],
         ctypes.c_int32,
     ),
     "l3_ball_hyps_struct_bytes": ([], _U32),
     "l3_ball_hyps_classify": ([_P(BallHyps), _P(BallHypVerdict)], None),
+    # l3_ball_fit.h
+    "l3_ball_fit_cfg_defaults": ([_P(BallFitCfg)], None),
+    "l3_ball_fit_max_evaluations": ([_P(BallFitCfg)], _U32),
+    "l3_ball_fit_direction": ([_F32, _F32, _P(Vec3)], None),
+    "l3_ball_fit_run": ([_P(BallFitCfg), _P(Vec3), _P(ClubTrack), _P(BallFit)], _U32),
+    "l3_ball_fit_why_name": ([ctypes.c_uint8], ctypes.c_char_p),
     "l3_ball_track_cfg_defaults": ([_P(BallTrackCfg)], None),
     "l3_ball_track_init": ([_P(BallTrack), _P(BallTrackCfg)], None),
     "l3_ball_track_reset": ([_P(BallTrack)], None),
@@ -1956,8 +1822,12 @@ _SIGNATURES: dict[str, tuple[list, object]] = {
         ctypes.c_int32,
     ),
     "l3_ball_track_struct_bytes": ([], _U32),
-    "l3_ball_track_set_angles": ([_P(BallTrack), _F32, _F32, ctypes.c_uint8], ctypes.c_int32),
+    "l3_ball_track_set_angles": (
+        [_P(BallTrack), _F32, _F32, ctypes.c_uint8, _F32],
+        ctypes.c_int32,
+    ),
     "l3_ball_track_launch": ([_P(BallTrack), _P(Launch)], _U32),
+    "l3_ball_track_reconstruct": ([_P(BallTrack), _P(Launch)], _U32),
     "l3_ball_track_why_name": ([ctypes.c_uint8], ctypes.c_char_p),
     "l3_ball_track_format_status": ([_P(BallTrack), *_TEXT], ctypes.c_int32),
     "l3_launch_format": ([_P(Launch), *_TEXT], ctypes.c_int32),
@@ -2214,6 +2084,8 @@ __all__ = [
     "MEAS_MEASURED",
     "MEAS_RADIAL_ONLY",
     "MEAS_VALID",
+    "FILTER_HYP_NAMES",
+    "FILTER_HYP_UNFILTERED",
     "PROFILE_STAGE_NAMES",
     "QUALITY_FLAGS",
     "AdaptiveCfg",
@@ -2265,6 +2137,7 @@ __all__ = [
     "ObsParams",
     "TargetObs",
     "TrackCfg",
+    "TrackKfCfg",
     "TrackPoint",
     "Trig",
     "TrigCfg",

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "l3_ball_fit.h"
 #include "l3_launch.h"
 #include "l3_text.h"
 
@@ -10,7 +11,6 @@ void l3_launch_from_delivery(const l3_delivery_t *fit, uint32_t impactTimestampU
     float dtS = (float)(int32_t)(impactTimestampUs - fit->timestampUs) * 1.0e-6F;
 
     memset(out, 0, sizeof(*out));
-    out->lateFrom = L3_LAUNCH_NO_LATE;
     out->points = fit->points;
     out->velocity = fit->velocity;
     out->launchPosition.x = fit->position.x + fit->velocity.x * dtS;
@@ -40,7 +40,7 @@ int32_t l3_launch_format(const l3_launch_t *launch, char *out, uint32_t cap)
     char residualText[16];
     char confidenceText[16];
     char valid[4];
-    char lateText[4];
+    char rmsText[16];
     uint32_t v = 0U;
 
     l3_text_fixed2(launch->speedMps, speedText, sizeof(speedText));
@@ -49,6 +49,7 @@ int32_t l3_launch_format(const l3_launch_t *launch, char *out, uint32_t cap)
     l3_text_degrees2(launch->vlaRad, vlaText, sizeof(vlaText));
     l3_text_fixed2(launch->residualM * 1000.0F, residualText, sizeof(residualText));
     l3_text_fixed2(launch->confidence, confidenceText, sizeof(confidenceText));
+    l3_text_degrees2(launch->angleRmsRad, rmsText, sizeof(rmsText));
     if (launch->speedValid) {
         valid[v++] = 's';
     }
@@ -59,15 +60,10 @@ int32_t l3_launch_format(const l3_launch_t *launch, char *out, uint32_t cap)
         valid[v++] = 'v';
     }
     valid[v] = '\0';
-    if (launch->lateFrom == L3_LAUNCH_NO_LATE) {
-        lateText[0] = '-';
-        lateText[1] = '\0';
-    } else {
-        (void)snprintf(lateText, sizeof(lateText), "%u", (unsigned)launch->lateFrom);
-    }
     return snprintf(out, cap,
                     "launch points=%u speed=%s radial=%s hla=%s vla=%s residualmm=%s conf=%s "
-                    "late=%s valid=%s",
+                    "angles=%u rms=%s why=%s valid=%s",
                     (unsigned)launch->points, speedText, radialText, hlaText, vlaText,
-                    residualText, confidenceText, lateText, (v > 0U) ? valid : "none");
+                    residualText, confidenceText, (unsigned)launch->anglesAccepted, rmsText,
+                    l3_ball_fit_why_name(launch->angleWhy), (v > 0U) ? valid : "none");
 }

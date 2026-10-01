@@ -50,7 +50,6 @@ class ViewerOptions:  # pylint: disable=too-many-instance-attributes
     pitch_deg: float = DEFAULT_PITCH_DEG
     tee_range_m: float = st.DEFAULT_TEE_RANGE_M
     ball_hypotheses: bool | None = None  # the ball search; None: the firmware default
-    joint_search: bool = False  # run l3_joint_search in parallel (host-only, viz)
     # The tee band's width, placed automatically; 0 turns it off.
     band_bins: float | None = st.TEE_BAND_DEFAULT_BINS
     ball_snr: float | None = st.FIRMWARE_BALL_DEFAULT_SNR  # the ball tracker's (trackCfg ballSnr)
@@ -261,7 +260,6 @@ def firmware_section(raw: bytes, meta: dict, cube: np.ndarray, options: ViewerOp
         stop_at_fire=options.stop_at_fire,
         pitch_deg=options.pitch_deg,
         ball_hypotheses=options.ball_hypotheses,
-        joint_search=options.joint_search,
         band_bins=options.band_bins,
         ball_snr=options.ball_snr,
     )
@@ -285,10 +283,6 @@ def firmware_section(raw: bytes, meta: dict, cube: np.ndarray, options: ViewerOp
         "watched_peak": watched,
         "points": _jsonable(result.points),
         "ball_points": _jsonable(result.ball_points),
-        "joint_ball_points": _jsonable(result.joint_ball_points),
-        "joint_club_points": _jsonable(result.joint_club_points),
-        "joint_confirmed": result.joint_confirmed,
-        "joint_counters": result.joint_counters,
         "fired_frame": result.fired_frame,
         "impact_timestamp_us": result.impact_timestamp_us,
         "delivery": _jsonable(result.delivery),

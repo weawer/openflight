@@ -42,6 +42,8 @@ class Ball:
         for name, value in overrides.items():
             setattr(cfg, name, value)
         self.track = fw.BallTrack()
+        # These tests' ORIGIN sits at antenna height (z = 0): anchor the tee there.
+        cfg.fit.teeBallHeightM = cfg.fit.radarHeightM
         lib.l3_ball_track_init(ctypes.byref(self.track), ctypes.byref(cfg))
 
     def arm(self, origin_bin=ORIGIN_BIN, origin=ORIGIN, impact_us=IMPACT_US):
@@ -56,12 +58,14 @@ class Ball:
             self.lib.l3_ball_track_update(ctypes.byref(self.track), arr, len(targets), frame, stamp)
         )
 
-    def set_angles(self, az, el, flags=fw.ANGLE_AZIMUTH | fw.ANGLE_ELEVATION) -> int:
-        return self.lib.l3_ball_track_set_angles(ctypes.byref(self.track), az, el, flags)
+    def set_angles(self, az, el, flags=fw.ANGLE_AZIMUTH | fw.ANGLE_ELEVATION, confidence=1.0) -> int:
+        return self.lib.l3_ball_track_set_angles(ctypes.byref(self.track), az, el, flags, confidence)
 
     def launch(self):
+        """The per-frame launch, then the once-per-shot direction fit, as the board does."""
         out = fw.Launch()
         used = self.lib.l3_ball_track_launch(ctypes.byref(self.track), ctypes.byref(out))
+        self.lib.l3_ball_track_reconstruct(ctypes.byref(self.track), ctypes.byref(out))
         return used, out
 
     @property
@@ -296,7 +300,7 @@ def test_why_names_and_formats(lib):
     assert text.startswith("launch points=6 speed=60.") or text.startswith(
         "launch points=6 speed=59."
     )
-    assert " hla=2.0" in text and " vla=12.0" in text and text.endswith(" valid=shv")
+    assert " hla=2." in text and " vla=12." in text and text.endswith(" why=ok valid=shv")
     empty = fw.Launch()
     assert fw.c_text(lib.l3_launch_format, ctypes.byref(empty)).endswith(" valid=none")
 
@@ -533,7 +537,7 @@ def test_angles_on_hypothesis_points_survive_adoption(lib):
     def angle_every_new_point(track, _frame):
         for i in range(fw.BALL_HYP_MAX):
             if track.hyps.hyp[i].lastTargetIndex != fw.BALL_HYP_NONE:
-                lib.l3_ball_hyps_set_angles(ctypes.byref(track.hyps), i, 0.02, 0.2, both)
+                lib.l3_ball_hyps_set_angles(ctypes.byref(track.hyps), i, 0.02, 0.2, both, 1.0)
 
     track = hyp_track(lib)
     run_joint(lib, track, TwoTracks(frames=4), on_frame=angle_every_new_point)
@@ -620,101 +624,75 @@ def test_fastest_credible_keeps_an_unclaimed_follow_through_off_the_ball(lib, de
 BOTH = fw.ANGLE_AZIMUTH | fw.ANGLE_ELEVATION
 
 
-def _set_point_angles(lib, ball, *, vla_deg, hla_deg, speed, flip_first):
-    """Rewrite each point's angles from the true geometry; the first ``flip_first``
-    read the floor image (elevation mirrored, azimuth thrown 40 deg), as the
-    captures near launch show."""
-    core = ball.track.core
-    cal = core.cfg.cal
-    vx = speed * math.cos(vla_deg * DEG) * math.cos(hla_deg * DEG)
-    vy = speed * math.cos(vla_deg * DEG) * math.sin(hla_deg * DEG)
-    vz = speed * math.sin(vla_deg * DEG)
-    for index in range(core.count):
-        point = fw.TrackPoint()
-        lib.l3_track_point(ctypes.byref(core), index, ctypes.byref(point))
-        s = (point.timestampUs - IMPACT_US) * 1e-6
-        golf = fw.Vec3(ORIGIN[0] + vx * s, ORIGIN[1] + vy * s, ORIGIN[2] + vz * s)
-        radar = fw.Vec3()
-        lib.l3_frames_golf_to_radar(ctypes.byref(cal), ctypes.byref(golf), ctypes.byref(radar))
-        sph = fw.Spherical()
-        lib.l3_frames_to_spherical(ctypes.byref(radar), ctypes.byref(sph))
-        az, el = sph.azimuthRad, sph.elevationRad
-        if index < flip_first:
-            az, el = az + 40.0 * DEG, -el
-        assert lib.l3_track_set_point_angles(ctypes.byref(core), index, az, el, BOTH) == 1
-
-
-def test_defaults_put_the_late_window_0p6_m_past_the_ball(lib):
-    cfg = fw.BallTrackCfg()
-    lib.l3_ball_track_cfg_defaults(ctypes.byref(cfg))
-    assert cfg.lateRangeM == pytest.approx(0.6)
-
-
-def test_launch_angles_come_from_the_late_points_when_the_early_ones_flip(lib):
-    ball, _ = fly(lib, speed=45.0, vla_deg=14.0, hla_deg=2.0, frames=14, angles=False)
-    _set_point_angles(lib, ball, vla_deg=14.0, hla_deg=2.0, speed=45.0, flip_first=4)
-    used, launch = ball.launch()
-    assert launch.vlaValid and launch.hlaValid
-    assert launch.vlaRad / DEG == pytest.approx(14.0, abs=0.5)
-    assert launch.hlaRad / DEG == pytest.approx(2.0, abs=0.5)
-    assert launch.lateFrom != fw.LAUNCH_NO_LATE
-    first = fw.TrackPoint()
-    lib.l3_track_point(ctypes.byref(ball.track.core), launch.lateFrom, ctypes.byref(first))
-    assert (first.rangeBin - ORIGIN_BIN) * BIN_M >= 0.6
-    # Control: the same points fitted over the early window only (which holds the
-    # flipped ones) do not recover the 14 deg, so the late window is what does.
-    early = fw.Delivery()
-    early_launch = fw.Launch()
-    lib.l3_track_delivery_range(ctypes.byref(ball.track.core), 0, 6, 6, ctypes.byref(early))
-    lib.l3_launch_from_delivery(ctypes.byref(early), IMPACT_US, ctypes.byref(early_launch))
-    assert not early_launch.vlaValid or abs(early_launch.vlaRad / DEG - 14.0) > 0.5
-
-
-def test_the_speed_is_still_the_early_fit(lib):
-    """Speed, points, residual and confidence do not move with the late window."""
-    ball, _ = fly(lib, speed=45.0, vla_deg=14.0, frames=14, angles=False)
-    early = fw.Launch()
-    ref = fw.Delivery()
-    lib.l3_track_delivery_range(ctypes.byref(ball.track.core), 0, 6, 6, ctypes.byref(ref))
-    lib.l3_launch_from_delivery(ctypes.byref(ref), IMPACT_US, ctypes.byref(early))
-    _, launch = ball.launch()
-    assert launch.points == early.points == 6
-    assert launch.speedMps == pytest.approx(early.speedMps)
-    assert launch.radialSpeedMps == pytest.approx(early.radialSpeedMps)
-    assert launch.confidence == pytest.approx(early.confidence)
-
-
-def test_a_short_flight_reports_speed_and_no_angles(lib):
-    """A 5-point flight at 45 m/s never has three points 0.6 m past the ball: speed only."""
-    ball, _ = fly(lib, speed=45.0, vla_deg=14.0, frames=5)
-    used, launch = ball.launch()
-    assert used > 0 and launch.speedValid
-    assert not launch.vlaValid and not launch.hlaValid
-    assert launch.lateFrom == fw.LAUNCH_NO_LATE
-
-
-def test_late_points_without_angles_give_no_angles(lib):
+def test_points_without_angles_give_no_angles(lib):
     ball, _ = fly(lib, speed=45.0, vla_deg=14.0, frames=14, angles=False)
     _, launch = ball.launch()
     assert launch.speedValid and not launch.vlaValid and not launch.hlaValid
 
 
-def test_scattered_late_angles_are_still_rejected(lib):
+def test_scattered_angles_are_still_rejected(lib):
     ball, _ = fly(lib, speed=45.0, vla_deg=14.0, frames=14, angles=False)
     core = ball.track.core
     for index in range(core.count):
         jitter = 25.0 * DEG if index % 2 else -25.0 * DEG
-        lib.l3_track_set_point_angles(ctypes.byref(core), index, jitter, jitter, BOTH)
+        lib.l3_track_set_point_angles(ctypes.byref(core), index, jitter, jitter, BOTH, 1.0)
     _, launch = ball.launch()
     assert launch.speedValid and not launch.vlaValid
 
 
-def test_the_late_window_is_measured_from_the_origin(lib):
-    """A larger lateRangeM starts the late fit further out, or not at all."""
-    near = fly(lib, speed=45.0, vla_deg=14.0, frames=14, ball=Ball(lib, lateRangeM=0.3))[0]
-    far = fly(lib, speed=45.0, vla_deg=14.0, frames=14, ball=Ball(lib, lateRangeM=3.0))[0]
-    assert near.launch()[1].lateFrom < 6
-    assert far.launch()[1].lateFrom == fw.LAUNCH_NO_LATE
+def test_the_per_frame_launch_is_speed_only(lib):
+    """l3_ball_track_launch runs every post frame: it must not fit a direction."""
+    ball, _ = fly(lib, speed=60.0, hla_deg=3.0, vla_deg=12.0)
+    out = fw.Launch()
+    assert lib.l3_ball_track_launch(ctypes.byref(ball.track), ctypes.byref(out)) == 6
+    assert out.speedValid and not out.hlaValid and not out.vlaValid
+    assert out.angleWhy == 0, "none: the direction fit has not run"
+
+
+def test_reconstruct_sets_the_direction_the_velocity_and_the_launch_position(lib):
+    ball, (vx, vy, vz) = fly(lib, speed=60.0, hla_deg=3.0, vla_deg=12.0, frames=8)
+    _, launch = ball.launch()
+    assert launch.hlaValid and launch.vlaValid
+    assert fw.BALL_FIT_WHY_NAMES[launch.angleWhy] == "ok"
+    assert launch.anglesAccepted == 8, "fly() sets every point's angles"
+    assert launch.angleRmsRad == pytest.approx(0.0, abs=0.01)
+    assert launch.hlaRad / DEG == pytest.approx(3.0, abs=0.3)
+    assert launch.vlaRad / DEG == pytest.approx(12.0, abs=0.3)
+    speed = launch.speedMps
+    assert (launch.velocity.x, launch.velocity.y, launch.velocity.z) == pytest.approx(
+        (vx / 60.0 * speed, vy / 60.0 * speed, vz / 60.0 * speed), abs=0.3
+    )
+    assert (launch.launchPosition.x, launch.launchPosition.y, launch.launchPosition.z) == pytest.approx(
+        ORIGIN, abs=1e-3
+    )
+
+
+def test_reconstruct_on_an_unconfirmed_track_leaves_everything_unfiltered(lib):
+    ball = Ball(lib)
+    ball.arm()
+    assert ball.update(8, [target(8, ORIGIN_BIN + 3.0)])
+    out = fw.Launch()
+    assert lib.l3_ball_track_reconstruct(ctypes.byref(ball.track), ctypes.byref(out)) == 0
+    assert out.angleWhy == 0 and not out.hlaValid
+    point = fw.TrackPoint()
+    lib.l3_track_point(ctypes.byref(ball.track.core), 0, ctypes.byref(point))
+    assert point.filterHypothesis == fw.FILTER_HYP_UNFILTERED
+
+
+def test_the_launch_line_reports_the_direction_fit(lib):
+    ball, _ = fly(lib, speed=60.0, hla_deg=0.0, vla_deg=12.0, frames=8)
+    _, launch = ball.launch()
+    text = fw.c_text(lib.l3_launch_format, ctypes.byref(launch))
+    assert " angles=8 rms=" in text and " why=ok valid=shv" in text
+    assert "late=" not in text
+
+
+def test_defaults_carry_the_direction_fit_constants(lib):
+    cfg = fw.BallTrackCfg()
+    lib.l3_ball_track_cfg_defaults(ctypes.byref(cfg))
+    reference = fw.BallFitCfg()
+    lib.l3_ball_fit_cfg_defaults(ctypes.byref(reference))
+    assert bytes(cfg.fit) == bytes(reference)
 
 
 # --- seeded from the ball-leave fallback ---------------------------------------
@@ -859,3 +837,37 @@ def test_the_displacing_confidence_is_the_club_trackers(lib):
     cfg = fw.BallTrackCfg()
     lib.l3_ball_track_cfg_defaults(ctypes.byref(cfg))
     assert cfg.displaceConfidence == pytest.approx(0.2)
+
+
+def test_an_adopted_hypothesis_keeps_its_points_angle_confidence(lib):
+    """Adoption re-seeds the core from the hypothesis's points; each keeps the
+    confidence its angles were measured with, or the direction fit would drop them."""
+    ball = Ball(lib, useHypotheses=1)
+    ball.arm()
+    both = fw.ANGLE_AZIMUTH | fw.ANGLE_ELEVATION
+    rng = ORIGIN_BIN + 2.0
+    for frame in range(8, 16):
+        rng += 3.0
+        arr = (fw.TargetObs * 1)(target(frame, rng, doppler=12.0))
+        lib.l3_ball_track_update_joint(ctypes.byref(ball.track), arr, 1, frame, frame * FRAME_US, 0xFFFFFFFF)
+        for i in range(fw.BALL_HYP_MAX):
+            lib.l3_ball_hyps_set_angles(ctypes.byref(ball.track.hyps), i, 0.02, 0.2, both, 0.61)
+        if ball.track.confirmed:
+            break
+    assert ball.track.confirmed, "the hypothesis search never adopted the ball"
+    point = fw.TrackPoint()
+    lib.l3_track_point(ctypes.byref(ball.track.core), 0, ctypes.byref(point))
+    assert point.anglesValid == both
+    assert point.angleConfidence == pytest.approx(0.61)
+
+
+def test_a_launch_call_after_reconstruct_resets_the_angles(lib):
+    """The contract the board relies on: l3_ball_track_launch rebuilds the whole
+    l3_launch_t, so callers must not call it again once reconstruct has run
+    (l3_dump.c guards the per-frame call with gShotResultReady)."""
+    ball, _ = fly(lib, speed=60.0, hla_deg=3.0, vla_deg=12.0, frames=8)
+    _, launch = ball.launch()
+    assert launch.hlaValid and launch.vlaValid
+    lib.l3_ball_track_launch(ctypes.byref(ball.track), ctypes.byref(launch))
+    assert not launch.hlaValid and not launch.vlaValid
+    assert launch.angleWhy == 0 and launch.anglesAccepted == 0

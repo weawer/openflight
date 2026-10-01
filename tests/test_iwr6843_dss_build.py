@@ -330,6 +330,8 @@ def test_detect_core_is_a_trackcfg_sub_mode():
     handler = _function(text, "static int32_t l3_cli_trackCfgDetectCore(")
     assert "l3_detect_core_reset_counts(&gDetectCore);" in handler
     assert "l3_timingRestart();" in handler
+    assert "detectCore dss|verify" in handler
+    assert "mss|" not in handler, "mss is not a choice"
 
 
 def test_timing_restarts_with_each_session():

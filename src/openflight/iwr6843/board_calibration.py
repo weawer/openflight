@@ -4,13 +4,17 @@ onboard angles and the host LCMF share a source (late-flight spec 2026-09-29).""
 
 from __future__ import annotations
 
+import logging
 import math
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
 import numpy as np
 
+from openflight.iwr6843 import tunables
 from openflight.iwr6843.calibration import Calibration
+
+logger = logging.getLogger(__name__)
 
 N_ELEMENTS = 8
 
@@ -27,6 +31,7 @@ class BoardCalibration:  # pylint: disable=too-many-instance-attributes
     range_bias_m: float
     elem_phase_rad: tuple[float, ...]
     elem_gain: tuple[float, ...]
+    radar_height_m: float = 0.152  # antenna height above the floor, for the ball fit
 
     def __post_init__(self) -> None:
         if len(self.elem_phase_rad) != N_ELEMENTS or len(self.elem_gain) != N_ELEMENTS:
@@ -47,13 +52,14 @@ class BoardCalibration:  # pylint: disable=too-many-instance-attributes
             pitch_deg=math.degrees(cal.tilt_rad),
             yaw_deg=0.0,
             roll_deg=0.0,
-            # Always 0: the firmware subtracts azimuthOffsetRad in both l3_angle.c and
-            # l3_frames.c, so a non-zero value would be applied twice (tracked separately).
+            # The firmware applies azimuthOffsetRad once, as a phase, in l3_angle.c; it stays 0
+            # until a board calibration measures it.
             az_offset_rad=0.0,
             el_offset_deg=0.0,
             range_bias_m=float(cal.range_bias_m),
             elem_phase_rad=tuple(float(-np.angle(c)) for c in correction),
             elem_gain=tuple(float(1.0 / abs(c)) for c in correction),
+            radar_height_m=float(cal.radar_height_m),
         )
 
     @classmethod
@@ -88,6 +94,21 @@ class BoardCalibration:  # pylint: disable=too-many-instance-attributes
             "elem_phase_rad": self.elem_phase_rad,
             "elem_gain": self.elem_gain,
         }
+
+    def tunable_overrides(self) -> dict[str, float]:
+        """Firmware tunables the calibration sets (``ReplayConfig.overrides``): the radar
+        height the ball fit measures the tee from. Skipped, with a warning, outside the
+        tunables registry's bounds."""
+        tunable = tunables.BY_NAME["ball.fit.radarHeightM"]
+        if not tunable.low <= self.radar_height_m <= tunable.high:
+            logger.warning(
+                "radar height %.3f m is outside %.2f..%.2f m; the ball fit keeps its default",
+                self.radar_height_m,
+                tunable.low,
+                tunable.high,
+            )
+            return {}
+        return {tunable.name: self.radar_height_m}
 
     def to_dict(self) -> dict:
         return asdict(self)

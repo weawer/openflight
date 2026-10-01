@@ -144,11 +144,20 @@ def test_radar_to_golf_matches_a_numpy_rotation_and_inverts_exactly(lib):
         assert vec(back) == pytest.approx(tuple(p), abs=1e-5)
 
 
-def test_observe_removes_the_range_bias_and_baseline_offsets_before_rotating(lib):
+def test_observe_removes_the_range_bias_but_not_the_angle_offsets(lib):
+    """l3_angle_estimate already removed the offsets (the azimuth one as a
+    phase); observing them again would count them twice."""
     c = cal(lib, rangeBiasM=0.066, azimuthOffsetRad=2.0 * DEG, elevationOffsetRad=-1.0 * DEG)
     golf = fw.Vec3()
-    lib.l3_frames_observe(ctypes.byref(c), 2.066, 2.0 * DEG, -1.0 * DEG, ctypes.byref(golf))
+    lib.l3_frames_observe(ctypes.byref(c), 2.066, 0.0, 0.0, ctypes.byref(golf))
     assert vec(golf) == pytest.approx((2.0, 0.0, 0.0), abs=1e-5)
+    lib.l3_frames_observe(ctypes.byref(c), 2.066, 3.0 * DEG, -2.0 * DEG, ctypes.byref(golf))
+    expected = (
+        2.0 * math.cos(-2.0 * DEG) * math.cos(3.0 * DEG),
+        2.0 * math.cos(-2.0 * DEG) * math.sin(3.0 * DEG),
+        2.0 * math.sin(-2.0 * DEG),
+    )
+    assert vec(golf) == pytest.approx(expected, abs=1e-5)
     lib.l3_frames_observe(ctypes.byref(c), 0.01, 0.0, 0.0, ctypes.byref(golf))
     assert vec(golf) == pytest.approx((0.0, 0.0, 0.0)), "a range under the bias clamps at zero"
 

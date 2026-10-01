@@ -1,15 +1,17 @@
 """Tests for the detect core, firmware/iwr6843/l3_detect_core.c.
 
-"trackCfg detectCore mss|dss|verify" chooses which core scores the
-detector's bins; l3_detect_core decides per frame and keeps the record:
+"trackCfg detectCore dss|verify" chooses how the detector's bins are
+scored; l3_detect_core decides per frame and keeps the record:
 
-- mss: as before the DSS existed
-- dss: the DSS scores; a DSS that fails a frame has the MSS score it (a
-  fallback), and three failures in a row latch the MSS until the core is
-  chosen again
+- dss (the default): the DSS scores; a DSS that fails a frame has the MSS
+  score it (a fallback), and three failures in a row latch the MSS until
+  the core is chosen again
 - verify: both score and must agree bit for bit; never latches
-- dss and verify are refused for a capture the DSS cannot read, and a frame
-  that is not one (the format changed since) goes to the MSS as ineligible
+- mss is not a choice: the MSS scores only the frames the DSS cannot take
+  (ineligible: not an IQ16 ring frame, or the link busy or down), the
+  fallbacks, and every frame once latched
+- verify is refused for a capture the DSS cannot read; dss is not, its
+  frames go to the MSS as ineligible
 """
 
 from __future__ import annotations
@@ -60,23 +62,42 @@ def formatted(lib, c: fw.DetectCore, clock_mhz: int = 600) -> str:
 # --- choosing a core ---------------------------------------------------------------
 
 
-def test_it_starts_on_the_mss(lib):
+def test_it_starts_on_the_dss(lib):
     c = core(lib)
-    assert (c.requested, c.active, c.latched, c.failLimit) == (MSS, MSS, 0, 3)
-    assert route(lib, c) == MSS
+    assert (c.requested, c.active, c.latched, c.failLimit) == (DSS, DSS, 0, 3)
+    assert route(lib, c) == DSS
+    assert (c.dssFrames, c.mssFrames) == (1, 0)
 
 
-@pytest.mark.parametrize("which", [DSS, VERIFY])
-def test_the_dss_needs_a_capture_it_can_read(lib, which):
+def test_verify_needs_a_capture_the_dss_can_read(lib):
     c = core(lib)
-    assert lib.l3_detect_core_set(ctypes.byref(c), which, 0) == -1
-    assert (c.requested, c.active) == (MSS, MSS), "a refusal changes nothing"
+    assert lib.l3_detect_core_set(ctypes.byref(c), VERIFY, 0) == -1
+    assert (c.requested, c.active) == (DSS, DSS), "a refusal changes nothing"
 
 
-def test_the_mss_is_always_allowed(lib):
+def test_dss_is_allowed_on_any_capture(lib):
+    """An IQ8 or compact capture: every frame goes to the MSS as ineligible."""
+    c = core(lib, VERIFY)
+    assert lib.l3_detect_core_set(ctypes.byref(c), DSS, 0) == 0
+    assert (c.requested, c.active) == (DSS, DSS)
+    assert route(lib, c, eligible=False) == MSS
+    assert (c.ineligible, c.mssFrames, c.dssFrames) == (1, 1, 0)
+
+
+@pytest.mark.parametrize("eligible", [0, 1])
+def test_the_mss_cannot_be_chosen(lib, eligible):
+    c = core(lib, VERIFY)
+    assert lib.l3_detect_core_set(ctypes.byref(c), MSS, eligible) == -1
+    assert (c.requested, c.active) == (VERIFY, VERIFY), "a refusal changes nothing"
+
+
+def test_the_mss_cannot_be_chosen_to_clear_a_latch(lib):
+    """Only choosing dss or verify again clears it."""
     c = core(lib, DSS)
-    assert lib.l3_detect_core_set(ctypes.byref(c), MSS, 0) == 0
-    assert c.active == MSS
+    for _ in range(3):
+        fail_dss_frame(lib, c)
+    assert lib.l3_detect_core_set(ctypes.byref(c), MSS, 1) == -1
+    assert (c.latched, c.active) == (1, MSS)
 
 
 def test_an_unknown_core_is_refused(lib):
@@ -85,7 +106,7 @@ def test_an_unknown_core_is_refused(lib):
     assert c.active == VERIFY
 
 
-@pytest.mark.parametrize("which", [MSS, DSS, VERIFY])
+@pytest.mark.parametrize("which", [DSS, VERIFY])
 def test_each_core_routes_its_frames(lib, which):
     c = core(lib, which)
     assert route(lib, c) == which
@@ -112,9 +133,12 @@ def test_ineligible_frames_never_latch(lib):
     assert (c.latched, c.active, c.ineligible) == (0, DSS, 10)
 
 
-def test_an_mss_frame_is_not_ineligible(lib):
-    c = core(lib)
-    route(lib, c, eligible=False)
+def test_a_latched_frame_is_not_ineligible(lib):
+    """Latched, every frame goes to the MSS anyway: not the frame's doing."""
+    c = core(lib, DSS)
+    for _ in range(3):
+        fail_dss_frame(lib, c)
+    assert route(lib, c, eligible=False) == MSS
     assert c.ineligible == 0 and c.mssFrames == 1
 
 
@@ -238,14 +262,19 @@ def test_reset_counts_keeps_the_choice_and_the_latch(lib):
 
 
 @pytest.mark.parametrize(("which", "name"), list(enumerate(fw.DETECT_CORE_NAMES)))
-def test_names_round_trip(lib, which, name):
+def test_every_core_has_a_name(lib, which, name):
+    """mss too: the status line prints it as the active core once latched."""
     assert lib.l3_detect_core_name(which).decode() == name
+
+
+@pytest.mark.parametrize("which", [DSS, VERIFY])
+def test_the_choices_parse(lib, which):
     out = ctypes.c_uint32(99)
-    assert lib.l3_detect_core_parse(name.encode(), ctypes.byref(out)) == 0
+    assert lib.l3_detect_core_parse(fw.DETECT_CORE_NAMES[which].encode(), ctypes.byref(out)) == 0
     assert out.value == which
 
 
-@pytest.mark.parametrize("name", [b"MSS", b"", b"dsp", b"verify "])
+@pytest.mark.parametrize("name", [b"mss", b"MSS", b"", b"dsp", b"verify "])
 def test_other_names_are_refused(lib, name):
     out = ctypes.c_uint32(99)
     assert lib.l3_detect_core_parse(name, ctypes.byref(out)) == -1

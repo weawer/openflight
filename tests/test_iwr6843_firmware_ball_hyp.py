@@ -175,13 +175,13 @@ def test_set_angles_marks_the_newest_point_this_frame_only(lib):
     feed(lib, hyps, 1, 2000, [obs(1, 2000, 47.8, 1500.0, 42.0)])
     index = next(i for i in range(fw.BALL_HYP_MAX) if hyps.hyp[i].active)
     both = fw.ANGLE_AZIMUTH | fw.ANGLE_ELEVATION
-    assert lib.l3_ball_hyps_set_angles(ctypes.byref(hyps), index, 0.1, 0.2, both) == 1
+    assert lib.l3_ball_hyps_set_angles(ctypes.byref(hyps), index, 0.1, 0.2, both, 1.0) == 1
     point = hyps.hyp[index].points[0]
     assert (point.azimuthRad, point.elevationRad) == pytest.approx((0.1, 0.2))
     assert point.anglesValid == both
     feed(lib, hyps, 2, 4000, [])  # nothing appended this frame
-    assert lib.l3_ball_hyps_set_angles(ctypes.byref(hyps), index, 0.3, 0.3, both) == 0
-    assert lib.l3_ball_hyps_set_angles(ctypes.byref(hyps), fw.BALL_HYP_MAX, 0.3, 0.3, both) == 0
+    assert lib.l3_ball_hyps_set_angles(ctypes.byref(hyps), index, 0.3, 0.3, both, 1.0) == 0
+    assert lib.l3_ball_hyps_set_angles(ctypes.byref(hyps), fw.BALL_HYP_MAX, 0.3, 0.3, both, 1.0) == 0
 
 
 def test_the_fit_reads_the_rate_and_the_range_at_a_reference_time(lib):

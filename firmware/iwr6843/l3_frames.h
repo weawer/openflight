@@ -84,8 +84,10 @@ void l3_frames_to_spherical(const l3_vec3_t *radar, l3_spherical_t *out);
 /* Radar <-> golf, the attitude part of the calibration. */
 void l3_frames_radar_to_golf(const l3_radar_cal_t *cal, const l3_vec3_t *radar, l3_vec3_t *golf);
 void l3_frames_golf_to_radar(const l3_radar_cal_t *cal, const l3_vec3_t *golf, l3_vec3_t *radar);
-/* A measured (range, azimuth, elevation) to a golf-frame position: range bias
- * and baseline offsets removed, then the attitude. */
+/* A measured point in the golf frame: the range less rangeBiasM, then the
+ * attitude rotation. The angles are l3_angle_estimate's, which has already
+ * removed the az/el offsets (the azimuth one as a phase), so they are not
+ * applied here again. */
 void l3_frames_observe(const l3_radar_cal_t *cal, float rangeM, float azimuthRad,
                        float elevationRad, l3_vec3_t *golf);
 /* Velocity-vector angles per the header conventions. */

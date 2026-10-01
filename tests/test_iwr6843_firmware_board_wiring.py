@@ -329,13 +329,8 @@ def test_hypothesis_angles_take_their_fitted_rate_for_the_tdm_branch():
     assert "hit->dopplerPhaseRad, radial, &snapshot);" in hyps
 
 
-def test_every_launch_reset_carries_the_no_late_sentinel():
-    """A zeroed lateFrom reads as the late fit from track point 0, so each
-    memset of gLaunch is followed by the sentinel."""
-    resets = [m.end() for m in re.finditer(r"memset\(&gLaunch, 0, sizeof\(gLaunch\)\);", SOURCE)]
-    assert len(resets) >= 2
-    for end in resets:
-        assert SOURCE[end:].lstrip().startswith("gLaunch.lateFrom = L3_LAUNCH_NO_LATE;")
+def test_no_launch_reset_names_the_removed_late_window():
+    assert "lateFrom" not in SOURCE and "L3_LAUNCH_NO_LATE" not in SOURCE
 
 
 def test_track_cfg_cal_and_elem_survive_trigger_cfg_and_sensor_start():
@@ -474,6 +469,39 @@ def test_after_impact_the_ball_tracker_scores_the_post_spans_against_the_frozen_
     assert band < post < merge < score < extract < whole
     # The club track's prediction, as the ball's: from its last point and rate.
     assert "gClubTrack.active && gClubTrack.count > 0U" in ball_track[band:post]
+
+
+def test_result_reconstructs_the_ball_once_before_building_the_result():
+    flat = " ".join(SOURCE.split())
+    gate = flat.index("if (gShot.state == L3_SHOT_RESULT && !gShotResultReady) {")
+    fit = flat.index("l3_ball_track_reconstruct(&gBallTrack, &gLaunch);", gate)
+    build = flat.index("l3_result_build(&gShot, &gBallTrack, &gLaunch,", gate)
+    assert gate < fit < build
+
+
+def test_the_ball_reconstruction_is_profiled():
+    assert SOURCE.count("l3_profileStage(L3_PROF_RECONSTRUCT,") == 1
+
+
+def test_the_per_frame_paths_do_not_reconstruct():
+    """The ball's reconstruction has one call site (RESULT); the board never
+    reconstructs the club and its frozen delivery is the unfiltered one."""
+    assert SOURCE.count("l3_ball_track_reconstruct(") == 1
+    assert "l3_track_kf_run(" not in SOURCE
+    assert "l3_track_delivery_filtered(" not in SOURCE
+
+
+def test_per_frame_launch_stops_once_the_result_is_ready():
+    # l3_ball_track_launch resets gLaunch, wiping the angles RESULT reconstructed.
+    ball_track = body("l3_considerBallTrack")
+    assert re.search(
+        r"if \(!gShotResultReady\) \{\s*\(void\)l3_ball_track_launch\(&gBallTrack, &gLaunch\);\s*\}",
+        ball_track,
+    )
+    assert ball_track.index("l3_ball_track_launch(") < ball_track.index(
+        "l3_ball_track_reconstruct("
+
+    )
 
 
 # --- the range window (l3_window.h, "captureCfg window") ------------------------

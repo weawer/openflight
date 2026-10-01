@@ -27,6 +27,7 @@
 #include "l3_club_track.h"
 #include "l3_ball_hyp.h"
 #include "l3_frames.h"
+#include "l3_ball_fit.h"
 #include "l3_launch.h"
 
 typedef struct {
@@ -49,10 +50,9 @@ typedef struct {
     /* Once confirmed, skip the club's claimed target while another candidate
      * is in the gate. */
     uint32_t skipClubClaim;
-    /* Launch angles are fitted only from points at least this far beyond the
-     * ball's origin (metres): near launch the floor image flips them
-     * (2026-09-29 stage comparison). The speed keeps the earliest points. */
-    float    lateRangeM;
+    /* The ball's direction: the tee-anchored fit over every held point
+     * (l3_ball_fit.h), once per shot by l3_ball_track_reconstruct. */
+    l3_ball_fit_cfg_t fit;
 #if L3_BALL_HYPOTHESES
     l3_ball_hyps_cfg_t hyps;      /* binWidthM and velocitySpanMps come from core */
 #endif
@@ -123,10 +123,19 @@ int32_t l3_ball_track_update_joint(l3_ball_track_t *track, const l3_target_obs_t
 uint32_t l3_ball_track_struct_bytes(void);
 /* Angles for the point the last update appended; see l3_track_set_angles. */
 int32_t l3_ball_track_set_angles(l3_ball_track_t *track, float azimuthRad, float elevationRad,
-                                 uint8_t anglesValid);
-/* The launch from the earliest cfg.launchPoints confirmed points (at least
- * 3). Returns the points used, 0 when too few. */
+                                 uint8_t anglesValid, float angleConfidence);
+/* The launch SPEED from the earliest cfg.launchPoints confirmed points (at
+ * least 3); cheap enough for every post frame. The direction is not fitted
+ * here (hlaValid, vlaValid 0): l3_ball_track_reconstruct does that once.
+ * Returns the points used, 0 when too few. */
 uint32_t l3_ball_track_launch(const l3_ball_track_t *track, l3_launch_t *out);
+/* Once per shot: fit the ball's direction from the tee (l3_ball_fit.h), write
+ * every held point's reconstruction, and set launch's HLA/VLA (valid only when
+ * the fit is), angle fields, launch position (the tee) and, with a valid speed,
+ * its velocity along the fitted direction. An unconfirmed track leaves every
+ * point unfiltered and the angles invalid. Returns the accepted angles, 0 when
+ * the direction is not valid. */
+uint32_t l3_ball_track_reconstruct(l3_ball_track_t *track, l3_launch_t *launch);
 const char *l3_ball_track_why_name(uint8_t why);
 /* "balltrack armed=1 confirmed=1 done=0 why=tracked count=5 origin=47.0 ..." */
 int32_t l3_ball_track_format_status(const l3_ball_track_t *track, char *out, uint32_t cap);

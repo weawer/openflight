@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **IWR6843 trajectory reconstruction.** The ball's direction is now fitted
+  on the board at RESULT from the departing track, anchored at the tee, and
+  reported with a reason; an uncertainty gate withholds HLA/VLA when the
+  per-point angle scatter leaves the direction ill-determined (with real
+  scatter of about 12 deg elevation and 27 deg azimuth most recorded ball
+  angles read "uncertain"; the published LCMF launch angle is unaffected).
+  A host-only club EKF and smoother reconstructs the club's points for the
+  dump viewer, which draws the raw angle points and the reconstruction
+  together; the club's frozen delivery stays unfiltered. A baseline of
+  scatter and angle reasons over the recordings is in
+  `docs/superpowers/specs/2026-10-01-trajectory-reconstruction-baseline.json`
+  (`scripts/analysis/evaluate_trajectory_reconstruction.py`). Needs a
+  firmware rebuild and reflash; the board image was not built on this host.
 - **Spin feasibility: the rotation-rate scan and label-tracked spin probe.**
   `scripts/analysis/spin_probe.py --labels` follows the ball along the
   dump's reviewed label file (it recedes 2-3 bins a frame, so the fixed-bin
@@ -87,6 +100,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a firmware rebuild and reflash.
 
 ### Changed
+- **IWR6843 detector bins are scored on the DSS by default; `mss` is no
+  longer a `detectCore` choice.** `trackCfg detectCore` now takes `dss`
+  (the boot default) or `verify`. The MSS still scores the frames the DSS
+  cannot take (IQ8, `compact16` and `adaptive16` captures, or the link busy
+  or down, counted as `ineligible`), a frame the DSS fails (a `fallback`),
+  and every frame once three failures in a row latch it; choosing `dss`
+  again clears the latch. `dss` is accepted on any capture; `verify` still
+  needs an IQ16 ring and the link. Needs a firmware rebuild and reflash,
+  and the board acceptance (`iwr6843_dsp_probe.py --acceptance`) before it
+  is relied on.
 - **The IWR6843 DSS boots: it keeps the platform's caches.** The DSS image
   had never run: it died in its BIOS module startups, where the Cache
   module applied this image's 32 KB L2 cache override (TI's mmw demo keeps

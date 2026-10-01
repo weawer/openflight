@@ -590,11 +590,11 @@ class IWR6843Radar:
         return parse_dsp_probe(self.cmd(line, 2.0))
 
     def detect_core(self, core: str | None = None):
-        """``trackCfg detectCore [mss|dss|verify]``: which core scores the
-        detector's bins (``dsp_link.DetectCoreStatus``). With ``core``,
-        choose it first: that clears a latch and starts the counts and the
-        detect timing over. dss and verify need an IQ16 ring and the DSS
-        link; a refusal raises ``DspLinkError``."""
+        """``trackCfg detectCore [dss|verify]``: how the detector's bins are
+        scored (``dsp_link.DetectCoreStatus``). With ``core``, choose it
+        first: that clears a latch and starts the counts and the detect
+        timing over. verify needs an IQ16 ring and the DSS link; a refusal
+        raises ``DspLinkError``."""
         from .dsp_link import (  # pylint: disable=import-outside-toplevel
             DETECT_CORES,
             parse_detect_core,

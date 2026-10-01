@@ -182,7 +182,7 @@ React UI (WebSocket) ──► Flask Server ──► RollingBufferMonitor ─�
 - `clubs/` - Built-in club types and immutable physics defaults
 - `launch_monitor.py` - Shot dataclass and carry estimation
 - `ballistics.py` - Numerical ballistic trajectory simulation (drag + Magnus RK4)
-- `iwr6843/` - TI IWR6843 mmWave radar driver, L3 raw dump parser, LCMF-v1 launch angle & club path; firmware `l3_band`/`l3_impact_fit` fit impact from the tracks either side of the tee band
+- `iwr6843/` - TI IWR6843 mmWave radar driver, L3 raw dump parser, LCMF-v1 launch angle & club path; firmware `l3_band`/`l3_impact_fit` fit impact from the tracks either side of the tee band; firmware `l3_ball_fit` (tee-anchored ball direction, run at RESULT) and `l3_track_kf` (club EKF + RTS, host/viewer only) reconstruct the 3D tracks
 - `iwr6843/firmware_host.py`, `firmware_replay.py` - host build of the pure-C firmware modules (`firmware/iwr6843/l3_*.c`) and the recorded-capture replay harness
 - `iwr6843/iq8_emulation.py`, `ab_compare.py`, `baseline.py` - firmware-exact IQ8 emulation, the IQ16-vs-IQ8 A/B and the baseline dataset extractor
 - `iwr6843/ops_compare.py`, `angle_validation.py`, `confidence_calibration.py`, `datasets.py` - OPS and reference validation statistics and confidence calibration

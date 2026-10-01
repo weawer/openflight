@@ -46,6 +46,12 @@ TUNABLES: tuple[Tunable, ...] = (
     _t("club", "maxSameBinPoints", "int", 1, 5, 1),
     _t("club", "approachMaxSameBinPoints", "int", 1, 5, 1),
     _t("club", "standingFrames", "int", 0, 6, 1),
+    # The club "kf.*" constants affect only the replay/viewer reconstruction; the board
+    # does not run the club filter.
+    _t("club", "kf.accelSigmaMps2", "float", 100.0, 5000.0, 100.0),
+    _t("club", "kf.rangeSigmaM", "float", 0.005, 0.1, 0.005),
+    _t("club", "kf.angleSigmaRad", "float", 0.02, 0.6, 0.02),
+    _t("club", "kf.chi2Gate", "float", 2.0, 20.0, 1.0),
     _t("club", "acquireMinStepBins", "float", 0.25, 2.0, 0.25),
     _t("club", "acquireMaxStepBins", "float", 0.0, 6.0, 0.5),  # 0: single-frame acquisition
     _t("club", "acquireDopplerTolMps", "float", 1.0, 9.0, 1.0),  # 9: any (half the alias span)
@@ -66,6 +72,13 @@ TUNABLES: tuple[Tunable, ...] = (
     _t("ball", "hyps.maxResidualBins", "float", 0.25, 2.5, 0.25),
     _t("ball", "hyps.dopplerToleranceMps", "float", 1.0, 6.0, 0.5),
     _t("ball", "hyps.fastSupportFraction", "float", 0.3, 0.9, 0.05),
+    _t("ball", "fit.angleSigmaRad", "float", 0.02, 0.6, 0.02),
+    _t("ball", "fit.gateK", "float", 1.0, 5.0, 0.25),
+    _t("ball", "fit.minAccepted", "int", 3, 8, 1),  # the firmware clamps to 3
+    _t("ball", "fit.maxAngleSigmaRad", "float", 0.01, 0.2, 0.01),
+    _t("ball", "fit.maxRmsRad", "float", 0.05, 0.6, 0.05),
+    _t("ball", "fit.radarHeightM", "float", 0.05, 0.6, 0.01),
+    _t("ball", "fit.teeBallHeightM", "float", 0.0, 0.6, 0.01),
     _t("fit", "fitPoints", "int", 3, 8, 1),
     _t("fit", "minPoints", "int", 2, 5, 1),
     _t("fit", "ballMinMps", "float", 5.0, 30.0, 2.5),

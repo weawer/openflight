@@ -12,7 +12,7 @@
     --text: #d6dde6; --muted: #8b97a6; --accent: #4dabf7;
     --gate: #ff6b6b; --freeze: #ffd43b; --geo: #b197fc;
     --club: #69db7c; --ball: #339af0; --target: #adb5bd;
-    --joint-ball: #f03e3e; --joint-club: #a9e34b;
+    --club-out: #a9e34b;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
@@ -100,7 +100,6 @@
       <label>band bins <input type="number" id="band_bins" step="0.5" min="0" placeholder="0 = off"></label>
       <label>ball search <select id="ball_hypotheses"><option value="">firmware default</option><option value="true">hypotheses</option><option value="false">legacy</option></select></label>
       <label class="chk"><input type="checkbox" id="stop_at_fire"> stop at fire</label>
-      <label class="chk"><input type="checkbox" id="joint_search"> joint search</label>
     </div>
     <div class="row"><button id="useFreeze" title="Treat the recorded freeze as impact so the ball tracker runs from it">post = freeze frame</button></div>
 
@@ -145,6 +144,11 @@
               <button data-v="mti" class="on">MTI surface</button>
               <button data-v="static">Static surface</button>
               <button data-v="traj">Trajectory (golf frame)</button>
+            </div>
+            <div class="tabs" id="tabsTraj" hidden>
+              <button data-t="both" class="on">Raw + fitted</button>
+              <button data-t="raw">Raw</button>
+              <button data-t="fitted">Fitted</button>
             </div>
           </div>
           <div id="p3d" class="plot" style="height:520px"></div>
@@ -194,12 +198,11 @@ const $ = (s) => document.querySelector(s);
 const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 const C = {};
 ["gate", "freeze", "geo", "club", "ball", "target", "text", "muted", "line", "panel", "bg",
-  "joint-ball", "joint-club"]
+  "club-out"]
   .forEach((k) => (C[k] = css("--" + k)));
-C.jball = C["joint-ball"]; C.jclub = C["joint-club"];
 const OPTS = ["tee_bin", "dest_bin", "snr", "ball_snr", "stat", "subbin",
   "post_from_frame", "pitch_deg", "band_bins", "stop_at_fire", "tee_range_m",
-  "ball_hypotheses", "joint_search"];
+  "ball_hypotheses"];
 // The form's defaults are ViewerOptions' (GET /api/defaults): one place for them.
 const FORM_DEFAULTS = {};
 async function loadDefaults() {
@@ -216,6 +219,7 @@ const SETTINGS_PREFIX = "openflight.dumpViewer.settings:";
 let files = [], current = null, upload = null, D = null, ctx = null, frame = 0, playing = null;
 let filesRoot = "", keepSettings = false;
 let view3d = "mti", viewMap = "mti_db";
+let trajShow = "both";  // the trajectory view: raw angle points, the reconstruction, or both
 const base = {};  // per-plot shapes without the frame cursor
 
 const PLOT_CFG = { responsive: true, displaylogo: false, modeBarButtonsToRemove: ["lasso2d", "select2d"] };
@@ -440,11 +444,10 @@ function renderChips() {
     out.push(chip(C.club, "club pts", `${F.points.length} · run ${F.longest_run} · ${fmt(F.speed_mps)} m/s`));
     if (F.delivery) out.push(chip(C.club, "delivery", `${fmt(F.delivery.speed_mps)} m/s path ${fmt(F.delivery.path_deg)}° aoa ${fmt(F.delivery.attack_deg)}°`));
     out.push(chip(C.ball, "ball pts", F.ball_points.length));
-    if (F.launch) out.push(chip(C.ball, "launch", `${fmt(F.launch.speed_mps)} m/s vla ${fmt(F.launch.vla_deg)}° hla ${fmt(F.launch.hla_deg)}°`));
-    if (F.joint_ball_points && F.joint_ball_points.length) {
-      const confirmed = F.joint_confirmed ? " ✓" : "";
-      out.push(chip(C.jball, "joint ball" + confirmed, F.joint_ball_points.length));
-      out.push(chip(C.jclub, "joint club", F.joint_club_points.length));
+    if (F.launch) {
+      const missing = F.launch.hla_deg == null || F.launch.vla_deg == null;
+      const why = missing ? ` · angles: ${F.launch.angle_why} (n=${F.launch.angles_accepted})` : "";
+      out.push(chip(C.ball, "launch", `${fmt(F.launch.speed_mps)} m/s vla ${fmt(F.launch.vla_deg)}° hla ${fmt(F.launch.hla_deg)}°${why}`));
     }
   }
   if (m.temperature_report) out.push(chip(null, "temp", `${m.temperature_report.pm_c}°C`));
@@ -484,10 +487,6 @@ function render3d() {
     });
     if (F.points.length) traces.push(pts(F.points, "club track", C.club));
     if (F.ball_points.length) traces.push(pts(F.ball_points, "ball track", C.ball));
-    if (F.joint_ball_points && F.joint_ball_points.length)
-      traces.push(pts(F.joint_ball_points, "joint ball", C.jball));
-    if (F.joint_club_points && F.joint_club_points.length)
-      traces.push(pts(F.joint_club_points, "joint club", C.jclub));
   }
   events().forEach((e) => traces.push({
     type: "scatter3d", mode: "lines", name: e.name, x: [x[0], x[x.length - 1]], y: [T(e.f), T(e.f)], z: [zmax + 2, zmax + 2],
@@ -510,20 +509,45 @@ function render3d() {
 function renderTraj(el) {
   const F = fw(); const traces = [];
   traces.push({ type: "scatter3d", mode: "markers+text", name: "radar", x: [0], y: [0], z: [0], text: ["radar"], textposition: "top center", marker: { size: 5, color: "#ffffff", symbol: "diamond" } });
-  const add = (list, name, color) => {
+  const hover = (p) => `frame ${p.frame} · ${(p.timestamp_us / 1000).toFixed(1)} ms<br>bin ${p.range_bin.toFixed(2)} · v ${p.doppler_mps.toFixed(1)} m/s`
+    + `<br>angles ${p.angles_valid ? "valid" : "boresight"} · conf ${(p.angle_confidence ?? 0).toFixed(2)}`
+    + (p.filter_hypothesis
+      ? `<br>fit ${p.filter_hypothesis}${p.filter_hypothesis !== "unfiltered" && p.filter_accepted === false ? " · angles not used" : ""}`
+      : "");
+  // Raw: each point's own angles. A rejected angle is hollow, a floor reflection a diamond.
+  const raw = (list, name, color) => {
     if (!list || !list.length) return;
+    const alone = trajShow === "raw" || !list.some((p) => p.filtered_position);
     traces.push({
-      type: "scatter3d", mode: "lines+markers", name,
+      type: "scatter3d", mode: alone ? "lines+markers" : "markers", name: alone ? name : `${name} (raw)`,
+      opacity: alone ? 1 : 0.45,
       x: list.map((p) => p.position && p.position[0]), y: list.map((p) => p.position && p.position[1]), z: list.map((p) => p.position && p.position[2]),
-      marker: { size: 4, color: list.map((p) => (p.angles_valid ? color : C.muted)) }, line: { color, width: 3 },
-      text: list.map((p) => `frame ${p.frame} · ${(p.timestamp_us / 1000).toFixed(1)} ms<br>bin ${p.range_bin.toFixed(2)} · v ${p.doppler_mps.toFixed(1)} m/s<br>angles ${p.angles_valid ? "valid" : "boresight"}`),
-      hovertemplate: `${name}<br>%{text}<br>x %{x:.3f} y %{y:.3f} z %{z:.3f} m<extra></extra>`,
+      marker: {
+        size: 4, color: list.map((p) => (p.angles_valid ? color : C.muted)),
+        symbol: list.map((p) => (p.filter_hypothesis === "image" ? "diamond"
+          : (p.filter_accepted || !p.filter_hypothesis || p.filter_hypothesis === "unfiltered") ? "circle" : "circle-open")),
+      },
+      line: { color, width: 2 },
+      text: list.map(hover), hovertemplate: `${name}<br>%{text}<br>x %{x:.3f} y %{y:.3f} z %{z:.3f} m<extra></extra>`,
     });
+  };
+  // Fitted: the reconstruction (l3_ball_fit / l3_track_kf); a point without one is skipped.
+  const fitted = (list, name, color) => {
+    const kept = (list || []).filter((p) => p.filtered_position);
+    if (!kept.length) return;
+    traces.push({
+      type: "scatter3d", mode: "lines+markers", name: `${name} (fitted)`,
+      x: kept.map((p) => p.filtered_position[0]), y: kept.map((p) => p.filtered_position[1]), z: kept.map((p) => p.filtered_position[2]),
+      marker: { size: 3, color }, line: { color, width: 6 },
+      text: kept.map(hover), hovertemplate: `${name} (fitted)<br>%{text}<br>x %{x:.3f} y %{y:.3f} z %{z:.3f} m<extra></extra>`,
+    });
+  };
+  const add = (list, name, color) => {
+    if (trajShow !== "fitted" || !(list || []).some((p) => p.filtered_position)) raw(list, name, color);
+    if (trajShow !== "raw") fitted(list, name, color);
   };
   if (F) {
     add(F.points, "club track", C.club); add(F.ball_points, "ball track", C.ball);
-    add(F.joint_ball_points, "joint ball", C.jball);
-    add(F.joint_club_points, "joint club", C.jclub);
   }
   const tee = binM(D.tee_bin);
   traces.push({ type: "scatter3d", mode: "markers+text", name: "tee (boresight)", x: [tee], y: [0], z: [0], text: ["tee"], textposition: "top center", marker: { size: 4, color: C.freeze } });
@@ -644,10 +668,6 @@ function renderMap() {
       marker: { size: 7, color }, line: { color, width: 2 }, hovertemplate: `${name} %{x:.3f} m @ %{y:.1f} ms<extra></extra>` });
     if (F.points.length) traces.push(pl(F.points, "club track", C.club));
     if (F.ball_points.length) traces.push(pl(F.ball_points, "ball track", C.ball));
-    if (F.joint_ball_points && F.joint_ball_points.length)
-      traces.push(pl(F.joint_ball_points, "joint ball", C.jball));
-    if (F.joint_club_points && F.joint_club_points.length)
-      traces.push(pl(F.joint_club_points, "joint club", C.jclub));
     const latest = {};
     F.frames.forEach((fr) => (fr.ball_hypotheses || []).forEach((h) => (latest[h.id] = h.points)));
     const hx = [], hy = [];
@@ -659,7 +679,7 @@ function renderMap() {
       line: { color: "rgba(255,146,43,.45)", width: 1, dash: "dot" }, marker: { size: 4, color: "rgba(255,146,43,.45)" }, hoverinfo: "skip" });
     if (F.band) shapes.push({ type: "rect", xref: "x", yref: "paper", x0: binM(F.band[0]), x1: binM(F.band[1]), y0: 0, y1: 1, fillcolor: "rgba(255,105,180,.10)", line: { width: 0 } });
     if (F.impact_fit) {
-      const colors = { club_in: C.club, club_out: C.jclub, ball_out: C.ball };
+      const colors = { club_in: C.club, club_out: C["club-out"], ball_out: C.ball };
       Object.entries(F.impact_fit.tracks).forEach(([name, t]) => {
         if (!t.line) return;
         traces.push({ type: "scatter", mode: "lines", name: `${name} fit`, x: t.line.map((p) => p[1]), y: t.line.map((p) => p[0] / 1000),
@@ -857,7 +877,12 @@ document.addEventListener("keydown", (e) => {
 });
 document.querySelectorAll("#tabs3d button").forEach((b) => (b.onclick = () => {
   document.querySelectorAll("#tabs3d button").forEach((x) => x.classList.toggle("on", x === b));
-  view3d = b.dataset.v; Plotly.purge($("#p3d")); render3d();
+  view3d = b.dataset.v; $("#tabsTraj").hidden = view3d !== "traj";
+  Plotly.purge($("#p3d")); render3d();
+}));
+document.querySelectorAll("#tabsTraj button").forEach((b) => (b.onclick = () => {
+  document.querySelectorAll("#tabsTraj button").forEach((x) => x.classList.toggle("on", x === b));
+  trajShow = b.dataset.t; render3d();
 }));
 document.querySelectorAll("#tabsMap button").forEach((b) => (b.onclick = () => {
   document.querySelectorAll("#tabsMap button").forEach((x) => x.classList.toggle("on", x === b));

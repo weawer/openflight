@@ -156,7 +156,7 @@ def test_the_queue_path_gives_exactly_the_immediate_estimate(lib, cal):
     flags = (fw.ANGLE_AZIMUTH if obs.azimuthValid else 0) | (
         fw.ANGLE_ELEVATION if obs.elevationValid else 0
     )
-    lib.l3_track_set_angles(ctypes.byref(immediate.track), obs.azimuthRad, obs.elevationRad, flags)
+    lib.l3_track_set_angles(ctypes.byref(immediate.track), obs.azimuthRad, obs.elevationRad, flags, obs.confidence)
     assert bytes(queued.points()[-1]) == bytes(immediate.points()[-1])
 
 
@@ -372,3 +372,20 @@ def test_the_board_builds_the_queue_and_reports_it():
     assert "l3_angle_queue.c" in (BOARD / "makefile").read_text(encoding="utf-8")
     assert "l3_angle_queue.c" in fw.HOST_SOURCES
     assert "angles queued=%u done=%u stale=%u failed=%u dropped=%u pending=%u" in _board()
+
+
+def test_a_drained_angle_carries_its_confidence_onto_the_point(lib, cal):
+    """l3_angle_queue_apply passes obs->confidence to the point."""
+    q = queue(lib)
+    tr = track_of(lib, 4)
+    newest = tr.points()[-1]
+    job = fw.AngleJob(timestampUs=newest.timestampUs, snapshot=snapshot(lib, 2))
+    obs = fw.AngleObs()
+    assert (
+        lib.l3_angle_queue_apply(
+            ctypes.byref(q), ctypes.byref(cal), ctypes.byref(job), ctypes.byref(tr.track), ctypes.byref(obs)
+        )
+        == 1
+    )
+    assert obs.confidence > 0.0
+    assert tr.points()[-1].angleConfidence == pytest.approx(obs.confidence)

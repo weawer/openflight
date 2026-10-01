@@ -49,3 +49,21 @@ def test_replay_overrides_are_replay_config_fields():
 def test_bad_elements_are_refused(gains):
     with pytest.raises(ValueError, match="element"):
         BoardCalibration(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, (0.0,) * len(gains), gains)
+
+
+def test_the_calibrated_radar_height_reaches_the_ball_fit():
+    cal = Calibration.load(REFERENCE)
+    cal.meta["radar_height_m"] = 0.21
+    board = BoardCalibration.from_calibration(cal)
+    assert board.tunable_overrides() == {"ball.fit.radarHeightM": pytest.approx(0.21)}
+    config = ReplayConfig(tee_bin=34, overrides=board.tunable_overrides())
+    assert config.overrides["ball.fit.radarHeightM"] == pytest.approx(0.21)
+
+
+def test_a_radar_height_outside_the_tunable_bounds_is_skipped_with_a_warning(caplog):
+    cal = Calibration.load(REFERENCE)
+    cal.meta["radar_height_m"] = 1.5
+    board = BoardCalibration.from_calibration(cal)
+    with caplog.at_level("WARNING"):
+        assert board.tunable_overrides() == {}
+    assert "radar height" in caplog.text

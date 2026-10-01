@@ -137,7 +137,7 @@ The self-trigger is armed and tuned over the CLI:
 ```text
 triggerCfg <globalBin> <snr> <on> [approach past stat]
 triggerLog [trace|track|shot|result|perf|timing|clear]
-trackCfg detectCore [mss|dss|verify]
+trackCfg detectCore [dss|verify]
 trackCfg cal <pitchDeg> <yawDeg> <rollDeg> <azOffsetRad> <elOffsetDeg> <rangeBiasM>
 trackCfg elem <index> <phaseRad> <gain>
 trackCfg impact <horizonS> [endM]
@@ -529,8 +529,10 @@ format miss the club.
 
 `triggerLog perf` prints per-stage counts, last, mean and maximum in
 microseconds (residual, trigger, extraction, club track, angle, impact, ball
-detector, ball tracker, and `dspwait`, the part of the residual the MSS
-spent blocked on the DSS, which the frame total does not count twice) from
+detector, ball tracker, `reconstruct`, the ball's direction fit at RESULT,
+once per shot, and `dspwait`, the part of the residual the
+MSS spent blocked on the DSS; the frame total excludes both `dspwait` and
+`reconstruct`) from
 `l3_profile.c` and the R4F cycle counter. That
 is the evidence for moving a stage to the HWA or DSP; nothing is moved until
 the numbers say which. `captureCfg adaptive 1 <approachBins> <marginBins>`
@@ -680,8 +682,8 @@ reaching the slot is discarded and counted as `stale_read` in `stats`.
 
 #### DSS bin scoring (steps 3-4)
 
-`trackCfg detectCore mss|dss|verify` chooses which core scores the
-detector's bins; the observation -> tracker -> trigger path stays on the
+`trackCfg detectCore dss|verify` chooses how the detector's bins are
+scored (`dss` from boot); the observation -> tracker -> trigger path stays on the
 MSS, unchanged. Every scan-plan read goes through `l3_scoreSpans`, one call
 a frame, so both cores are always asked for exactly the same bins:
 
@@ -698,17 +700,19 @@ a frame, so both cores are always asked for exactly the same bins:
   `l3_dsp_result_check`), then merges it (`l3_dsp_result_merge`)
 - `dss`: the detect task blocks on the reply (the CLI and notices run
   meanwhile) for at most 6 ms, two frames. A DSS that fails a frame has the
-  MSS score it (a `fallback`); three in a row latch the MSS until the core is
-  chosen again, and queue the notice `dsp detect latched to mss`
+  MSS score it (a `fallback`); three in a row latch the MSS until `dss` or
+  `verify` is chosen again, and queue the notice `dsp detect latched to mss`
 - `verify`: the request goes first, the MSS scores the same bins while the
   DSS does, then the two are compared bit for bit
   (`l3_dsp_result_compare`); the MSS's are used. A frame costs about what it
   did before, so it can stay on through real swings. Never latches
-- only an IQ16 ring frame in L3 can go to the DSS: `dss` and `verify` are
-  refused for any other capture or without the link, and a frame that is
-  not one (the format changed since) goes to the MSS as `ineligible`, as
-  does a frame that finds the link held by a CLI `dsp` command (the detect
-  task never waits for it)
+- `mss` is not a choice: the MSS scores only the frames the DSS cannot
+  take, the fallbacks, and every frame once latched. Only an IQ16 ring frame
+  in L3 can go to the DSS: `verify` is refused for any other capture or
+  without the link; `dss` is not, and a frame that is not one (IQ8,
+  `compact16`, `adaptive16`, or the format changed since) goes to the MSS as
+  `ineligible`, as does a frame that finds the link down or held by a CLI
+  `dsp` command (the detect task never waits for it)
 
 The `detect core=...` line (printed by `trackCfg detectCore`, `triggerLog
 perf` and `triggerLog timing`) has the counts, the latch, the DSS's

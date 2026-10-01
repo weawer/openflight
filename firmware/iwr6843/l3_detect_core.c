@@ -8,8 +8,8 @@
 void l3_detect_core_init(l3_detect_core_t *core)
 {
     memset(core, 0, sizeof(*core));
-    core->requested = (uint8_t)L3_DETECT_CORE_MSS;
-    core->active = (uint8_t)L3_DETECT_CORE_MSS;
+    core->requested = (uint8_t)L3_DETECT_CORE_DSS;
+    core->active = (uint8_t)L3_DETECT_CORE_DSS;
     core->failLimit = (uint8_t)L3_DETECT_CORE_FAIL_LIMIT_DEFAULT;
 }
 
@@ -29,10 +29,10 @@ void l3_detect_core_reset_counts(l3_detect_core_t *core)
 
 int32_t l3_detect_core_set(l3_detect_core_t *core, uint32_t which, uint8_t captureEligible)
 {
-    if (which >= L3_DETECT_CORE_COUNT) {
+    if (which != L3_DETECT_CORE_DSS && which != L3_DETECT_CORE_VERIFY) {
         return -1;
     }
-    if (which != L3_DETECT_CORE_MSS && captureEligible == 0U) {
+    if (which == L3_DETECT_CORE_VERIFY && captureEligible == 0U) {
         return -1;
     }
     core->requested = (uint8_t)which;
@@ -132,7 +132,8 @@ int32_t l3_detect_core_parse(const char *name, uint32_t *which)
     if (name == NULL || which == NULL) {
         return -1;
     }
-    for (index = 0U; index < L3_DETECT_CORE_COUNT; index++) {
+    /* From DSS on: mss names the active core once latched, not a choice. */
+    for (index = L3_DETECT_CORE_DSS; index < L3_DETECT_CORE_COUNT; index++) {
         if (strcmp(name, kCoreNames[index]) == 0) {
             *which = index;
             return 0;

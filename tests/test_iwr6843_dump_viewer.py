@@ -920,3 +920,59 @@ def test_switching_dumps_keeps_the_firmware_form(client):
     reset = page.split('$("#reset").onclick', 1)[1].split('$("#useFreeze")', 1)[0]
     assert "saveForm()" in reset
     assert 'OPTS.forEach((k) => $("#" + k).addEventListener("change", () => { saveForm();' in page
+
+
+def _page() -> str:
+    return (Path(__file__).parents[1] / "scripts" / "iwr6843" / "dump_viewer.html").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_the_trajectory_view_has_a_raw_fitted_both_toggle():
+    html = _page()
+    assert 'id="tabsTraj"' in html
+    for value in ("both", "raw", "fitted"):
+        assert f'data-t="{value}"' in html
+    assert 'let trajShow = "both"' in html
+
+
+def test_the_trajectory_view_draws_the_reconstruction_and_tolerates_its_absence():
+    """Review Focus 5: an older payload (no filtered_position) still draws the raw track."""
+    html = _page()
+    body = html[html.index("function renderTraj(") : html.index("// ---------- annotate")]
+    assert "filtered_position" in body
+    assert ".filter((p) => p.filtered_position)" in body, "points with no reconstruction are skipped"
+    assert "filter_hypothesis" in body and "angle_confidence" in body
+
+
+@needs_compiler
+def test_shot_points_carry_their_reconstruction_to_the_page():
+    raw = synth_shot_dump(
+        path_deg=3.0, hla_deg=2.0, vla_deg=12.0, ball_speed_ms=60.0, tee_range_m=TEE_RANGE_M
+    )
+    data = dv.analyze_dump(raw, dv.ViewerOptions(tee_bin=TEE_BIN, tee_range_m=TEE_RANGE_M))
+    json.dumps(data, allow_nan=False)
+    firmware = data["firmware"]
+    for point in firmware["points"] + firmware["ball_points"]:
+        assert {"filtered_position", "filter_accepted", "filter_hypothesis", "angle_confidence"} <= set(point)
+        assert point["filter_hypothesis"] in fw.FILTER_HYP_NAMES
+    assert "angle_why" in firmware["launch"]
+
+
+def test_the_hover_only_reports_a_fit_for_reconstructed_points():
+    html = _page()
+    body = html[html.index("function renderTraj(") : html.index("// ---------- annotate")]
+    assert "p.filter_accepted === false" in body
+    assert 'p.filter_hypothesis ?? "unfiltered"' not in body
+
+
+def test_a_track_without_a_reconstruction_is_still_drawn_raw():
+    page = _page()
+    assert 'const alone = trajShow === "raw" || !list.some((p) => p.filtered_position);' in page
+    assert 'if (trajShow !== "fitted" || !(list || []).some((p) => p.filtered_position)) raw(' in page
+
+
+def test_the_launch_chip_says_why_the_angles_are_missing():
+    page = _page()
+    assert "F.launch.angle_why" in page and "F.launch.angles_accepted" in page
+    assert "angles: " in page

@@ -140,3 +140,15 @@ def test_adaptive_format_names_every_window(lib):
     _, out = windows(lib, cfg, 46)
     text = fw.c_text(lib.l3_adaptive_format, ctypes.byref(cfg), ctypes.byref(out))
     assert text == "adaptive enabled=1 approach=24 margin=4 pre=22 impact=42 post=42 late=68"
+
+
+def test_reconstruct_is_a_stage_but_not_a_per_frame_cost(lib):
+    """It runs once per shot (the ball fit at RESULT): its mean would inflate the
+    per-frame budget the MSS reports."""
+    assert fw.PROFILE_STAGE_NAMES.index("reconstruct") == 8
+    assert fw.PROFILE_STAGE_NAMES[-1] == "dspwait"
+    p = profile(lib)
+    lib.l3_profile_add(ctypes.byref(p), STAGE["residual"], 200 * 300)
+    lib.l3_profile_add(ctypes.byref(p), STAGE["reconstruct"], 200 * 900)
+    lib.l3_profile_frame(ctypes.byref(p))
+    assert lib.l3_profile_frame_us(ctypes.byref(p)) == 300

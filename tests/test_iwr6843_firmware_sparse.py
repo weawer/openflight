@@ -640,6 +640,7 @@ def test_ball_tracker_runs_the_whole_post_window_against_the_trigger_floor():
     assert "gBallTrack.core.count > 1U" in consider, "angles once the flight has a range rate"
     assert "const l3_target_obs_t *hit = &targets[gBallTrack.lastTargetIndex];" in consider
     assert "l3_ball_track_set_angles(&gBallTrack, angle.azimuthRad," in consider
+    assert "angle.elevationRad, flags, angle.confidence);" in " ".join(consider.split())
     assert "(void)l3_ball_track_launch(&gBallTrack, &gLaunch);" in consider
     assert "in.postFrame = 1U;" in consider
     assert "in.ballTrackDone = gBallTrack.done;" in consider

@@ -92,13 +92,13 @@ def test_an_unknown_mismatch_field_is_kept_as_its_number():
 @pytest.mark.parametrize(
     "text",
     [
-        "Error: detectCore dss needs an IQ16 ring (captureFormat iq16)\n",
+        "Error: detectCore verify needs an IQ16 ring (captureFormat iq16)\n",
         "Error: detectCore verify needs the DSS link (trackCfg dsp status)\n",
-        "Error: trackCfg detectCore mss|dss|verify\n",
+        "Error: trackCfg detectCore dss|verify\n",
     ],
 )
 def test_a_refusal_is_raised_with_its_reason(text):
-    with pytest.raises(DspLinkError, match="needs|mss\\|dss"):
+    with pytest.raises(DspLinkError, match="needs|dss\\|verify"):
         parse_detect_core(text)
 
 
@@ -260,7 +260,6 @@ class _Radar(IWR6843Radar):
     ("core", "line"),
     [
         (None, "trackCfg detectCore"),
-        ("mss", "trackCfg detectCore mss"),
         ("dss", "trackCfg detectCore dss"),
         ("verify", "trackCfg detectCore verify"),
     ],
@@ -271,8 +270,9 @@ def test_the_driver_reads_or_chooses_the_core(core, line):
     assert radar.sent == [(line, 2.0)]
 
 
-@pytest.mark.parametrize("core", ["DSS", "dsp", ""])
+@pytest.mark.parametrize("core", ["DSS", "dsp", "", "mss"])
 def test_the_driver_refuses_an_unknown_core_before_sending(core):
+    """mss is not a choice: the MSS scores only the frames the DSS cannot take."""
     radar = _Radar(DETECT)
     with pytest.raises(ValueError):
         radar.detect_core(core)
@@ -280,9 +280,9 @@ def test_the_driver_refuses_an_unknown_core_before_sending(core):
 
 
 def test_the_driver_raises_the_boards_refusal():
-    radar = _Radar("Error: detectCore dss needs an IQ16 ring (captureFormat iq16)\n")
+    radar = _Radar("Error: detectCore verify needs an IQ16 ring (captureFormat iq16)\n")
     with pytest.raises(DspLinkError, match="IQ16"):
-        radar.detect_core("dss")
+        radar.detect_core("verify")
 
 
 def test_the_driver_reads_the_timing():

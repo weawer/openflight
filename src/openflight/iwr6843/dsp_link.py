@@ -6,8 +6,9 @@ the mailbox) and ``trackCfg dsp probe [bins]`` (the newest ring frame scored
 on both cores with the same code, l3_bin_score.c, timed and compared bit
 for bit).
 
-Then the live detector: ``trackCfg detectCore [mss|dss|verify]`` chooses the
-core that scores each frame's bins (firmware l3_detect_core.h) and prints
+Then the live detector: ``trackCfg detectCore [dss|verify]`` chooses how
+each frame's bins are scored (firmware l3_detect_core.h; the MSS scores
+only the frames the DSS cannot take, and every frame once latched) and prints
 the ``detect core=...`` line; ``triggerLog perf`` and ``triggerLog timing``
 print it with the detect timing (l3_timing.h), which keeps latency and
 throughput apart.
@@ -73,7 +74,9 @@ _TIMELINE = re.compile(
     r"flags=(?P<flags>[a-z|]+|-)\s*$",
     re.MULTILINE,
 )
-DETECT_CORES = ("mss", "dss", "verify")
+# What ``trackCfg detectCore`` accepts. mss is not one: the status line
+# still prints it as the active core once latched (``_CORES``).
+DETECT_CORES = ("dss", "verify")
 # l3_dsp_ipc.h L3_DSP_FIELD_*: which field of a bin two cores disagreed on.
 MISMATCH_FIELDS = ("energy", "peak", "loop0", "r1Re", "r1Im", "set")
 

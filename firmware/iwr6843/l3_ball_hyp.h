@@ -42,6 +42,7 @@ typedef struct {
     float    azimuthRad;
     float    elevationRad;
     uint8_t  anglesValid;         /* L3_OBS_ANGLE_* bits */
+    float    angleConfidence;     /* l3_angle_estimate's confidence for these angles */
 } l3_ball_hyp_point_t;
 
 typedef struct {
@@ -125,7 +126,8 @@ int32_t l3_ball_hyp_fit(const l3_ball_hyp_t *hyp, uint32_t referenceUs, float *r
 /* Angles for the point hypothesis `index` appended this frame. Returns 0 when
  * it appended nothing this frame or the index is out of range. */
 int32_t l3_ball_hyps_set_angles(l3_ball_hyps_t *hyps, uint32_t index, float azimuthRad,
-                                float elevationRad, uint8_t anglesValid);
+                                float elevationRad, uint8_t anglesValid,
+                                float angleConfidence);
 /* The ball among the hypotheses holding at least classifyPoints points:
  * fitted over them from the gate time, it must move outward at
  * minDepartureMps..maxSpeedMps, cross the origin within impactToleranceUs of

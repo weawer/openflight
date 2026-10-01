@@ -90,7 +90,8 @@ static int32_t l3_angle_queue_record(l3_angle_queue_t *queue, const l3_angle_job
     if (obs->elevationValid) {
         flags |= L3_OBS_ANGLE_ELEVATION;
     }
-    (void)l3_track_set_point_angles(track, index, obs->azimuthRad, obs->elevationRad, flags);
+    (void)l3_track_set_point_angles(track, index, obs->azimuthRad, obs->elevationRad, flags,
+                                    obs->confidence);
     queue->done++;
     return 1;
 }

@@ -148,6 +148,8 @@ static void l3_ball_hyps_append(l3_ball_hyp_t *hyp, const l3_target_obs_t *targe
     memset(point, 0, sizeof(*point));
     point->frame = frame;
     point->timestampUs = timestampUs;
+    point->anglesValid = 0U;
+    point->angleConfidence = 0.0F;
     point->rangeBin = target->rangeBin;
     point->dopplerAliasMps = target->dopplerAliasMps;
     point->stat = target->stat;
@@ -314,7 +316,8 @@ uint32_t l3_ball_hyps_update(l3_ball_hyps_t *hyps, const l3_target_obs_t *target
 }
 
 int32_t l3_ball_hyps_set_angles(l3_ball_hyps_t *hyps, uint32_t index, float azimuthRad,
-                                float elevationRad, uint8_t anglesValid)
+                                float elevationRad, uint8_t anglesValid,
+                                float angleConfidence)
 {
     l3_ball_hyp_t *hyp;
     l3_ball_hyp_point_t *point;
@@ -330,6 +333,7 @@ int32_t l3_ball_hyps_set_angles(l3_ball_hyps_t *hyps, uint32_t index, float azim
     point->azimuthRad = azimuthRad;
     point->elevationRad = elevationRad;
     point->anglesValid = anglesValid;
+    point->angleConfidence = angleConfidence;
     return 1;
 }
 

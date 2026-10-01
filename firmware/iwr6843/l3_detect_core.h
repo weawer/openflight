@@ -1,24 +1,25 @@
 /* IWR6843 detect core: which core scores a frame's bins.
  *
- * "trackCfg detectCore mss|dss|verify" (l3_dump.c) asks for a core; this
+ * "trackCfg detectCore dss|verify" (l3_dump.c) asks for a core; this
  * decides per frame where its bins are scored and keeps the record of how
  * that went. The observation -> tracker -> trigger path stays on the MSS
  * whatever is chosen: only l3_dsp_spans_score's work moves.
  *
- *   mss     the MSS scores, as before the DSS existed
- *   dss     the DSS scores (SCORE, l3_dsp_ipc.h) while the MSS detect task
- *           waits, blocked, so the CLI and the notices run
+ *   dss     (the default) the DSS scores (SCORE, l3_dsp_ipc.h) while the
+ *           MSS detect task waits, blocked, so the CLI and the notices run
  *   verify  both score the same frame at once and must agree bit for bit;
  *           the MSS's observations drive the detector. The live A/B check.
  *
+ * mss is not a choice: it is where a frame goes that the DSS cannot take.
  * Only an IQ16 ring frame can go to the DSS (the shared scorer reads int16,
- * and the compact formats' detect frames live in MSS scratch): dss and
- * verify are refused for any other capture, and a frame that is not one
- * after all (the format changed since) is scored on the MSS and counted as
- * ineligible. A DSS that fails a frame (no answer in time, a refused or stale
- * result) has the MSS score it instead, counted as a fallback; failLimit
- * failures in a row latch the MSS until the core is chosen again. Verify
- * never latches: a failure there costs nothing, the MSS already scored.
+ * and the compact formats' detect frames live in MSS scratch): any other
+ * frame, or one that finds the link busy or down, is scored on the MSS and
+ * counted as ineligible. verify is refused for a capture the DSS cannot
+ * read; dss is not, its frames are all ineligible then. A DSS that fails a
+ * frame (no answer in time, a refused or stale result) has the MSS score it
+ * instead, counted as a fallback; failLimit failures in a row latch the MSS
+ * until dss or verify is chosen again. Verify never latches: a failure
+ * there costs nothing, the MSS already scored.
  * Pure C, no hardware.
  */
 #ifndef L3_DETECT_CORE_H
@@ -62,13 +63,13 @@ typedef struct {
     uint32_t dssScoreCyclesMax;
 } l3_detect_core_t;
 
-/* mss, no latch, failLimit L3_DETECT_CORE_FAIL_LIMIT_DEFAULT, no counts. */
+/* dss, no latch, failLimit L3_DETECT_CORE_FAIL_LIMIT_DEFAULT, no counts. */
 void l3_detect_core_init(l3_detect_core_t *core);
 /* Zero the counts and the first mismatch; keep the choice and any latch. */
 void l3_detect_core_reset_counts(l3_detect_core_t *core);
-/* Choose a core. 0, or -1 (nothing changes) for an unknown core, or for dss
- * or verify when the capture cannot feed the DSS (captureEligible 0).
- * Choosing clears a latch and the failure streak. */
+/* Choose dss or verify. 0, or -1 (nothing changes) for mss or an unknown
+ * core, or for verify when the capture cannot feed the DSS (captureEligible
+ * 0). Choosing clears a latch and the failure streak. */
 int32_t l3_detect_core_set(l3_detect_core_t *core, uint32_t which, uint8_t captureEligible);
 /* The core this frame's bins go to, counted. frameEligible 0 sends a dss or
  * verify frame to the MSS as ineligible. */
@@ -86,7 +87,7 @@ void l3_detect_core_note_mismatch(l3_detect_core_t *core, uint32_t slot, uint32_
 
 /* "mss", "dss", "verify"; NULL for anything else. */
 const char *l3_detect_core_name(uint32_t which);
-/* 0 with *which set, or -1 for a name that is none of them. */
+/* 0 with *which set, or -1 for a name that is not "dss" or "verify". */
 int32_t l3_detect_core_parse(const char *name, uint32_t *which);
 /* "detect core=dss active=mss latched=1 mss=N dss=N verify=N ineligible=N
  *  failures=N fallbacks=N streak=N latches=N mismatches=N

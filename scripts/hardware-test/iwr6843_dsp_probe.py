@@ -149,10 +149,7 @@ def run_acceptance(radar: IWR6843Radar, args: argparse.Namespace) -> bool:
         checks = [check for check in checks if not check.name.startswith("verify")]
     for check in checks:
         print(f"  {'pass' if check.passed else 'FAIL'} {check.name}: {check.detail}")
-    if not args.dss_only:
-        # Not with --dss-only: an armed MSS detector on such a profile starves
-        # the CLI before sensorStop gets through.
-        radar.detect_core("mss")
+    radar.detect_core("dss")  # the default: clears a latch from the run
     return all(check.passed for check in checks)
 
 

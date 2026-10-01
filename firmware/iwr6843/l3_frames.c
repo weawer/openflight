@@ -102,8 +102,8 @@ void l3_frames_observe(const l3_radar_cal_t *cal, float rangeM, float azimuthRad
     if (spherical.rangeM < 0.0F) {
         spherical.rangeM = 0.0F;
     }
-    spherical.azimuthRad = azimuthRad - cal->azimuthOffsetRad;
-    spherical.elevationRad = elevationRad - cal->elevationOffsetRad;
+    spherical.azimuthRad = azimuthRad;
+    spherical.elevationRad = elevationRad;
     l3_frames_from_spherical(&spherical, &radar);
     l3_frames_radar_to_golf(cal, &radar, golf);
 }

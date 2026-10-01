@@ -293,7 +293,7 @@ def straight_line_track(
         assert tr.update(frame, [tgt]) is True
         assert (
             lib.l3_track_set_angles(
-                ctypes.byref(tr.track), sph.azimuthRad, sph.elevationRad, angles
+                ctypes.byref(tr.track), sph.azimuthRad, sph.elevationRad, angles, 1.0
             )
             == 1
         )
@@ -318,12 +318,12 @@ def test_points_carry_golf_frame_positions_from_range_and_angles(lib):
 
 def test_set_angles_targets_the_point_the_last_update_appended(lib):
     tr = Tracker(lib)
-    assert lib.l3_track_set_angles(ctypes.byref(tr.track), 0.1, 0.2, 3) == 0, "nothing yet"
+    assert lib.l3_track_set_angles(ctypes.byref(tr.track), 0.1, 0.2, 3, 1.0) == 0, "nothing yet"
     tr.update(1, [target(1, 20.0)])
     assert tr.track.lastTargetIndex == 0
     tr.update(2, [target(2, 30.0, confidence=0.3), target(2, 22.0)])
     assert tr.track.lastTargetIndex == 1, "the associated target, not the first"
-    assert lib.l3_track_set_angles(ctypes.byref(tr.track), 0.1, -0.2, ANGLE_ELEVATION) == 1
+    assert lib.l3_track_set_angles(ctypes.byref(tr.track), 0.1, -0.2, ANGLE_ELEVATION, 1.0) == 1
     newest = tr.points()[-1]
     assert newest.anglesValid == ANGLE_ELEVATION
     assert newest.elevationRad == pytest.approx(-0.2)
@@ -332,7 +332,7 @@ def test_set_angles_targets_the_point_the_last_update_appended(lib):
     assert newest.position.z == pytest.approx(22.0 * BIN_M * math.sin(-0.2), abs=1e-4)
     assert tr.update(3, []) is False
     assert tr.track.lastTargetIndex == TRACK_NO_TARGET
-    assert lib.l3_track_set_angles(ctypes.byref(tr.track), 0.0, 0.0, 3) == 0
+    assert lib.l3_track_set_angles(ctypes.byref(tr.track), 0.0, 0.0, 3, 1.0) == 0
 
 
 def test_a_range_only_point_sits_on_boresight_with_the_range_bias_removed(lib):
@@ -424,7 +424,7 @@ def test_measured_angles_never_mix_with_assumed_boresight(lib):
         tr.update(frame, [target(frame, bin_)])
         if frame <= 5:
             lib.l3_track_set_angles(
-                ctypes.byref(tr.track), 6.0 * DEG, 0.0, ANGLE_AZIMUTH | ANGLE_ELEVATION
+                ctypes.byref(tr.track), 6.0 * DEG, 0.0, ANGLE_AZIMUTH | ANGLE_ELEVATION, 1.0
             )
     used, out = delivery(lib, tr)
     assert used == 5 and out.points == 5 and out.azimuthPoints == 5
@@ -445,7 +445,9 @@ def test_too_few_angled_points_give_a_radial_only_delivery_never_a_mix(lib):
         tr.update(frame, [target(frame, 20.0 + 2.0 * frame)])
         if frame in wild:
             az, el = wild[frame]
-            lib.l3_track_set_angles(ctypes.byref(tr.track), az, el, ANGLE_AZIMUTH | ANGLE_ELEVATION)
+            lib.l3_track_set_angles(
+                ctypes.byref(tr.track), az, el, ANGLE_AZIMUTH | ANGLE_ELEVATION, 1.0
+            )
     used, out = delivery(lib, tr)
     walk_mps = 2.0 * BIN_M / (FRAME_US * 1e-6)
     assert used == 6
@@ -544,7 +546,9 @@ def test_angles_that_do_not_fit_a_line_are_dropped_in_favour_of_the_radial_speed
         [(50.0, 0.0), (52.6, 0.4), (55.2, -0.4), (57.8, 0.5), (60.4, -0.5), (63.0, 0.3)], start=1
     ):
         tr.update(frame, [target(frame, b)])
-        lib.l3_track_set_angles(ctypes.byref(tr.track), az, 0.0, ANGLE_AZIMUTH | ANGLE_ELEVATION)
+        lib.l3_track_set_angles(
+            ctypes.byref(tr.track), az, 0.0, ANGLE_AZIMUTH | ANGLE_ELEVATION, 1.0
+        )
     used, out = delivery(lib, tr)
     assert used == 6 and out.speedValid
     assert not out.pathValid and not out.attackValid
@@ -556,14 +560,18 @@ def test_angles_that_do_not_fit_a_line_are_dropped_in_favour_of_the_radial_speed
     tr = Tracker(lib)
     for frame, b in enumerate([50.0, 52.6, 55.2, 57.8, 60.4, 63.0], start=1):
         tr.update(frame, [target(frame, b)])
-        lib.l3_track_set_angles(ctypes.byref(tr.track), 0.05, 0.2, ANGLE_AZIMUTH | ANGLE_ELEVATION)
+        lib.l3_track_set_angles(
+            ctypes.byref(tr.track), 0.05, 0.2, ANGLE_AZIMUTH | ANGLE_ELEVATION, 1.0
+        )
     _, steady = delivery(lib, tr)
     assert steady.pathValid and steady.attackValid
     # The guard can be disabled.
     tr = Tracker(lib, maxAngleResidualM=0.0)
     for frame, (b, az) in enumerate([(50.0, 0.0), (52.6, 0.4), (55.2, -0.4), (57.8, 0.5)], start=1):
         tr.update(frame, [target(frame, b)])
-        lib.l3_track_set_angles(ctypes.byref(tr.track), az, 0.0, ANGLE_AZIMUTH | ANGLE_ELEVATION)
+        lib.l3_track_set_angles(
+            ctypes.byref(tr.track), az, 0.0, ANGLE_AZIMUTH | ANGLE_ELEVATION, 1.0
+        )
     _, raw = delivery(lib, tr)
     assert raw.pathValid
 
@@ -1098,6 +1106,46 @@ def test_a_track_on_a_standing_return_gets_no_such_pass(lib):
     stand = target(4, 34.0, doppler=3.0)  # a step onto a neighbouring bin of the standing return
     tr.update(4, [stand])
     assert tr.points()[-1].rangeBin != pytest.approx(34.0)
+
+
+BOTH_ANGLES = fw.ANGLE_AZIMUTH | fw.ANGLE_ELEVATION
+
+
+def test_set_point_angles_stores_the_angle_confidence_and_unfilters(lib):
+    tr = Tracker(lib)
+    for frame, rng in ((1, 30.0), (2, 31.0), (3, 32.0)):
+        assert tr.update(frame, [target(frame, rng)])
+    assert (
+        lib.l3_track_set_point_angles(ctypes.byref(tr.track), 1, 0.1, 0.2, BOTH_ANGLES, 0.37) == 1
+    )
+    point = tr.points()[1]
+    assert point.angleConfidence == pytest.approx(0.37)
+    assert point.filterHypothesis == fw.FILTER_HYP_UNFILTERED and point.filterAccepted == 0
+    assert (point.filteredPosition.x, point.filteredPosition.y, point.filteredPosition.z) == (
+        point.position.x,
+        point.position.y,
+        point.position.z,
+    )
+
+
+def test_an_appended_point_starts_unfiltered_with_no_angle_confidence(lib):
+    tr = Tracker(lib)
+    assert tr.update(1, [target(1, 30.0)])
+    point = tr.points()[0]
+    assert point.angleConfidence == 0.0
+    assert point.filterHypothesis == fw.FILTER_HYP_UNFILTERED
+
+
+def test_track_cfg_defaults_fill_the_reconstruction_constants(lib):
+    cfg = fw.TrackCfg()
+    lib.l3_track_cfg_defaults(ctypes.byref(cfg))
+    assert cfg.kf.accelSigmaMps2 == pytest.approx(1500.0)
+    assert cfg.kf.rangeSigmaM == pytest.approx(0.03)
+    assert cfg.kf.angleSigmaRad == pytest.approx(math.radians(15.0))
+    assert cfg.kf.minAngleConfidence == pytest.approx(0.05)
+    assert cfg.kf.chi2Gate == pytest.approx(9.21)
+    assert cfg.kf.initPositionSigmaM == pytest.approx(0.5)
+    assert cfg.kf.initVelocitySigmaMps == pytest.approx(50.0)
 
 
 # --- candidate approaches (acquisition past the golfer) -----------------------
