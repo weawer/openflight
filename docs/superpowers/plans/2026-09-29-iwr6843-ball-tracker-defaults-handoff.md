@@ -1,104 +1,108 @@
-# Handoff: IWR6843 ball tracker defaults and 3 ms frame overrun (2026-09-29)
+# Handoff: IWR6843 ball tracker tuning on Cormac's pipeline (updated 2026-10-01)
 
-Branch `test_build` (Cormac's `feat/iwr-calcs` at `bb06293e`, plus fixes).
-It supersedes `feat/iwr-2ms-pipeline` and `feat/iwr-2ms-trigger-merge`.
-2 ms is parked: get 3 ms working on the rig first.
+## Branch
 
-## State
+`test_build_v2` is Cormac's `feat/iwr-calcs` at `ca8c7512`, plus one
+commit: the TrackMan data and this handoff.
 
-| Commit | What |
+It replaces `test_build`, which stays as the record of the earlier work.
+Most of `test_build` is now covered on his branch:
+
+| Our `test_build` work | Status on his branch |
 |---|---|
-| `f16ae54d` | `l3_cli_dump` waits for the frozen ring (`l3_awaitFrozenRing`). Cormac's branch doesn't need this because his host reads captures with `l3track`/`l3sparse`. We compiled those out to save DATA_RAM, so we read captures with `l3dump`, which is what exposed the bug. |
-| `506bab66` | Task priorities: CLI 3 < detect 4 < HWA rearm 5 < control 6 |
-| `8d216dd0`, `e9bdb9a7` | `swing_trigger.py` saves the triggered capture and `triggerLog perf` before it fails a health check |
-| `d0ad53fc` | Ball tracker defaults: hypotheses on, `fastBallMps` 26.5, `minDepartureMps` 20 (in both `l3_ball_track.c` and `l3_ball_hyp.c`) |
+| `l3dump` freeze fix | He has `l3_awaitFrozenRing` |
+| Detect task above the CLI | He has the same ordering: CLI 3 < detect 4 < HWA rearm 5 < control 6 |
+| `swing_trigger` health diagnostics | Superseded. His acceptance run (`scripts/hardware-test/iwr6843_dsp_probe.py`) prints the detect timing, budget, `over_budget` and margins per phase |
+| DATA_RAM trim, Hann window | Superseded by his rewrite |
+| TrackMan ball defaults (`d0ad53fc`) | **Not ported.** See below |
 
-The latest image is `firmware/releases/l3_dump_hann_dumpfix_detectprio_balltuned_3ms_20260929.bin`
-(SHA-256 `a96ecdf5…90f5`, 23,814 B DATA_RAM free). It builds and the host
-tests pass. **It has not been run on the rig.**
+He has also moved detect bin scoring to the DSS, with an L2 gather
+(`1237bb39`, `8ce808b3`). And he made the detect frame cheaper (`6024a48b`):
+- the ball detector runs every 8th frame;
+- the club angle moved to a queued task, off the decision path.
 
-## The open problem: the detect task overruns the 3 ms frame
+## Ball tracker defaults: not ported, needs Cormac
 
-- On the detectprio image, the rig fails its health check with
-  `scratch_stale=15` while armed.
-- `triggerLog perf` shows:
-  - `residual` about 1237 µs per frame (16 trigger bins);
-  - `balltrack` about 4174 µs mean, 4234 µs max (53 post-window bins).
-- Raising detect priority did not fix it (stale went from 3 to 15). The cause
-  is too much work per frame, not starvation.
-- The new defaults add the hypothesis search, so expect the overrun to grow.
-  The balltuned image exists to measure that.
+The TrackMan replay still favours the hypothesis search on his tracker.
+These are the 3 ms wide captures, run with the true ball origin
+(`dest_bin`):
 
-**Next rig step:**
+| Variant | Follows ball (of 124) | Within 5 mph | Drivers (of 18) |
+|---|---|---|---|
+| his defaults | 68 | 42 | 2 |
+| hypotheses only | 95 | 65 | 14 |
+| hyp + fastBall 26.5 | 119 | 84 | 17 |
+| hyp + fastBall 26.5 + minDep 20 | 119 | 84 | 17 |
 
-1. Flash the balltuned image.
-2. Run `swing_trigger.py --tee-m 1.845 --config config/iwr6843_l3dump_adaptive_47f3ms_53bin_a16.cfg --capture-dir …`
-   and take a few real swings.
-3. Record the `balltrack` mean/max from the saved `triggerLog perf`, and
-   compare it with 4174/4234 µs.
-4. Check that each readback is a full-size `.l3dump` with a ball speed.
+But his labelled kiosk replay regresses with the search on:
 
-## Why these ball settings (TrackMan evidence)
+- **Test:** `test_iwr6843_labelled_replay.py::test_the_labelled_swings_report_their_launch_at_the_kiosk_settings`.
+- **Result:** at least 25 good launches are required. With the search on,
+  14 of 34 are good and 20 report no launch at all. Hypotheses alone give
+  15 of 34, so the search is the cause. `minDepartureMps` 20 alone passes.
+- **Likely cause:** the hypothesis path bypasses his newer single-track
+  logic:
+  - the ball-leave fallback, which seeds the tracker from the fallback's
+    two points after a late fire;
+  - confident-departure displacement;
+  - the late-launch-angle window.
 
-- **Data:** John Pacino's August sessions. They are untracked, at
-  `openflight_sessions/openflight_trackman_sessions/`, with aligned CSVs in
-  `sessions/<date>/comparisons/`.
-- **Method:** replay through `firmware_replay` with the true ball origin
-  (`dest_bin`, median bin 39). The configured tee (bin 34) was wrong on
-  these sessions, so using it gives a −76 mph median error.
+  Those swings are self-triggered and fire late, unlike the sound-triggered
+  TrackMan captures.
 
-| Variant | 3 ms: follows ball (of 124) | 3 ms: within 5 mph | Drivers (of 18) | 2 ms held-out: follows ball (of 36) |
-|---|---|---|---|---|
-| old defaults | 68 | 42 | 2 | 31 |
-| hypotheses only | 115 | 87 | 15 | 26 (regressed) |
-| **all three settings** | **121** | **92** | 16 | **34** |
+**Question for Cormac:** should the hypothesis search take the leave
+fallback's seed and his displacement rules? Or should the TrackMan wins
+come into the single-track path some other way (e.g. a fast-ball floor)?
 
-- Median |error| on ball-following shots is 3.2 mph.
-- `minDepartureMps` alone does nothing. Hypotheses without the 26.5 m/s
-  fast-ball floor regress at 2 ms. So the three settings go together.
+Enabling the search also changes reporting. `ball_points` start where the
+winning line is committed, 3–4 frames past the tee, and that lowers label
+coverage even when the launch is right.
 
-**Reporting change:** with the search on, `ball_points` start once the
-winning line is committed, 3–4 frames past the tee. The launch still fits
-the earlier points. The manifest `ball_origin_bin` ranges moved to match,
-and the speed ranges were unchanged.
+## Before turning the search on, its tests fail on his tip
 
-## Ball reach (context for any search window)
+49 IWR tests already fail on `ca8c7512`, before any of our changes:
 
-| Range | 2.0 m | 2.5 m | 3.0 m | 3.5 m | 4.0 m | 4.5 m |
-|---|---|---|---|---|---|---|
-| Median SNR on the true ball line | 20 dB | 10 dB | 7 dB | 6 dB | 4.6 dB | 2.5 dB |
-| Frames above the 4.8 dB cut | 100% | 92% | 86% | 69% | 41% | 2% |
+| Failing on his tip | Count |
+|---|---|
+| `test_iwr6843_labelled_replay.py::test_firmware_tracks_match_the_labels` | 33 |
+| `test_iwr6843_firmware_angle_table.py::test_the_scan_answers_as_it_did_before_the_table` | 11 |
+| `test_iwr6843_firmware_replay.py::test_with_the_band_on_every_recording_has_the_club_after_impact` | 2 |
+| `test_iwr6843_labelled_replay.py`: two kiosk self-trigger tests | 2 |
+| `test_iwr6843_memory_layout.py::test_tracked_reference_map_agrees_with_the_live_map` | 1 |
 
-Tracks end where the SNR falls below the tracker's 4.8 dB cut. Only 4 of
-124 shots reported a vertical launch angle.
+The memory-layout failure may only be a stale local build map. Confirm
+these with Cormac before reading anything into new failures.
 
-## The bin search window is not ready
+## Next rig step
 
-Scoring only a window around the expected ball position cuts the scored
-bins per frame from 53 to about 16. That is the obvious fix for the overrun,
-but it loses accuracy:
+1. Build his tip unchanged.
+2. Run his acceptance run (`iwr6843_dsp_probe.py`) on the 3 ms profile.
+3. Read `over_budget` and the margins with detect on the MSS and on the DSS.
 
-| | Full window | Search window |
-|---|---|---|
-| Follows ball (of 124) | 121 | 100 |
-| Within 5 mph | 92 | 58 |
+That gives the first real detect budget on his pipeline. It also settles
+the 2 ms question. Cormac says detect would need to run in under 0.3 ms,
+which is the ~0.38 ms idle gap of the 2 ms profile. The double-buffered
+scratch suggests the budget is closer to one frame. The measured margin
+shows which is right.
 
-The cause is unknown. Suspects:
+## Evidence kept from the earlier work
 
-- the seeking cone;
-- the interplay between the club claim and the hypotheses.
+- **Ball signal strength on the true ball line, 3 ms TrackMan captures:**
 
-**Trap:** the noise floor must come from the whole window, or from every 4th
-bin. A median over the narrow window is dominated by the impact echo, and
-tracking collapses to 1 of 124 shots.
+  | Range | 2.0 m | 2.5 m | 3.0 m | 3.5 m | 4.0 m | 4.5 m |
+  |---|---|---|---|---|---|---|
+  | Median SNR | 20 dB | 10 dB | 7 dB | 6 dB | 4.6 dB | 2.5 dB |
 
-**Next offline step:** replay full and windowed side by side and find the
-first frame where the tracks diverge. The prototype is
-`tm_ball_window.py`, a scratch script that is not in the repo.
-
-## For Cormac (he asked to be told before we change his tracker's per-frame cost)
-
-- The new defaults above, and the TrackMan table.
-- The overrun: about 4.2 ms of `balltrack` in a 3 ms frame.
-- The window-floor trap.
-- The `l3dump` freeze bug, which is latent on his branch.
+- **The configured tee was wrong on the August sessions.** It was set at bin
+  34, but the true ball origin is a median of bin 39. Replays need
+  `dest_bin`.
+- **A bin search window was not ready.**
+  - It scores ~16 bins per frame instead of 53.
+  - But it loses accuracy: 121 → 100 shots follow the ball, and 92 → 58 are
+    within 5 mph.
+  - Trap: take the noise floor from the full window or from every 4th bin,
+    never from the narrow window. The impact echo dominates a narrow-window
+    median.
+- The comparison scripts live outside the repo (`tm_ball_variants*.py`,
+  `tm_ball_window.py`, `tm_ball_line*.py`). On his branch, `tee_global_bin`
+  no longer takes `range_bias_m`.
