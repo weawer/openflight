@@ -947,6 +947,7 @@ class TestIWR6843ShotIntegration:
                 self.port = "/dev/ttyUSB0"
 
             def start(self, *, armed=True, onboard_track_config=None):
+                self.detect_core = None  # what IWR6843CaptureMonitor.start resolves
                 self.self_trigger = None
                 self.onboard_tracking = False
 
@@ -992,6 +993,7 @@ class TestIWR6843ShotIntegration:
                 self.slice_planner = "unset"
 
             def start(self, *, armed=True, onboard_track_config=None):
+                self.detect_core = None  # what IWR6843CaptureMonitor.start resolves
                 self.self_trigger = None
                 self.onboard_tracking = False
                 self.onboard_track_config = onboard_track_config
