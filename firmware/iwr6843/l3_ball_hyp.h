@@ -17,6 +17,7 @@
 
 #include <stdint.h>
 
+#include "l3_ball_anchor.h"
 #include "l3_observation.h"
 
 /* Build switch. The search is off at run time (l3_ball_track_cfg_defaults)
@@ -39,6 +40,7 @@ typedef struct {
     float    dopplerAliasMps;
     float    stat;
     float    clubStat;            /* the club's claimed return that frame, 0 without one */
+    float    coherence;           /* the target's lag-1 coherence */
     float    azimuthRad;
     float    elevationRad;
     uint8_t  anglesValid;         /* L3_OBS_ANGLE_* bits */
@@ -57,16 +59,18 @@ typedef struct {
 typedef struct {
     float    binWidthM;           /* l3_ball_track_init copies these two from its core */
     float    velocitySpanMps;
-    float    spawnBehindBins;     /* a hypothesis starts from origin - this ... */
-    float    spawnBeyondBins;     /* ... to origin + this, + maxSpeedMps x the time
-                                   * since the gate (a late gate finds the ball out) */
-    float    gateBins;            /* association half-width at zero elapsed time ... */
+    float    spawnBehindM;        /* a hypothesis starts from origin - this ... */
+    float    spawnBeyondM;        /* ... to origin + this, + maxSpeedMps x the time
+                                   * since the gate (a late gate finds the ball out);
+                                   * used only with corridorGate off */
+    float    gateM;               /* association half-width at zero elapsed time ... */
     float    gateMps;             /* ... growing by this speed uncertainty over the gap */
-    uint32_t maxMisses;           /* coasted frames before a hypothesis is dropped */
+    uint32_t coastUs;             /* longest a hypothesis goes without a point ... */
+    uint32_t impactCoastUs;       /* ... unless its newest point is short of the tee + */
+    float    impactRegionM;       /* this: the ball is hidden near impact for longer */
     uint32_t classifyPoints;      /* points before a hypothesis may be the ball */
     float    minDepartureMps;
     float    maxSpeedMps;
-    uint32_t impactToleranceUs;   /* the fit must reach the origin this close to the gate time */
     float    maxResidualBins;     /* RMS about the fitted line */
     float    dopplerToleranceMps; /* a point agrees when its Doppler is this close to the rate */
     /* Fastest credible, the Pi detector's rule (tracking.find_ball_from_power):
@@ -78,10 +82,29 @@ typedef struct {
      * that fast. 0 turns the rule off. */
     float    fastBallMps;
     float    fastSupportFraction;
-    /* Far window: targets short of origin + farWindowBins are the club's, the
+    /* Far window: targets short of origin + farWindowM (metres) are the club's, the
      * impact echo's or the golfer's and never become hypothesis points, so the
      * ball is taken only once it is clear of the merged bins. 0 turns it off. */
-    float    farWindowBins;
+    float    farWindowM;
+    /* G1: a target must be explainable by an impact within the anchor's
+     * tolerance and a speed in [minDepartureMps, maxSpeedMps], within
+     * anchorRangeTolM. 0: the start band [accept - spawnBehind, accept +
+     * spawnBeyond + maxSpeedMps x elapsed] as before. */
+    uint32_t corridorGate;
+    float    anchorRangeTolM;
+    /* G4: a hypothesis whose newer half is slower than its older half by
+     * more than maxDecelMps2 x the time between them + 2 sigma (each half's
+     * slope uncertainty from rangeNoiseM) is two objects. 0 disables. */
+    float    maxDecelMps2;
+    float    rangeNoiseM;
+    /* A3 score weights: back-projection, implied-velocity consistency, fit
+     * residual, Doppler agreement, lag-1 coherence, weaker than the club. */
+    float    wBack;
+    float    wVel;
+    float    wResid;
+    float    wDoppler;
+    float    wCoherence;
+    float    wWeaker;
 } l3_ball_hyps_cfg_t;
 
 typedef struct {
@@ -95,13 +118,24 @@ typedef struct {
     float    score;
     uint32_t waitingForFast;      /* 1 when a slow winner is held back for a fast
                                    * hypothesis still gathering points (index -1) */
+    float    velocityConsistency; /* 0..1: the points' implied launch speeds agree */
+    float    coherence;           /* mean lag-1 coherence of its points */
+    uint8_t  anchorSource;        /* L3_BALL_ANCHOR_* the search back-projected to */
+    uint32_t recovered;           /* points the backward pass added at adoption */
+    uint32_t recoveredFirstFrame;
+    uint32_t recoveredMask;       /* bit k: frame recoveredFirstFrame + k was recovered */
 } l3_ball_hyp_verdict_t;
 
 typedef struct {
     l3_ball_hyps_cfg_t cfg;
     uint8_t  armed;
-    float    originBin;
-    uint32_t impactTimestampUs;   /* the gate time the tracker was armed at */
+    l3_ball_anchor_t anchor;      /* where and when the ball was struck; acceptFromBin is the old origin */
+    /* cfg's metric settings in bins, from binWidthM at init */
+    float    spawnBehindBins;
+    float    spawnBeyondBins;
+    float    gateBins;
+    float    farWindowBins;
+    float    impactRegionBins;
     uint32_t nextId;
     uint32_t spawned;
     uint32_t dropped;             /* coasted out or evicted */
@@ -110,8 +144,8 @@ typedef struct {
 
 void l3_ball_hyps_cfg_defaults(l3_ball_hyps_cfg_t *cfg);
 void l3_ball_hyps_init(l3_ball_hyps_t *hyps, const l3_ball_hyps_cfg_t *cfg);
-/* Forget every hypothesis and start looking from originBin at the gate time. */
-void l3_ball_hyps_arm(l3_ball_hyps_t *hyps, float originBin, uint32_t impactTimestampUs);
+/* Forget every hypothesis and start looking from anchor->acceptFromBin, back-projecting to the anchor. */
+void l3_ball_hyps_arm(l3_ball_hyps_t *hyps, const l3_ball_anchor_t *anchor);
 /* One post-impact frame's targets (strongest first) and the index of the one
  * the club track claimed (L3_TRACK_NO_TARGET, or anything >= n, for none).
  * Returns the hypotheses active afterwards. */
@@ -123,6 +157,9 @@ uint32_t l3_ball_hyps_update(l3_ball_hyps_t *hyps, const l3_target_obs_t *target
  * no spread in time. */
 int32_t l3_ball_hyp_fit(const l3_ball_hyp_t *hyp, uint32_t referenceUs, float *rateBinsPerS,
                         float *binAtReference, float *residualBins);
+/* l3_ball_hyp_fit over any time-ordered point array. */
+int32_t l3_ball_points_fit(const l3_ball_hyp_point_t *points, uint32_t count, uint32_t referenceUs,
+                           float *rateBinsPerS, float *binAtReference, float *residualBins);
 /* Angles for the point hypothesis `index` appended this frame. Returns 0 when
  * it appended nothing this frame or the index is out of range. */
 int32_t l3_ball_hyps_set_angles(l3_ball_hyps_t *hyps, uint32_t index, float azimuthRad,
@@ -130,7 +167,7 @@ int32_t l3_ball_hyps_set_angles(l3_ball_hyps_t *hyps, uint32_t index, float azim
                                 float angleConfidence);
 /* The ball among the hypotheses holding at least classifyPoints points:
  * fitted over them from the gate time, it must move outward at
- * minDepartureMps..maxSpeedMps, cross the origin within impactToleranceUs of
+ * minDepartureMps..maxSpeedMps, cross the origin within the anchor tolerance of
  * the gate time and fit within maxResidualBins. The best score wins:
  * (1 - residual / maxResidualBins) + the fraction of points whose Doppler
  * agrees with the rate + half the fraction of club frames where it was the

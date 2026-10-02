@@ -37,8 +37,10 @@ HOST_SOURCES = (
     "l3_club_track.c",
     "l3_track_kf.c",
     "l3_impact_fit.c",
+    "l3_ball_anchor.c",
     "l3_launch.c",
     "l3_ball_hyp.c",
+    "l3_ball_recover.c",
     "l3_impact.c",
     "l3_leave.c",
     "l3_scan.c",
@@ -253,6 +255,10 @@ TRACK_WHY_NAMES = ("none", "acquired", "associated", "coasted", "dropped", "idle
 BALL_HYP_MAX = 4
 BALL_HYP_POINTS = 8
 BALL_HYP_NONE = 0xFFFFFFFF
+
+# l3_ball_recover.h
+BALL_HISTORY_FRAMES = 24
+BALL_HISTORY_TARGETS = 6
 
 
 class BinObs(ctypes.Structure):
@@ -1101,6 +1107,23 @@ class Shot(ctypes.Structure):
     ]
 
 
+BALL_ANCHOR_SOURCE_NAMES = ("gate", "club")
+
+
+class BallAnchor(ctypes.Structure):
+    """``l3_ball_anchor_t``: where and when the ball was struck."""
+
+    _fields_ = [
+        ("anchorBin", ctypes.c_float),
+        ("acceptFromBin", ctypes.c_float),
+        ("gateUs", ctypes.c_uint32),
+        ("anchorUs", ctypes.c_uint32),
+        ("anchorTolUs", ctypes.c_uint32),
+        ("anchorSigmaUs", ctypes.c_float),
+        ("source", ctypes.c_uint8),
+    ]
+
+
 class BallHypPoint(ctypes.Structure):
     """``l3_ball_hyp_point_t``."""
 
@@ -1111,6 +1134,7 @@ class BallHypPoint(ctypes.Structure):
         ("dopplerAliasMps", ctypes.c_float),
         ("stat", ctypes.c_float),
         ("clubStat", ctypes.c_float),
+        ("coherence", ctypes.c_float),
         ("azimuthRad", ctypes.c_float),
         ("elevationRad", ctypes.c_float),
         ("anglesValid", ctypes.c_uint8),
@@ -1131,26 +1155,95 @@ class BallHyp(ctypes.Structure):
     ]
 
 
+class BallHistoryTarget(ctypes.Structure):
+    """``l3_ball_history_target_t``."""
+
+    _fields_ = [
+        ("rangeBin", ctypes.c_float),
+        ("dopplerAliasMps", ctypes.c_float),
+        ("stat", ctypes.c_float),
+        ("coherence", ctypes.c_float),
+    ]
+
+
+class BallHistoryFrame(ctypes.Structure):
+    """``l3_ball_history_frame_t``."""
+
+    _fields_ = [
+        ("frame", ctypes.c_uint32),
+        ("timestampUs", ctypes.c_uint32),
+        ("count", ctypes.c_uint8),
+        ("clubMask", ctypes.c_uint8),
+        ("targets", BallHistoryTarget * BALL_HISTORY_TARGETS),
+    ]
+
+
+class BallHistory(ctypes.Structure):
+    """``l3_ball_history_t``: the post-impact target ring."""
+
+    _fields_ = [
+        ("next", ctypes.c_uint32),
+        ("count", ctypes.c_uint32),
+        ("frames", BallHistoryFrame * BALL_HISTORY_FRAMES),
+    ]
+
+
+class BallRecoverCfg(ctypes.Structure):
+    """``l3_ball_recover_cfg_t``."""
+
+    _fields_ = [
+        ("binWidthM", ctypes.c_float),
+        ("velocitySpanMps", ctypes.c_float),
+        ("gateM", ctypes.c_float),
+        ("tieBins", ctypes.c_float),
+        ("maxResidualBins", ctypes.c_float),
+        ("dopplerToleranceMps", ctypes.c_float),
+    ]
+
+
+class BallRecoverResult(ctypes.Structure):
+    """``l3_ball_recover_result_t``."""
+
+    _fields_ = [
+        ("count", ctypes.c_uint32),
+        ("recovered", ctypes.c_uint32),
+        ("firstFrame", ctypes.c_uint32),
+        ("mask", ctypes.c_uint32),
+        ("residualBins", ctypes.c_float),
+    ]
+
+
 class BallHypsCfg(ctypes.Structure):
     """``l3_ball_hyps_cfg_t``."""
 
     _fields_ = [
         ("binWidthM", ctypes.c_float),
         ("velocitySpanMps", ctypes.c_float),
-        ("spawnBehindBins", ctypes.c_float),
-        ("spawnBeyondBins", ctypes.c_float),
-        ("gateBins", ctypes.c_float),
+        ("spawnBehindM", ctypes.c_float),
+        ("spawnBeyondM", ctypes.c_float),
+        ("gateM", ctypes.c_float),
         ("gateMps", ctypes.c_float),
-        ("maxMisses", ctypes.c_uint32),
+        ("coastUs", ctypes.c_uint32),
+        ("impactCoastUs", ctypes.c_uint32),
+        ("impactRegionM", ctypes.c_float),
         ("classifyPoints", ctypes.c_uint32),
         ("minDepartureMps", ctypes.c_float),
         ("maxSpeedMps", ctypes.c_float),
-        ("impactToleranceUs", ctypes.c_uint32),
         ("maxResidualBins", ctypes.c_float),
         ("dopplerToleranceMps", ctypes.c_float),
         ("fastBallMps", ctypes.c_float),
         ("fastSupportFraction", ctypes.c_float),
-        ("farWindowBins", ctypes.c_float),
+        ("farWindowM", ctypes.c_float),
+        ("corridorGate", ctypes.c_uint32),
+        ("anchorRangeTolM", ctypes.c_float),
+        ("maxDecelMps2", ctypes.c_float),
+        ("rangeNoiseM", ctypes.c_float),
+        ("wBack", ctypes.c_float),
+        ("wVel", ctypes.c_float),
+        ("wResid", ctypes.c_float),
+        ("wDoppler", ctypes.c_float),
+        ("wCoherence", ctypes.c_float),
+        ("wWeaker", ctypes.c_float),
     ]
 
 
@@ -1167,6 +1260,12 @@ class BallHypVerdict(ctypes.Structure):
         ("weakerFraction", ctypes.c_float),
         ("score", ctypes.c_float),
         ("waitingForFast", ctypes.c_uint32),
+        ("velocityConsistency", ctypes.c_float),
+        ("coherence", ctypes.c_float),
+        ("anchorSource", ctypes.c_uint8),
+        ("recovered", ctypes.c_uint32),
+        ("recoveredFirstFrame", ctypes.c_uint32),
+        ("recoveredMask", ctypes.c_uint32),
     ]
 
 
@@ -1176,8 +1275,12 @@ class BallHyps(ctypes.Structure):
     _fields_ = [
         ("cfg", BallHypsCfg),
         ("armed", ctypes.c_uint8),
-        ("originBin", ctypes.c_float),
-        ("impactTimestampUs", ctypes.c_uint32),
+        ("anchor", BallAnchor),
+        ("spawnBehindBins", ctypes.c_float),
+        ("spawnBeyondBins", ctypes.c_float),
+        ("gateBins", ctypes.c_float),
+        ("farWindowBins", ctypes.c_float),
+        ("impactRegionBins", ctypes.c_float),
         ("nextId", ctypes.c_uint32),
         ("spawned", ctypes.c_uint32),
         ("dropped", ctypes.c_uint32),
@@ -1221,8 +1324,13 @@ class BallTrackCfg(ctypes.Structure):
         ("snr", ctypes.c_float),
         ("useHypotheses", ctypes.c_uint32),
         ("skipClubClaim", ctypes.c_uint32),
+        ("gateTolUs", ctypes.c_uint32),
+        ("anchorMaxSigmaUs", ctypes.c_float),
         ("fit", BallFitCfg),
         ("hyps", BallHypsCfg),
+        ("recover", ctypes.c_uint32),
+        ("historySnr", ctypes.c_float),
+        ("rec", BallRecoverCfg),
     ]
 
 
@@ -1239,10 +1347,12 @@ class BallTrack(ctypes.Structure):
         ("impactTimestampUs", ctypes.c_uint32),
         ("originBin", ctypes.c_float),
         ("origin", Vec3),
+        ("anchor", BallAnchor),
         ("lastTargetIndex", ctypes.c_uint32),
         ("counters", ctypes.c_uint32 * len(BALL_TRACK_WHY_NAMES)),
         ("hyps", BallHyps),
         ("verdict", BallHypVerdict),
+        ("history", BallHistory),
     ]
 
 
@@ -1747,6 +1857,12 @@ _SIGNATURES: dict[str, tuple[list, object]] = {
     "l3_impact_format": ([_P(Impact), *_TEXT], ctypes.c_int32),
     # l3_impact_fit.h
     "l3_impact_fit_cfg_defaults": ([_P(ImpactFitCfg)], None),
+    "l3_ball_anchor_make": (
+        [_F32, _F32, _U32, _U32, _P(ImpactFitCfg), _P(ClubTrack), _F32, _P(BallAnchor)],
+        None,
+    ),
+    "l3_ball_anchor_source_name": ([ctypes.c_uint8], ctypes.c_char_p),
+    "l3_ball_anchor_struct_bytes": ([], _U32),
     "l3_impact_fit_reset": ([_P(ImpactFit)], None),
     "l3_fit_list_point": ([ctypes.c_void_p, _U32, _P(TrackPoint)], ctypes.c_int32),
     "l3_fit_span_point": ([ctypes.c_void_p, _U32, _P(TrackPoint)], ctypes.c_int32),
@@ -1793,10 +1909,21 @@ _SIGNATURES: dict[str, tuple[list, object]] = {
     # l3_ball_track.h
     "l3_ball_hyps_cfg_defaults": ([_P(BallHypsCfg)], None),
     "l3_ball_hyps_init": ([_P(BallHyps), _P(BallHypsCfg)], None),
-    "l3_ball_hyps_arm": ([_P(BallHyps), ctypes.c_float, _U32], None),
+    "l3_ball_hyps_arm": ([_P(BallHyps), _P(BallAnchor)], None),
     "l3_ball_hyps_update": ([_P(BallHyps), _P(TargetObs), _U32, _U32, _U32, _U32], _U32),
     "l3_ball_hyp_fit": (
         [_P(BallHyp), _U32, _P(ctypes.c_float), _P(ctypes.c_float), _P(ctypes.c_float)],
+        ctypes.c_int32,
+    ),
+    "l3_ball_points_fit": (
+        [
+            _P(BallHypPoint),
+            _U32,
+            _U32,
+            _P(ctypes.c_float),
+            _P(ctypes.c_float),
+            _P(ctypes.c_float),
+        ],
         ctypes.c_int32,
     ),
     "l3_ball_hyps_set_angles": (
@@ -1805,6 +1932,25 @@ _SIGNATURES: dict[str, tuple[list, object]] = {
     ),
     "l3_ball_hyps_struct_bytes": ([], _U32),
     "l3_ball_hyps_classify": ([_P(BallHyps), _P(BallHypVerdict)], None),
+    # l3_ball_recover.h
+    "l3_ball_recover_cfg_defaults": ([_P(BallRecoverCfg)], None),
+    "l3_ball_history_reset": ([_P(BallHistory)], None),
+    "l3_ball_history_push": ([_P(BallHistory), _P(TargetObs), _U32, _U32, _U32, _U32], None),
+    "l3_ball_history_mark_club": ([_P(BallHistory), _U32, _U32], None),
+    "l3_ball_history_at": ([_P(BallHistory), _U32], _P(BallHistoryFrame)),
+    "l3_ball_recover": (
+        [
+            _P(BallRecoverCfg),
+            _P(BallHistory),
+            _P(BallHyp),
+            ctypes.c_float,
+            _P(BallHypPoint),
+            _U32,
+            _P(BallRecoverResult),
+        ],
+        _U32,
+    ),
+    "l3_ball_history_struct_bytes": ([], _U32),
     # l3_ball_fit.h
     "l3_ball_fit_cfg_defaults": ([_P(BallFitCfg)], None),
     "l3_ball_fit_max_evaluations": ([_P(BallFitCfg)], _U32),
@@ -1814,13 +1960,27 @@ _SIGNATURES: dict[str, tuple[list, object]] = {
     "l3_ball_track_cfg_defaults": ([_P(BallTrackCfg)], None),
     "l3_ball_track_init": ([_P(BallTrack), _P(BallTrackCfg)], None),
     "l3_ball_track_reset": ([_P(BallTrack)], None),
-    "l3_ball_track_arm": ([_P(BallTrack), _F32, _P(Vec3), _U32], None),
+    "l3_ball_track_arm": ([_P(BallTrack), _P(BallAnchor), _P(Vec3)], None),
+    "l3_ball_track_anchor": (
+        [
+            _P(BallTrack),
+            _F32,
+            _F32,
+            _U32,
+            _P(ImpactFitCfg),
+            _P(ClubTrack),
+            _P(BallAnchor),
+        ],
+        None,
+    ),
     "l3_ball_track_seed": ([_P(BallTrack), _P(TargetObs), _P(TargetObs)], ctypes.c_int32),
     "l3_ball_track_update": ([_P(BallTrack), _P(TargetObs), _U32, _U32, _U32], ctypes.c_int32),
     "l3_ball_track_update_joint": (
         [_P(BallTrack), _P(TargetObs), _U32, _U32, _U32, _U32],
         ctypes.c_int32,
     ),
+    "l3_ball_track_note_club": ([_P(BallTrack), _U32, _U32], None),
+    "l3_ball_track_extract_snr": ([_P(BallTrackCfg), _F32], _F32),
     "l3_ball_track_struct_bytes": ([], _U32),
     "l3_ball_track_set_angles": (
         [_P(BallTrack), _F32, _F32, ctypes.c_uint8, _F32],
@@ -2025,12 +2185,19 @@ __all__ = [
     "TRACK_WHY_NAMES",
     "BALL_HYP_MAX",
     "BALL_HYP_NONE",
+    "BALL_HISTORY_FRAMES",
+    "BALL_HISTORY_TARGETS",
     "BALL_HYP_POINTS",
+    "BallHistory",
+    "BallHistoryFrame",
+    "BallHistoryTarget",
     "BallHyp",
     "BallHypPoint",
     "BallHypVerdict",
     "BallHyps",
     "BallHypsCfg",
+    "BallRecoverCfg",
+    "BallRecoverResult",
     "TRIG_MAX_BINS",
     "TRIG_TRACE_DEPTH",
     "ANGLE_GRID_STEPS",

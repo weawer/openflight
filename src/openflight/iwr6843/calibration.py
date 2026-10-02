@@ -31,10 +31,14 @@ DEFAULT_PITCH_DEG = 10.0
 # ARRAY_DEPTH_M (or call antenna_range_m) before converting to a range bin.
 DEFAULT_TEE_RANGE_M = 1.575
 
-# Enclosure face to the antenna array. A tape measured from the face reads this
-# much less than the radar's range, which is measured from the array: about 6.4
-# range bins (2026-08-24: tee 1.524 m from the face, ball at bins 39-41).
-ARRAY_DEPTH_M = 0.30
+# Closest tee the kiosk accepts, tape from the enclosure front. Nearer than
+# this the self-trigger's watch region starts under a metre from the radar,
+# where the golfer's hands and body stand (and a desk test fires it).
+MIN_TEE_RANGE_M = 1.4
+
+# Enclosure face to the antenna array, 30 mm. A tape measured from the face
+# reads this much less than the radar's range, which is measured from the array.
+ARRAY_DEPTH_M = 0.030
 
 
 def antenna_range_m(face_range_m: float) -> float:

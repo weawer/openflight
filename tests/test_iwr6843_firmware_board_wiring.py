@@ -203,7 +203,9 @@ def test_post_impact_targets_are_band_filtered():
 
 def test_ball_tracker_is_armed_at_the_band_edge():
     assert "return gBand.valid ? gBand.hiBin : (float)teeBin;" in body("l3_ballArmBin")
-    assert "l3_ball_track_arm(&gBallTrack, l3_ballArmBin(teeBin)," in body("l3_shotObserve")
+    assert "l3_ball_track_anchor(&gBallTrack, (float)teeBin, l3_ballArmBin(teeBin)," in body(
+        "l3_shotObserve"
+    )
 
 
 def test_impact_fit_runs_before_the_result_is_built():
@@ -309,6 +311,9 @@ def test_ball_snr_is_a_track_cfg_sub_mode():
 def test_ball_extraction_uses_the_configured_ball_snr_else_the_default():
     ball_track = body("l3_considerBallTrack")
     assert "params.snr = (gBallSnr > 0.0F) ? gBallSnr : gBallTrackCfg.snr;" in ball_track
+    # ... lowered to the history's snr with recovery on (the replay's same call).
+    lowered = "params.snr = l3_ball_track_extract_snr(&gBallTrack.cfg, params.snr);"
+    assert ball_track.index(lowered) > ball_track.index("params.snr = (gBallSnr")
 
 
 def test_ball_angles_take_the_ball_tracks_rate_for_the_tdm_branch():
@@ -446,7 +451,7 @@ def test_behind_the_detect_task_sheds_the_ball_detector_and_the_map_chunk():
 
 def test_impact_freezes_the_post_floor_from_the_fallbacks_median():
     observe = body("l3_shotObserve")
-    arm = observe.index("l3_ball_track_arm(&gBallTrack,")
+    arm = observe.index("l3_ball_track_arm(&gBallTrack, &anchor,")
     freeze = observe.index("gBallFloor = (gLeaveFloor > 0.0F) ? gLeaveFloor : gTrig.floor;", arm)
     assert "if (gBand.valid) {" in observe[arm:freeze]
 
@@ -543,3 +548,18 @@ def test_the_dump_says_which_window_it_was_recorded_with():
     assert dump.index("clutter.rangeWindow = gRangeWindow;") < dump.index(
         "UART_writePolling(gDataUart, (uint8_t *)&clutter, sizeof(clutter));"
     )
+
+
+def test_the_clubs_claim_reaches_the_ball_history_after_the_club_follow():
+    """The ball is updated before the club is followed, so its own call can
+    only pass L3_TRACK_NO_TARGET: the club's claimed target is noted on the
+    ball's history right after the follow (l3_ball_track_note_club), with the
+    same frame number and the club's lastTargetIndex, as the replay does."""
+    ball_track = body("l3_considerBallTrack")
+    ball = ball_track.index("l3_ball_track_update_joint(&gBallTrack")
+    club = ball_track.index("l3_track_follow(&gClubTrack")
+    note = ball_track.index("l3_ball_track_note_club(&gBallTrack, frameIndex,")
+    assert ball < club < note
+    assert "gClubTrack.lastTargetIndex" in ball_track[note : note + 120]
+    between = ball_track[club:note]
+    assert "l3_ball_track_update_joint" not in between and between.count(";") == 1

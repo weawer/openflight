@@ -341,14 +341,26 @@ packets from older firmware, but older Pi code refuses version 2, so
 **update the Pi before flashing this firmware.** An `inconsistent` impact fit
 sets the `impact_uncertain` quality bit.
 
-The host reads that packet on every self-triggered capture, before the
-readback (`l3track`/`l3sparse` rearm the ring, which resets the result). It
-rides on the capture as `onboard_result`, on the shot as `iwr6843_onboard`
-(the session JSONL keeps it), and the kiosk shows it under the Live tiles
-with each metric's provenance and confidence. By default the host pipeline
-still owns the published numbers; `--iwr6843-onboard-metrics` copies the
-firmware's usable launch angles, club path and attack angle onto the shot
-(sources `radar_onboard` / `onboard`). OPS ball speed is never replaced.
+The host reads that packet on every capture, self-triggered or sound-triggered,
+before any readback (`l3track`/`l3sparse` rearm the ring, which resets the
+result). It rides on the capture as `onboard_result`, on the shot as
+`iwr6843_onboard` (the session JSONL keeps it), and the kiosk shows it under
+the Live tiles with each metric's provenance and confidence. The packet is
+the shot's only IWR source:
+
+- **Launch angles.** Its vertical and horizontal launch go on the shot with
+  source `radar`, unless the metric is missing, implausible or a tee fallback.
+- **Club delivery.** Its usable club path and attack angle go on the shot
+  with status `onboard`.
+- **Host corrections.** The host adds `--iwr6843-azimuth-offset-deg` to
+  horizontal launch and club path, because the board runs with azimuth
+  offset 0. It adds the inclinometer's effective-minus-configured tilt to
+  vertical launch and attack angle.
+
+Without `--debug` the ring is never read back; the frozen ring is released
+straight away. With `--debug` it is read back, saved, and run through the
+host LCMF-v1 and club-path pipeline. Those results are logged beside the
+board's but never published. OPS ball speed is never replaced.
 
 The detect path reads IQ8 rings as well as IQ16: every ring reader takes
 the component width from the capture format and multiplies int8 samples by
@@ -908,9 +920,12 @@ ball scan <bin> <n>  static power of n global bins, pre frames averaged
 ball cfg <enable> <follow> [minRatio stableUpdates buildUpdates]
 ```
 
-The server turns the detector on at startup (`--iwr6843-ball-detector on`,
-the default; `follow` also aims the self-trigger at the locked ball, `off`
-keeps the configured tee bin) through the capture worker's job queue, and
+The detector is off by default: each poll holds the serial port, a
+sound-trigger edge that arrives meanwhile is dropped, and with a golfer over
+the ball the detector cannot see it anyway. With `--iwr6843-ball-detector on`
+(`follow` also aims the self-trigger at the locked ball; `off` keeps the
+configured tee bin) the server turns it on at startup through the capture
+worker's job queue, and
 polls `ball status` every `--iwr6843-setup-poll-s` seconds
 (`openflight.iwr6843.setup_poll`). Each poll becomes an `iwr_setup` socket
 event with the detector state, the ball range and the placement advice
@@ -1433,6 +1448,7 @@ board image compiles some features out through `L3_FEATURE_DEFS` in
 | Switch | Board | Host | What it drops |
 |---|---|---|---|
 | `L3_BALL_HYPOTHESES` | `0` | `1` | The ball-hypothesis search. It is off at run time until the recorded captures justify it (~1.6 KB). |
+| `L3_BALL_RECOVER` | `0` | `1` | The post-impact target history and the backward recovery of the frames an adopted ball hypothesis missed. Needs `L3_BALL_HYPOTHESES`. ~4.6 KB static: the history and its configuration in the track (2632 B) plus function-static buffers (2016 B: `usable`/`original` in `l3_ball_track_update_joint`, 576 + 32 B; `merged` in `l3_ball_track_adopt`, 1408 B); and 1056 B of stack (`found` in `l3_ball_recover`). Host `ctypes` sizes; a TI link map is still needed for the board figure. |
 | `L3_TRIG_LOG_DEPTH` | `48U` | `128U` | Older trigger flight-recorder records (~2.2 KB) |
 | `L3_TRIG_TRACE_DEPTH` | `24U` | `64U` | Older trigger raw-input trace entries (~1.3 KB) |
 

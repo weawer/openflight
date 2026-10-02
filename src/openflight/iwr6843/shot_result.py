@@ -99,6 +99,16 @@ class ShotResultPacket:
     def __getitem__(self, name: str) -> Measurement:
         return self.metrics[name]
 
+    @property
+    def ball_flight(self) -> bool:
+        """The board measured a ball leaving: a ball speed, plausible or not.
+
+        Ball points alone do not count; a stationary return near the tee
+        leaves some. An implausible speed still counts, so the no-ball veto
+        errs toward keeping the capture.
+        """
+        return self.metrics["ball_speed"].value is not None
+
     def with_onboard_angles_doubted(self) -> ShotResultPacket:
         """The same packet with every angle-derived metric marked implausible
         (launch angles, club path, angle of attack): the board ran without

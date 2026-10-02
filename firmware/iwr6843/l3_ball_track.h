@@ -26,7 +26,9 @@
 
 #include "l3_club_track.h"
 #include "l3_ball_hyp.h"
+#include "l3_ball_recover.h"
 #include "l3_frames.h"
+#include "l3_ball_anchor.h"
 #include "l3_ball_fit.h"
 #include "l3_launch.h"
 
@@ -50,11 +52,26 @@ typedef struct {
     /* Once confirmed, skip the club's claimed target while another candidate
      * is in the gate. */
     uint32_t skipClubClaim;
+    /* The gate anchor's tolerance, and the club fit's sigma under which its
+     * impact time anchors the search instead (0: never). */
+    uint32_t gateTolUs;
+    float    anchorMaxSigmaUs;
     /* The ball's direction: the tee-anchored fit over every held point
      * (l3_ball_fit.h), once per shot by l3_ball_track_reconstruct. */
     l3_ball_fit_cfg_t fit;
 #if L3_BALL_HYPOTHESES
     l3_ball_hyps_cfg_t hyps;      /* binWidthM and velocitySpanMps come from core */
+#endif
+#if L3_BALL_RECOVER
+    /* Recover the frames the adopted hypothesis missed from the post-impact
+     * history (l3_ball_recover.h). historySnr under snr (0: the same) lowers
+     * the post-window extraction (l3_ball_track_extract_snr): the history
+     * holds the weaker returns, the ball's searches still see only snr, but
+     * the club follow and the recorded targets see the lowered list too. */
+    uint32_t recover;
+    float    historySnr;
+    l3_ball_recover_cfg_t rec;    /* binWidthM and velocitySpanMps come from core;
+                                   * maxResidualBins and dopplerToleranceMps from hyps */
 #endif
 } l3_ball_track_cfg_t;
 
@@ -83,6 +100,7 @@ typedef struct {
     uint32_t  impactTimestampUs;
     float     originBin;          /* global bin of the ball at impact */
     l3_vec3_t origin;             /* golf frame */
+    l3_ball_anchor_t anchor;      /* the search's; originBin and impactTimestampUs stay the legacy ones */
     uint32_t  lastTargetIndex;    /* index into the last update's targets that was
                                    * appended, L3_TRACK_NO_TARGET when none */
     uint32_t  counters[L3_BALL_TRACK_WHY_COUNT];
@@ -90,15 +108,29 @@ typedef struct {
     l3_ball_hyps_t hyps;
     l3_ball_hyp_verdict_t verdict; /* the last classification; index -1 before one */
 #endif
+#if L3_BALL_RECOVER
+    /* Every searching frame's targets since arming (reset with the arming, so
+     * no frame of a previous shot is ever recovered). Adoption merges the
+     * adopted hypothesis's points with the ones recovered here; recovered
+     * points carry no angles and no clubStat (the history does not keep the
+     * club's stat). */
+    l3_ball_history_t history;
+#endif
 } l3_ball_track_t;
 
 void l3_ball_track_cfg_defaults(l3_ball_track_cfg_t *cfg);
 void l3_ball_track_init(l3_ball_track_t *track, const l3_ball_track_cfg_t *cfg);
 /* Forget the flight and the arming; configuration and counters survive. */
 void l3_ball_track_reset(l3_ball_track_t *track);
-/* IMPACT: start looking for a ball leaving originBin (global) at origin. */
-void l3_ball_track_arm(l3_ball_track_t *track, float originBin, const l3_vec3_t *origin,
-                       uint32_t impactTimestampUs);
+/* IMPACT: start looking for a ball. The legacy acquisition starts from
+ * anchor->acceptFromBin at anchor->gateUs; the hypotheses back-project to the
+ * anchor. origin is the tee in the golf frame. */
+void l3_ball_track_arm(l3_ball_track_t *track, const l3_ball_anchor_t *anchor,
+                       const l3_vec3_t *origin);
+/* The anchor for arming, from this track's gateTolUs and anchorMaxSigmaUs. */
+void l3_ball_track_anchor(const l3_ball_track_t *track, float teeBin, float acceptFromBin,
+                          uint32_t gateUs, const l3_impact_fit_cfg_t *fitCfg,
+                          const l3_club_track_t *club, l3_ball_anchor_t *out);
 /* Start the flight from two points already known to be the ball (the
  * ball-leave fallback's, l3_leave.h): after its late fire the departing ball
  * is too smeared for the tracker to acquire, but once a flight exists it is
@@ -119,6 +151,22 @@ int32_t l3_ball_track_update(l3_ball_track_t *track, const l3_target_obs_t *targ
 int32_t l3_ball_track_update_joint(l3_ball_track_t *track, const l3_target_obs_t *targets,
                                    uint32_t n, uint32_t frame, uint32_t timestampUs,
                                    uint32_t clubIndex);
+/* After the club follow, the target it claimed this frame (clubIndex, an
+ * index into the caller's list as passed to l3_ball_track_update_joint;
+ * L3_TRACK_NO_TARGET for none): the ball is updated before the club is
+ * followed, so its own call cannot know the claim. With L3_BALL_RECOVER it is
+ * flagged on the history's newest frame when that frame is frame, and is then
+ * never recovered; otherwise nothing. */
+void l3_ball_track_note_club(l3_ball_track_t *track, uint32_t frame, uint32_t clubIndex);
+/* The extraction threshold for the post window: searchSnr, or the history's
+ * lower historySnr with recovery and the hypothesis search on. The ball
+ * track itself (legacy, search and confirmed) only uses targets at snr or
+ * above, and the indices it reports stay indices into the caller's list. The
+ * caller's lowered list is not the ball track's alone, though: on the board
+ * and in the replay it also reaches the club follow and the replay's recorded
+ * frame targets (and so the evaluator's ball_present label). A historySnr
+ * under snr is therefore a diagnostic setting, not a history-only one. */
+float l3_ball_track_extract_snr(const l3_ball_track_cfg_t *cfg, float searchSnr);
 /* sizeof(l3_ball_track_t), for the ctypes mirror's layout check. */
 uint32_t l3_ball_track_struct_bytes(void);
 /* Angles for the point the last update appended; see l3_track_set_angles. */

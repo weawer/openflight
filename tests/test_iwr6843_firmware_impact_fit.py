@@ -83,7 +83,9 @@ def test_defaults_are_the_specs(lib):
     assert c.bandBins == 6.0  # on by default: the 2026-09-28 capture's ridge is 6 bins wide
     assert c.bandSearchBins == 10.0
     assert c.fitPoints == 4 and c.minPoints == 3
-    assert (c.clubMinMps, c.clubMaxMps, c.clubOutMaxRatio) == (10.0, 70.0, pytest.approx(1.10))
+    # 17 m/s: a late backswing swings downrange past the ball's range too, but
+    # rarely that fast radially; a full downswing is 30-50 m/s.
+    assert (c.clubMinMps, c.clubMaxMps, c.clubOutMaxRatio) == (17.0, 70.0, pytest.approx(1.10))
     assert (c.ballMinMps, c.ballMaxMps) == (15.0, 90.0)
     assert (c.gateSigmas, c.minSigmaUs) == (3.0, 500.0)
     assert c.maxSigmaUs == 3000.0  # one 3 ms frame
@@ -196,6 +198,17 @@ def test_moving_toward_the_radar_is_the_wrong_direction(lib, which, times):
 )
 def test_speeds_outside_the_bounds_are_rejected(lib, which, speed, times):
     assert estimate(lib, which, line(speed, times)).why == WHY["speed_bounds"]
+
+
+@pytest.mark.parametrize("speed", [12.0, 15.0, 16.9])
+def test_a_backswing_speed_club_in_is_rejected(lib, speed):
+    # The club heading downrange into the top of the backswing crosses the
+    # ball's range above the ball; at backswing speed it must not fire.
+    assert estimate(lib, CLUB_IN, line(speed, CLUB_IN_T)).why == WHY["speed_bounds"]
+
+
+def test_the_club_in_floor_itself_is_accepted(lib):
+    assert estimate(lib, CLUB_IN, line(17.0, CLUB_IN_T)).why == WHY["ok"]
 
 
 def test_crawling_club_out_is_too_uncertain_to_time(lib):

@@ -658,7 +658,8 @@ def test_shot_machine_sees_every_pre_frame_and_arms_the_ball_tracker_at_impact()
     assert "in.clubActive = gClubTrack.active;" in observe
     assert "in.impactTimestampUs = fired ? impactUs : frameUs;" in observe
     assert "gShot.impactFrame == gPreFramesCaptured" in observe
-    assert "l3_ball_track_arm(&gBallTrack, l3_ballArmBin(teeBin), &gBallPosition," in observe
+    assert "l3_ball_track_anchor(&gBallTrack, (float)teeBin, l3_ballArmBin(teeBin)," in observe
+    assert "l3_ball_track_arm(&gBallTrack, &anchor, &gBallPosition);" in observe
     rearm = _function("static void l3_trigRearm(")
     assert "l3_shot_rearm(&gShot);" in rearm and "l3_ball_track_reset(&gBallTrack);" in rearm
     assert "gPostTimestampUs = 0U;" in rearm and "gPostFramesScored = 0U;" in rearm

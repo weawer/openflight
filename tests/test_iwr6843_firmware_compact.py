@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 FIRMWARE = Path(__file__).parents[1] / "firmware" / "iwr6843" / "l3_dump.c"
 
 
@@ -234,41 +236,102 @@ def test_stats_and_trigger_log_report_the_compact_state():
         assert reset in start, reset
 
 
-def test_the_adaptive_profile_asks_for_the_compact_format_and_its_retain_widths():
-    cfg = (
-        FIRMWARE.parents[2] / "config" / "iwr6843_l3dump_adaptive_47f3ms_53bin_a16.cfg"
-    ).read_text()
-    lines = [line.split() for line in cfg.splitlines() if line and not line.startswith("%")]
-    by_name = {line[0]: line[1:] for line in lines}
-    assert by_name["captureFormat"] == ["adaptive16"]
-    assert by_name["captureCfg"] == ["retain", "16", "24", "16"]
-    (
-        pre_start,
-        pre_bins,
-        pre_frames,
-        impact_start,
-        impact_bins,
-        impact_frames,
-        post_start,
-        post_bins,
-        late_start,
-        ball_frames,
-        stride,
-    ) = (int(v) for v in by_name["phaseCaptureCfg"])
-    assert (pre_bins, impact_bins, post_bins) == (53, 53, 53), "processing windows stay wide"
-    assert pre_frames + impact_frames + ball_frames == 47 <= 64
-    per_bin = 36 * 4 * 4
-    assert (
-        pre_frames * 16 * per_bin + impact_frames * 24 * per_bin + ball_frames * 16 * per_bin
-        < 768 * 1024
+CONFIG_DIR = FIRMWARE.parents[2] / "config"
+# The L3 ring arena (.l3ring in mss_linker.cmd), the plan's capacity.
+L3_RING_BYTES = 768 * 1024
+# L3_MAX_CAPTURE_FRAMES in l3_dump.c; the trackers' arrays are sized to it too.
+MAX_CAPTURE_FRAMES = 64
+# One stored IQ16 bin of one frame: 3 TX x 12 loops x 4 RX x (I, Q) int16.
+BYTES_PER_RETAINED_BIN = 3 * 12 * 4 * 4
+DEFAULT_PROFILE = "iwr6843_l3dump_wide_24f2ms_53bin_iq16_window_hann.cfg"
+
+
+def _profile(name: str) -> tuple[list[list[str]], dict[str, list[list[str]]]]:
+    """A cfg's command lines in order, and every line of each command by name."""
+    text = (CONFIG_DIR / name).read_text(encoding="utf-8")
+    lines = [line.split() for line in text.splitlines() if line and not line.startswith("%")]
+    by_name: dict[str, list[list[str]]] = {}
+    for line in lines:
+        by_name.setdefault(line[0], []).append(line[1:])
+    return lines, by_name
+
+
+def _phases(by_name) -> dict[str, int]:
+    names = (
+        "pre_start",
+        "pre_bins",
+        "pre_frames",
+        "impact_start",
+        "impact_bins",
+        "impact_frames",
+        "post_start",
+        "post_bins",
+        "late_start",
+        "ball_frames",
+        "stride",
     )
-    order = [line[0] if line[0] != "captureCfg" else "captureCfg retain" for line in lines]
+    (values,) = by_name["phaseCaptureCfg"]
+    return dict(zip(names, (int(v) for v in values), strict=True))
+
+
+def _retain_widths(by_name) -> tuple[int, int, int]:
+    (widths,) = [args[1:] for args in by_name["captureCfg"] if args[0] == "retain"]
+    pre, impact, post = (int(v) for v in widths)
+    return pre, impact, post
+
+
+def _frame_period_ms(by_name) -> int:
+    (frame_cfg,) = by_name["frameCfg"]
+    return int(frame_cfg[4])
+
+
+@pytest.mark.parametrize(
+    ("name", "frames", "period_ms"),
+    [
+        ("iwr6843_l3dump_adaptive_47f3ms_53bin_a16.cfg", 47, 3),
+        ("iwr6843_l3dump_adaptive_64f2ms_53bin_a16_window_hann.cfg", 64, 2),
+    ],
+)
+def test_the_adaptive_profiles_ask_for_the_compact_format_and_fit_l3(name, frames, period_ms):
+    lines, by_name = _profile(name)
+    assert by_name["captureFormat"] == [["adaptive16"]]
+    assert _retain_widths(by_name) == (16, 24, 16)
+    phases = _phases(by_name)
+    assert (phases["pre_bins"], phases["impact_bins"], phases["post_bins"]) == (53, 53, 53), (
+        "processing windows stay wide"
+    )
+    assert phases["pre_frames"] + phases["impact_frames"] + phases["ball_frames"] == frames
+    assert frames <= MAX_CAPTURE_FRAMES
+    assert _frame_period_ms(by_name) == period_ms
+    pre_bins, impact_bins, post_bins = _retain_widths(by_name)
+    retained_bins = (
+        phases["pre_frames"] * pre_bins
+        + phases["impact_frames"] * impact_bins
+        + phases["ball_frames"] * post_bins
+    )
+    assert retained_bins * BYTES_PER_RETAINED_BIN <= L3_RING_BYTES
+    order = [line[0] if line[0] != "captureCfg" else f"captureCfg {line[1]}" for line in lines]
     assert (
         order.index("captureFormat")
         < order.index("captureCfg retain")
         < order.index("phaseCaptureCfg")
     )
     assert order[-1] == "sensorStart"
+
+
+def test_the_64_frame_profile_is_the_default_rf_with_the_adaptive_format():
+    """Only the stored format and the movie length differ from the 2 ms Hann default."""
+    _lines, adaptive = _profile("iwr6843_l3dump_adaptive_64f2ms_53bin_a16_window_hann.cfg")
+    _lines, default = _profile(DEFAULT_PROFILE)
+    for command in ("channelCfg", "adcCfg", "profileCfg", "chirpCfg", "frameCfg"):
+        assert adaptive[command] == default[command], command
+    assert ["window", "hann"] in adaptive["captureCfg"]
+    phases, wide = _phases(adaptive), _phases(default)
+    for key in ("pre_start", "impact_start", "post_start", "late_start", "stride"):
+        assert phases[key] == wide[key], key
+    assert phases["impact_frames"] == wide["impact_frames"], "every impact frame kept"
+    assert phases["pre_frames"] > wide["pre_frames"]
+    assert phases["ball_frames"] > wide["ball_frames"]
 
 
 def test_iq16_frames_take_the_exact_integer_statistics_path():

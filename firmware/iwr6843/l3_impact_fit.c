@@ -13,7 +13,7 @@ void l3_impact_fit_cfg_defaults(l3_impact_fit_cfg_t *cfg)
     cfg->bandBins = 6.0F;         /* the ridge on the 2026-09-28 capture; 0 turns it off */
     cfg->fitPoints = 4U;          /* about 12 ms at 3 ms frames */
     cfg->minPoints = 3U;          /* a line and a residual */
-    cfg->clubMinMps = 10.0F;
+    cfg->clubMinMps = 17.0F;      /* over a late backswing's downrange crossing; downswings are 30-50 */
     cfg->clubMaxMps = 70.0F;
     cfg->clubOutMaxRatio = 1.10F; /* after impact the club only slows */
     cfg->ballMinMps = 15.0F;

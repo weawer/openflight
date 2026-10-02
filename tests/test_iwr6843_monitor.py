@@ -34,11 +34,15 @@ from openflight.iwr6843.monitor import (
 from openflight.iwr6843.sparse import SparseCapture
 
 
-def test_default_iwr6843_config_is_adaptive16():
+def test_default_iwr6843_config_is_the_2ms_hann_wide_iq16():
     path = Path(DEFAULT_IWR6843_CONFIG)
-    assert path.name == "iwr6843_l3dump_adaptive_47f3ms_53bin_a16.cfg"
+    assert path.name == "iwr6843_l3dump_wide_24f2ms_53bin_iq16_window_hann.cfg"
     text = path.read_text(encoding="utf-8")
-    assert "captureFormat adaptive16" in text
+    assert "captureFormat iq16" in text
+    assert "captureCfg window hann" in text
+    assert "frameCfg 0 2 12 0 2 1 0" in text  # 2 ms frames
+    # The self-trigger's default bins sit in its first capture window.
+    tee_global_bin(1.605, path)
 
 
 # A capture running and the self-trigger not latched: nothing to rearm.
@@ -615,24 +619,113 @@ def test_unreadable_firmware_result_never_costs_the_capture(tmp_path, caplog):
     monitor.stop()
 
 
-def test_gpio_captures_do_not_ask_for_a_firmware_result(tmp_path):
-    config = tmp_path / "radar.cfg"
-    config.write_text("sensorStart\n", encoding="utf-8")
-    radar = FakeRadar(_raw_dump())
-    monitor = IWR6843CaptureMonitor(
-        config_path=config,
-        output_dir=tmp_path / "dumps",
-        radar=radar,
-        button_factory=FakeButton,
-    )
-    monitor.start()
+def test_sound_triggered_captures_carry_the_firmware_result(tmp_path):
+    """The onboard result is the shot's angle source, so a GPIO edge reads it too."""
+    radar = SelfTriggerRadar(_raw_dump())
+    radar.result = SimpleNamespace(shot_id=3, verdict="valid", club_points=4, ball_points=9)
+    monitor = _started(tmp_path, radar, self_trigger=False)
     edge = time.time()
     assert monitor.notify_trigger(edge)
     capture = monitor.capture_for_shot(edge, timeout_s=1.0)
     monitor.stop()
 
     assert capture is not None and capture.valid
+    assert capture.onboard_result is radar.result
+    assert radar.result_reads == 1
+
+
+@pytest.mark.parametrize("self_trigger", [True, False])
+def test_without_readback_the_result_is_the_whole_capture(tmp_path, self_trigger):
+    """Not --debug: no l3track/l3sparse/l3dump traffic; the frozen ring is released."""
+    radar = SelfTriggerRadar(_raw_dump())
+    radar.result = SimpleNamespace(shot_id=3, verdict="valid", club_points=4, ball_points=9)
+    radar.stats_replies = [FROZEN_STATS]
+    monitor = _started(tmp_path, radar, self_trigger=self_trigger, readback=False)
+
+    if self_trigger:
+        capture = _self_triggered_capture(monitor, radar)
+    else:
+        edge = time.time()
+        assert monitor.notify_trigger(edge)
+        capture = monitor.capture_for_shot(edge, timeout_s=1.0)
+
+    assert capture is not None
+    assert capture.onboard_only
+    assert capture.raw is None and capture.path is None and capture.error is None
+    assert not capture.valid, "valid still means a complete dump"
+    assert capture.onboard_result is radar.result
+    assert radar.read_started_at is None, "no readback"
+    assert _wait_until(lambda: radar.releases == 1)
+    assert not list((tmp_path / "dumps").glob("*.l3dump"))
+    monitor.stop()
+
+
+def test_without_readback_and_without_a_result_the_capture_is_still_onboard_only(tmp_path):
+    """No RESULT this shot (ready=0): nothing to read back either, so the shot has no angles."""
+    radar = SelfTriggerRadar(_raw_dump())
+    monitor = _started(tmp_path, radar, readback=False)
+
+    capture = _self_triggered_capture(monitor, radar)
+
+    assert capture is not None and capture.onboard_only
     assert capture.onboard_result is None
+    assert radar.read_started_at is None
+    monitor.stop()
+
+
+def test_readback_is_on_by_default_and_marks_nothing_onboard_only(tmp_path):
+    radar = SelfTriggerRadar(_raw_dump())
+    monitor = _started(tmp_path, radar)
+
+    capture = _self_triggered_capture(monitor, radar)
+
+    assert capture is not None and capture.valid and not capture.onboard_only
+    assert radar.read_started_at is not None
+    monitor.stop()
+
+
+def test_full_capture_reads_the_whole_ring_even_with_the_firmware_tracker(tmp_path):
+    """--debug: every sample, though trackCfg stays on for the onboard result."""
+    radar = SelfTriggerRadar(_raw_dump())
+    radar.read_tracked = lambda: pytest.fail("full capture must not read tracked cells")
+    radar.read_sparse = lambda planner: pytest.fail("full capture must not read sparse cells")
+    monitor = _started(tmp_path, radar, full_capture=True)
+    monitor.onboard_tracking = True
+    monitor.slice_planner = object()
+
+    capture = _self_triggered_capture(monitor, radar)
+
+    assert capture is not None and capture.valid
+    assert radar.read_started_at is not None
+    monitor.stop()
+
+
+def test_full_capture_needs_the_readback(tmp_path):
+    config = tmp_path / "radar.cfg"
+    config.write_text("sensorStart\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="full_capture needs the readback"):
+        IWR6843CaptureMonitor(
+            config_path=config,
+            output_dir=tmp_path / "dumps",
+            radar=FakeRadar(_raw_dump()),
+            button_factory=FakeButton,
+            full_capture=True,
+            readback=False,
+        )
+
+
+def test_saving_dumps_needs_the_readback(tmp_path):
+    config = tmp_path / "radar.cfg"
+    config.write_text("sensorStart\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="save_dumps needs the readback"):
+        IWR6843CaptureMonitor(
+            config_path=config,
+            output_dir=tmp_path / "dumps",
+            radar=FakeRadar(_raw_dump()),
+            button_factory=FakeButton,
+            save_dumps=True,
+            readback=False,
+        )
 
 
 def test_self_trigger_config_is_sent_before_the_worker_owns_the_port(tmp_path):
@@ -968,11 +1061,14 @@ def test_tee_global_bin_is_the_absolute_fft_bin_inside_the_first_window(tmp_path
 
 
 def test_self_trigger_bin_is_two_short_of_the_ball_for_a_face_tape(tmp_path):
-    """Stock tee 1.575 m from the front → array 1.875 m → ball bin 40 → watch 38."""
+    """Stock tee 1.575 m from the front → array 1.605 m (30 mm behind the face)
+    → ball bin 34 → watch 32."""
+    from openflight.iwr6843.calibration import ARRAY_DEPTH_M
     from openflight.iwr6843.monitor import self_trigger_bin
 
     path = _cfg(tmp_path, "phaseCaptureCfg 20 53 9 32 53 7 47 53 47 8 1")
-    assert self_trigger_bin(1.575, path) == 38
+    assert ARRAY_DEPTH_M == pytest.approx(0.030)
+    assert self_trigger_bin(1.575, path) == 32
 
 
 @pytest.mark.parametrize("tee_m", [0.5, 4.0])
@@ -1830,3 +1926,101 @@ def test_a_restart_chooses_the_dss_again_before_arming(tmp_path):
     assert restart_thread == "iwr6843-capture"
     assert monitor.detect_core == "dss"
     monitor.stop()
+
+
+# --- the no-ball veto (2026-10-01) ------------------------------------------------
+#
+# Raking a ball onto the tee or a waggle fired the self-trigger 8 times in 10 on
+# 2026-10-01; each cost a ~7 s readback with no ball in it. With veto_no_ball the
+# board's own result decides: no ball flight, no readback, the ring is released.
+# It is off by default until the ball search finds the ball reliably (it missed
+# 26 of 39 labelled shots in replay that day).
+
+
+class _ResultPacket:
+    """Stands in for a ShotResultPacket with or without a ball flight."""
+
+    shot_id = 4
+    verdict = "partial"
+    club_points = 6
+
+    def __init__(self, ball_flight: bool):
+        self.ball_flight = ball_flight
+        self.ball_points = 6 if ball_flight else 0
+
+    def with_onboard_angles_doubted(self):
+        return self
+
+
+def _vetoing(tmp_path, radar, **kwargs) -> IWR6843CaptureMonitor:
+    radar.stats_replies = [FROZEN_STATS]
+    return _started(tmp_path, radar, veto_no_ball=True, **kwargs)
+
+
+def test_veto_no_ball_is_off_by_default(tmp_path):
+    radar = SelfTriggerRadar(_raw_dump())
+    radar.result = _ResultPacket(ball_flight=False)
+    monitor = _started(tmp_path, radar)
+
+    capture = _self_triggered_capture(monitor, radar)
+
+    assert capture is not None and capture.valid and not capture.vetoed
+    assert radar.read_started_at is not None
+    monitor.stop()
+
+
+def test_a_result_without_a_ball_flight_skips_the_readback_and_releases(tmp_path):
+    radar = SelfTriggerRadar(_raw_dump())
+    radar.result = _ResultPacket(ball_flight=False)
+    monitor = _vetoing(tmp_path, radar, save_dumps=True)
+
+    capture = _self_triggered_capture(monitor, radar)
+
+    assert capture is not None and capture.vetoed
+    assert not capture.valid and capture.raw is None and capture.path is None
+    assert capture.error == "vetoed: no ball flight"
+    assert capture.onboard_result is radar.result
+    assert radar.read_started_at is None, "no readback"
+    assert _wait_until(lambda: radar.releases == 1)
+    assert not list((tmp_path / "dumps").glob("*.l3dump")), "nothing saved"
+    monitor.stop()
+
+
+def test_a_result_with_a_ball_flight_is_read_back(tmp_path):
+    radar = SelfTriggerRadar(_raw_dump())
+    radar.result = _ResultPacket(ball_flight=True)
+    monitor = _vetoing(tmp_path, radar)
+
+    capture = _self_triggered_capture(monitor, radar)
+
+    assert capture is not None and capture.valid and not capture.vetoed
+    assert radar.read_started_at is not None
+    monitor.stop()
+
+
+@pytest.mark.parametrize("why", ["not_ready", "unreadable"])
+def test_without_a_result_the_veto_keeps_the_capture(tmp_path, why):
+    """No RESULT yet, or a packet the host cannot read: fail safe, read it back."""
+    radar = SelfTriggerRadar(_raw_dump())
+    if why == "unreadable":
+        radar.result_error = RuntimeError("triggerLog result timed out")
+    monitor = _vetoing(tmp_path, radar)
+
+    capture = _self_triggered_capture(monitor, radar)
+
+    assert capture is not None and capture.valid and not capture.vetoed
+    monitor.stop()
+
+
+def test_the_veto_needs_the_self_trigger(tmp_path):
+    """Sound-triggered captures read no onboard result, so nothing could veto them."""
+    config = tmp_path / "radar.cfg"
+    config.write_text("sensorStart\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="veto_no_ball needs the self-trigger"):
+        IWR6843CaptureMonitor(
+            config_path=config,
+            output_dir=tmp_path / "dumps",
+            radar=FakeRadar(_raw_dump()),
+            button_factory=FakeButton,
+            veto_no_ball=True,
+        )

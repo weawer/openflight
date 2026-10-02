@@ -458,6 +458,8 @@ def test_post_impact_frames_go_to_the_ball_tracker_and_the_launch_is_recovered(l
     bins = [p.range_bin for p in result.ball_points]
     assert all(b > a for a, b in zip(bins, bins[1:])), "the ball only ever departs"
     assert "balltrack armed=1 confirmed=1" in result.ball_status
+    # The legacy search (useHypotheses 0) never recovers frames.
+    assert result.recovered_frames == () and result.ball_status.endswith(" rec=0")
 
 
 def test_the_shot_machine_walks_the_whole_sequence_on_the_replay(lib, whole_shot):
@@ -671,13 +673,36 @@ def test_ball_tuning_writes_only_what_it_sets(lib):
         fast_ball_mps=34.0,
         fast_support_fraction=0.5,
         min_departure_mps=18.0,
-        far_window_bins=3.0,
+        far_window_m=0.140625,
     ).apply(tuned)
     assert (tuned.hyps.fastBallMps, tuned.hyps.fastSupportFraction) == (34.0, 0.5)
     # One floor, both searches: the legacy acquisition and the hypotheses.
     assert (tuned.minDepartureMps, tuned.hyps.minDepartureMps) == (18.0, 18.0)
-    assert tuned.hyps.farWindowBins == 3.0
+    assert tuned.hyps.farWindowM == 0.140625
     assert tuned.useHypotheses == default.useHypotheses
+
+
+def test_ball_tuning_writes_every_new_switch(lib):
+    cfg = fw.BallTrackCfg()
+    lib.l3_ball_track_cfg_defaults(ctypes.byref(cfg))
+    BallTuning(
+        corridor_gate=False,
+        impact_coast_ms=24.0,
+        max_decel_mps2=0.0,
+        classify_points=6,
+        recover=False,
+        recover_gate_m=0.05,
+        history_snr=0.7,
+        far_window_m=0.1,
+    ).apply(cfg)
+    assert (
+        cfg.hyps.corridorGate,
+        cfg.hyps.impactCoastUs,
+        cfg.hyps.maxDecelMps2,
+        cfg.hyps.classifyPoints,
+    ) == (0, 24_000, 0.0, 6)
+    assert (cfg.recover, cfg.historySnr) == (0, pytest.approx(0.7))
+    assert cfg.rec.gateM == pytest.approx(0.05) and cfg.hyps.farWindowM == pytest.approx(0.1)
 
 
 def test_empty_ball_tuning_leaves_the_replay_alone(lib, whole_shot):
@@ -691,7 +716,7 @@ def test_empty_ball_tuning_leaves_the_replay_alone(lib, whole_shot):
 
 def test_ball_tuning_reaches_the_replayed_launch(lib, whole_shot):
     """The synthetic ball flies clean: every switch on still finds it."""
-    tuning = BallTuning(fast_ball_mps=30.0, far_window_bins=2.0)
+    tuning = BallTuning(fast_ball_mps=30.0, far_window_m=0.09375)
     result = replay_dump(
         whole_shot,
         ReplayConfig(tee_bin=TEE_BIN, ball_hypotheses=True, ball_tuning=tuning),
@@ -1174,7 +1199,9 @@ def test_replay_without_element_calibration_is_identity(lib):
     assert [cal.correctionRe[i] for i in range(8)] == [1.0] * 8
 
 
-@pytest.mark.parametrize("phases, gains", [((0.1,) * 7, (1.0,) * 8), ((0.1,) * 8, (1.0,) * 8 + (1.0,))])
+@pytest.mark.parametrize(
+    "phases, gains", [((0.1,) * 7, (1.0,) * 8), ((0.1,) * 8, (1.0,) * 8 + (1.0,))]
+)
 def test_element_calibration_needs_eight_of_each(phases, gains):
     raw = synth_shot_dump(ball_speed_ms=60.0, tee_range_m=TEE_RANGE_M)
     with pytest.raises(ValueError, match="8 element"):
@@ -1196,7 +1223,9 @@ def test_replay_ball_angles_use_the_track_rate(lib, monkeypatch):
 
 
 def test_replay_track_rate_picks_the_branch_and_the_measured_phase_stays_the_rotor(lib):
-    raw = synth_shot_dump(ball_speed_ms=60.0, vla_deg=12.0, hla_deg=0.0, tee_range_m=TEE_RANGE_M, n_frames=24)
+    raw = synth_shot_dump(
+        ball_speed_ms=60.0, vla_deg=12.0, hla_deg=0.0, tee_range_m=TEE_RANGE_M, n_frames=24
+    )
     meta, cube = parse_dump(raw)
     n_tx = int(meta["n_tx"])
     chirp_period_s = 45e-6
@@ -1236,9 +1265,8 @@ def test_an_early_fire_does_not_make_the_frames_before_post_from_frame_post_impa
     ]
 
 
-# The kiosk's self-trigger as it runs on the board: the tee bin two short of
-# the stock ball, the default snr and tee band. The club track's range-only
-# impact fires it.
+# These 2026-08-24 recordings were armed at bin 38 (the old 0.30 m enclosure
+# depth). The club track's range-only impact fires the self-trigger.
 _KIOSK_TRIGGER = dict(
     tee_bin=38,
     snr=FIRMWARE_TRIGGER_DEFAULT_SNR,
@@ -1409,3 +1437,82 @@ def test_the_launch_line_says_why_the_angles_are_missing():
     )
     line = fr._launch_line(SimpleNamespace(launch=launch))
     assert "why=uncertain angles=5" in line
+
+
+def test_recovered_frames_decode_the_verdict_mask():
+    verdict = fw.BallHypVerdict(recovered=3, recoveredFirstFrame=12, recoveredMask=0b1011)
+    assert fr.recovered_frames(verdict) == (12, 13, 15)
+    assert fr.recovered_frames(fw.BallHypVerdict()) == ()
+    top = fw.BallHypVerdict(recovered=1, recoveredFirstFrame=5, recoveredMask=1 << 31)
+    assert fr.recovered_frames(top) == (36,)
+
+
+def test_the_hypothesis_replay_reports_its_recovery(lib, whole_shot):
+    """The synthetic shot's search misses no frame: nothing is recovered, and
+    the report, the status line and the verdict agree."""
+    config = ReplayConfig(
+        tee_bin=TEE_BIN,
+        ball_hypotheses=True,
+        overrides={"ball.fit.teeBallHeightM": 0.152, "ball.fit.radarHeightM": 0.152},
+    )
+    result = replay_dump(whole_shot, config, lib=lib)
+    verdict = result.ball_track.verdict
+    assert result.ball_track.confirmed and verdict.index >= 0
+    assert result.recovered_frames == fr.recovered_frames(verdict) == ()
+    assert result.ball_status.endswith(f" rec={verdict.recovered}")
+
+
+class _CallLog:
+    """The firmware library with a log of the post-impact ball and club calls."""
+
+    LOGGED = ("l3_ball_track_update_joint", "l3_track_follow", "l3_ball_track_note_club")
+
+    def __init__(self, lib):
+        self._lib = lib
+        self.calls: list[tuple] = []
+
+    def __getattr__(self, name):
+        func = getattr(self._lib, name)
+        if name not in self.LOGGED:
+            return func
+
+        def logged(*args):
+            result = func(*args)
+            if name == "l3_track_follow":
+                club = args[0]._obj  # pylint: disable=protected-access
+                self.calls.append((name, int(args[3]), int(club.lastTargetIndex)))
+            elif name == "l3_ball_track_note_club":
+                ball = args[0]._obj  # pylint: disable=protected-access
+                history = ball.history
+                newest = (
+                    self._lib.l3_ball_history_at(ctypes.byref(history), history.count - 1)
+                    if history.count
+                    else None
+                )
+                mask = newest.contents.clubMask if newest else 0
+                self.calls.append((name, int(args[1]), int(args[2]), mask))
+            else:
+                self.calls.append((name, int(args[3])))
+            return result
+
+        return logged
+
+
+def test_the_replay_notes_the_clubs_claim_right_after_the_club_follow(lib, whole_shot):
+    """R7: as l3_considerBallTrack, every post-impact frame updates the ball,
+    follows the club, then notes the club's claimed target (its lastTargetIndex)
+    on the ball's history for that frame."""
+    log = _CallLog(lib)
+    replay_dump(whole_shot, ReplayConfig(tee_bin=TEE_BIN, ball_hypotheses=True), lib=log)
+    calls = log.calls
+    follows = [i for i, c in enumerate(calls) if c[0] == "l3_track_follow"]
+    assert follows, "no post-impact frame was replayed"
+    for i in follows:
+        assert calls[i - 1][0] == "l3_ball_track_update_joint"
+        assert i + 1 < len(calls) and calls[i + 1][0] == "l3_ball_track_note_club", calls[i:]
+        _, frame, claimed = calls[i]
+        _, note_frame, note_index, _mask = calls[i + 1]
+        assert (note_frame, note_index) == (frame, claimed)
+    marked = [c for c in calls if c[0] == "l3_ball_track_note_club" and c[2] != fw.TRACK_NO_TARGET]
+    assert marked, "the synthetic club is never claimed after impact"
+    assert any(c[3] & (1 << c[2]) for c in marked if c[2] < 8), "no claim reached the history"

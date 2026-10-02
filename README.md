@@ -112,7 +112,7 @@ scripts/start-kiosk.sh
 # Geometry values are examples — measure your own; see the operator guide.
 scripts/start-kiosk.sh --iwr6843 \
   --ops-port /dev/ttyAMA0 \
-  --iwr6843-tee-m 1.372 --iwr6843-net-m 4.064 \
+  --iwr6843-tee-m 1.575 --iwr6843-net-m 4.064 \
   --iwr6843-tilt-deg 5.5 --iwr6843-radar-height-m 0.229 \
   --iwr6843-ball-height-m 0.021
 

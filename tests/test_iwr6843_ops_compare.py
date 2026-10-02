@@ -11,6 +11,9 @@ import pytest
 
 from openflight.clubs import ClubType
 from openflight.iwr6843.ops_compare import (
+    BALL_TOLERANCE,
+    CLUB_TOLERANCE,
+    MIN_AGREEMENT_CONFIDENCE,
     MPS_TO_MPH,
     ErrorStats,
     OpsComparison,
@@ -134,3 +137,97 @@ def test_session_files_are_read_back(tmp_path):
     assert list(read_session(path)) == [record]
     assert read_sessions([tmp_path]) == [record]
     assert read_sessions([tmp_path / "missing_dir"]) == []
+
+
+# --- Agreement: a confidence-scaled tolerance on the IWR-minus-OPS percent ---
+
+
+def _record(
+    *,
+    ops_ball=100.0,
+    iwr_ball=None,
+    ball_conf=None,
+    ops_club=80.0,
+    iwr_club=None,
+    club_conf=None,
+    verdict="valid",
+):
+    return OpsComparison(
+        shot_number=1,
+        timestamp="2026-10-02T12:00:00",
+        club="7-iron",
+        capture_format=None,
+        verdict=verdict,
+        ops_ball_speed_mph=ops_ball,
+        ops_club_speed_mph=ops_club,
+        iwr_ball_speed_mph=iwr_ball,
+        iwr_ball_confidence=ball_conf,
+        iwr_club_speed_mph=iwr_club,
+        iwr_club_confidence=club_conf,
+        impact_range_m=None,
+    )
+
+
+def test_tolerance_constants_are_pinned():
+    """Placeholders until ops_validation.py has real sessions to retune them from."""
+    assert (BALL_TOLERANCE.base_pct, BALL_TOLERANCE.max_pct) == (3.0, 9.0)
+    assert (CLUB_TOLERANCE.base_pct, CLUB_TOLERANCE.max_pct) == (5.0, 15.0)
+    assert MIN_AGREEMENT_CONFIDENCE == 0.3
+
+
+@pytest.mark.parametrize(
+    ("confidence", "expected"),
+    [(1.0, 3.0), (0.9, 3.0 / 0.9), (0.5, 6.0), (1.0 / 3.0, 9.0), (0.3, 9.0)],
+)
+def test_ball_tolerance_widens_as_confidence_drops_up_to_its_cap(confidence, expected):
+    assert BALL_TOLERANCE.pct(confidence) == pytest.approx(expected)
+
+
+def test_tolerance_needs_the_minimum_confidence():
+    with pytest.raises(ValueError, match="confidence"):
+        BALL_TOLERANCE.pct(0.29)
+
+
+@pytest.mark.parametrize(
+    ("iwr_ball", "expected"),
+    [(106.0, "agree"), (94.0, "agree"), (106.01, "disagree"), (93.99, "disagree")],
+)
+def test_ball_agreement_is_inclusive_at_the_tolerance(iwr_ball, expected):
+    record = _record(iwr_ball=iwr_ball, ball_conf=0.5)
+    assert record.ball_agreement == expected
+    assert record.ball_tolerance_pct == pytest.approx(6.0)
+
+
+def test_club_agreement_uses_the_club_tolerance():
+    agree = _record(iwr_club=84.0, club_conf=1.0)
+    disagree = _record(iwr_club=84.01, club_conf=1.0)
+    assert agree.club_agreement == "agree" and agree.club_tolerance_pct == pytest.approx(5.0)
+    assert disagree.club_agreement == "disagree"
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"iwr_ball": None, "ball_conf": 0.9},  # board value missing or implausible
+        {"iwr_ball": 101.0, "ball_conf": 0.9, "ops_ball": None},  # OPS missing
+        {"iwr_ball": 101.0, "ball_conf": 0.29},  # below the minimum confidence
+        {"iwr_ball": 101.0, "ball_conf": None},
+        {"iwr_ball": 101.0, "ball_conf": 0.9, "verdict": "invalid"},
+        {"iwr_ball": 101.0, "ball_conf": 0.9, "verdict": None},  # no onboard result
+    ],
+    ids=["no_iwr", "no_ops", "low_confidence", "no_confidence", "invalid", "no_result"],
+)
+def test_ball_agreement_is_unchecked_without_a_fair_comparison(overrides):
+    record = _record(**overrides)
+    assert record.ball_agreement == "unchecked"
+    assert record.ball_tolerance_pct is None
+
+
+def test_agreement_rides_in_the_dict_and_survives_a_round_trip():
+    record = _record(iwr_ball=101.0, ball_conf=1.0, iwr_club=95.0, club_conf=1.0)
+    data = record.to_dict()
+    assert data["ball_agreement"] == "agree" and data["ball_tolerance_pct"] == pytest.approx(3.0)
+    assert data["club_agreement"] == "disagree"
+    assert data["club_tolerance_pct"] == pytest.approx(5.0)
+    assert json.dumps(data)
+    assert OpsComparison.from_dict(data) == record

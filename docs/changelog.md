@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **The kiosk's IWR6843 launch angles come from the firmware.** Vertical and
+  horizontal launch, club path and attack angle are the board's result packet,
+  read after every capture whether it was self-triggered or sound-triggered.
+  - **Withheld values.** A metric that is missing, implausible or a tee
+    fallback stays empty, and an invalid verdict applies nothing.
+  - **Corrections.** The host adds the aim offset (horizontal launch, club
+    path) and the inclinometer tilt correction (vertical launch, attack angle).
+  - **Readback.** Without `--debug` the ring is no longer read back or saved,
+    so a shot no longer waits on the l3track/l3sparse transfer. With
+    `--debug` the readback still runs, and the host LCMF-v1 and club-path
+    results are logged beside the board's but never published.
+  - **`--debug` reads back the full capture.** Every sample and TX channel is
+    read back, about 7 s per shot on the default profile. The firmware tracker
+    stays configured, so the onboard result matches a kiosk run.
+    `--iwr6843-full-capture` on its own is now refused, because without
+    `--debug` nothing is read back.
+
+- **`--iwr6843-tee-m` must be at least 1.4 m.** A closer tee put the
+  self-trigger's watch region under a metre from the radar, where the
+  golfer's hands and body stand. A smaller value (or NaN) is now a usage
+  error, and the README and setup examples that used 1.372 m now use the
+  1.575 m default. `--iwr6843-net-m` must still be positive.
+
+### Removed
+- **`--iwr6843-onboard-metrics`.** The firmware's metrics always apply now.
+
+### Fixed
+- **IWR6843 enclosure depth is 30 mm, not 0.30 m.** `ARRAY_DEPTH_M` is added to a tape reading from the enclosure front. 0.30 m put the tee about six bins too far: a 1.7 m setting watched 2.0 m. The stock self-trigger bin is now 32 (was 38).
+
 ### Added
 - **IWR6843 trajectory reconstruction.** The ball's direction is now fitted
   on the board at RESULT from the departing track, anchored at the tee, and

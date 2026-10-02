@@ -3525,6 +3525,7 @@ static float l3_ballArmBin(uint32_t teeBin)
 static void l3_shotObserve(uint32_t teeBin, int32_t fired, uint32_t impactUs)
 {
     l3_shot_input_t in;
+    l3_ball_anchor_t anchor;
     uint32_t frameUs = gPreFramesCaptured * (uint32_t)gFramePeriodUs;
 
     memset(&in, 0, sizeof(in));
@@ -3538,8 +3539,9 @@ static void l3_shotObserve(uint32_t teeBin, int32_t fired, uint32_t impactUs)
     in.club = &gClubTrack;
     if (l3_shot_update(&gShot, &in, gPreFramesCaptured) == L3_SHOT_IMPACT &&
         gShot.impactFrame == gPreFramesCaptured) {
-        l3_ball_track_arm(&gBallTrack, l3_ballArmBin(teeBin), &gBallPosition,
-                          in.impactTimestampUs);
+        l3_ball_track_anchor(&gBallTrack, (float)teeBin, l3_ballArmBin(teeBin),
+                             in.impactTimestampUs, &gImpactFitCfg, &gClubTrack, &anchor);
+        l3_ball_track_arm(&gBallTrack, &anchor, &gBallPosition);
         if (gBand.valid) {
             /* The post window's floor, frozen (l3_scan.h): the fallback's
              * median beyond the band, else the trigger's own floor. */
@@ -3657,8 +3659,10 @@ static void l3_considerBallTrack(uint32_t slot)
     gTrigBusy = 1U;
     ticks = Cycleprofiler_getTimeStamp();
     params.stat = gTrigCfg.stat;
-    /* A departing ball is a weaker return than a club: its own snr. */
+    /* A departing ball is a weaker return than a club: its own snr, and with
+     * recovery on the history's lower one (l3_ball_track_extract_snr). */
     params.snr = (gBallSnr > 0.0F) ? gBallSnr : gBallTrackCfg.snr;
+    params.snr = l3_ball_track_extract_snr(&gBallTrack.cfg, params.snr);
     params.loopPeriodS = gTrigLoopPeriodS;
     params.subBin = gObsSubBin;
     if (gImpactFitCfg.bandBins > 0.0F && gBand.valid) {
@@ -3739,6 +3743,8 @@ static void l3_considerBallTrack(uint32_t slot)
         follow.ballClaimIndex = ballAppended ? gBallTrack.lastTargetIndex : L3_TRACK_NO_TARGET;
         follow.frameUs = gFramePeriodUs;
         (void)l3_track_follow(&gClubTrack, targets, found, frameIndex, gPostTimestampUs, &follow);
+        /* The club's claim reaches the ball's history now: never recovered. */
+        l3_ball_track_note_club(&gBallTrack, frameIndex, gClubTrack.lastTargetIndex);
     }
     if (ballAppended && gBallTrack.lastTargetIndex < found && gBallTrack.core.count > 1U &&
         l3_track_point(&gBallTrack.core, gBallTrack.core.count - 1U, &newest)) {

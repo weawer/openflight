@@ -65,15 +65,15 @@ def test_unknown_and_out_of_bounds_overrides_are_named():
         tn.check_overrides({"nope.gateBins": 1})
     with pytest.raises(ValueError, match="club.gateBins"):
         tn.check_overrides({"club.gateBins": 99.0})
-    tn.check_overrides({"club.gateBins": 2.5, "ball.hyps.maxMisses": 2})
+    tn.check_overrides({"club.gateBins": 2.5, "ball.hyps.coastUs": 2})
 
 
 def test_apply_overrides_touches_only_its_root_and_rounds_ints():
     cfg = fw.BallTrackCfg()
     tn.apply_overrides(
-        {"ball.hyps.gateBins": 2.0, "ball.launchPoints": 5.4, "club.gateBins": 9.0}, "ball", cfg
+        {"ball.hyps.gateM": 0.05, "ball.launchPoints": 5.4, "club.gateBins": 9.0}, "ball", cfg
     )
-    assert cfg.hyps.gateBins == 2.0
+    assert cfg.hyps.gateM == pytest.approx(0.05)
     assert cfg.launchPoints == 5
     club = fw.TrackCfg()
     tn.apply_overrides({"ball.launchPoints": 5}, "club", club)

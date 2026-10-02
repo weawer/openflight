@@ -597,3 +597,45 @@ def test_doubting_onboard_angles_leaves_the_speeds_usable(lib):
         if name not in angles:
             assert doubted[name].usable == packet[name].usable, name
     assert doubted["ball_speed"].usable and doubted["club_speed"].usable
+
+
+# --- ball_flight: what the no-ball veto reads (2026-10-01) ---------------------
+#
+# Raking a ball onto the tee or a waggle fired the self-trigger 8 times in 10 on
+# 2026-10-01 with no ball leaving. A packet saying the board measured no ball
+# speed is what lets the host skip the 7 s readback.
+
+
+def _packet(lib, shot, ball, launch) -> shot_result.ShotResultPacket:
+    result = build(lib, shot, ball, launch)
+    buffer = ctypes.create_string_buffer(fw.RESULT_PACKET_BYTES)
+    lib.l3_result_serialize(ctypes.byref(result), buffer, fw.RESULT_PACKET_BYTES)
+    return shot_result.parse_packet(buffer.raw)
+
+
+def test_a_measured_ball_speed_is_a_ball_flight(lib):
+    assert _packet(lib, make_shot(lib), make_ball(lib), make_launch()).ball_flight
+
+
+def test_a_club_without_a_ball_is_no_ball_flight(lib):
+    packet = _packet(
+        lib, make_shot(lib), make_ball(lib, confirmed=False, points=0), make_launch(valid=False)
+    )
+    assert packet.verdict == "partial"
+    assert not packet.ball_flight
+
+
+def test_an_implausible_ball_speed_still_counts_as_a_flight(lib):
+    """The veto drops captures; a doubted ball is still a ball, so it keeps the dump."""
+    packet = _packet(lib, make_shot(lib, speed=20.0), make_ball(lib), make_launch(speed=60.0))
+    assert packet["ball_speed"].implausible
+    assert packet.ball_flight
+
+
+def test_ball_points_alone_are_not_a_flight(lib):
+    """Replays of the raked-ball captures hold ball points on a stationary return."""
+    packet = _packet(
+        lib, make_shot(lib), make_ball(lib, confirmed=False, points=4), make_launch(valid=False)
+    )
+    assert packet.ball_points == 4
+    assert not packet.ball_flight

@@ -181,7 +181,10 @@ LATEST_FIRE_FRAMES = 3
 # scoring the whole window every frame fired all 34, none late, but only in
 # the replay -- on the board it starved the CLI and fired nothing. Speeding up
 # the per-bin residual can widen the spans back and tighten these again.
-MAX_UNFIRED = 2  # was 0
+# 2026-10-01: the club-in floor rose 10 -> 17 m/s so the downrange crossing
+# into the top of a backswing stops firing; 20260824_120840 (its club in
+# under 15 m/s on this replay) no longer fires.
+MAX_UNFIRED = 3  # was 2
 MAX_TOO_LATE = 1  # was 0
 
 

@@ -87,7 +87,7 @@ openflight_args=(
     # --calculated-spin  # Replaces measured OPS spin with a kinematic estimate.
     --iwr6843
     --iwr6843-port /dev/serial/by-id/REPLACE_WITH_TI_SERIAL_ID
-    --iwr6843-tee-m 1.372
+    --iwr6843-tee-m 1.575
     --iwr6843-net-m 4.064
     --iwr6843-tilt-deg 5.5
     --iwr6843-radar-height-m 0.229

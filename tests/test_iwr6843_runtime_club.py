@@ -586,3 +586,25 @@ def test_full_dump_keeps_its_own_noise_floor():
         runtime.process_shot(impact_timestamp=1.0, ball_speed_mph=100.0, club="7i")
 
     assert noise_calls == []
+
+
+def test_onboard_only_capture_skips_the_host_pipeline_and_keeps_the_result():
+    """Not --debug there is no readback: no LCMF, no club path, the board's result intact."""
+    result = SimpleNamespace(verdict="valid")
+    capture = SimpleNamespace(
+        valid=False, raw=None, onboard_only=True, onboard_result=result, error=None
+    )
+    runtime = IWR6843Runtime(
+        capture_monitor=SimpleNamespace(capture_for_shot=lambda _ts, timeout_s: capture),
+        calibration=object(),
+        net_range_m=4.064,
+    )
+
+    with patch("openflight.iwr6843.runtime.estimate_lcmf_v1") as lcmf:
+        shot_result = runtime.process_shot(
+            impact_timestamp=1.0, ball_speed_mph=100.0, club="7i", club_speed_mph=80.0
+        )
+
+    lcmf.assert_not_called()
+    assert shot_result.measurement is None and shot_result.club_path is None
+    assert shot_result.onboard is result

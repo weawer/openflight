@@ -206,6 +206,10 @@ class Shot:
     impact_timestamp: Optional[float] = None
     impact_timestamp_kld7: Optional[float] = None
     club_speed_mph: Optional[float] = None
+    # Where club_speed_mph came from: "ops" (set on construction, since every
+    # Shot is built from the OPS pipeline), "iwr6843" when the IWR6843 board
+    # filled a club speed the OPS missed, or None without a club speed.
+    club_speed_source: Optional[str] = None
     # Raw OPS radial ball speed, kept when the cosine correction rewrites
     # ball_speed_mph (radar bin anchoring must keep using the radial value)
     ball_speed_raw_mph: Optional[float] = None
@@ -273,6 +277,10 @@ class Shot:
     # verdict, quality flags and every onboard metric with confidence and
     # MEASURED / ESTIMATED provenance. Shown beside the host pipeline's values.
     iwr6843_onboard: Optional[dict] = None
+    # The board's ball and club speeds against the OPS, with a confidence-scaled
+    # agree / disagree / unchecked verdict per speed
+    # (ops_compare.OpsComparison.to_dict). Saved for comparison, never applied.
+    iwr6843_ops_check: Optional[dict] = None
     experimental_camera_horizontal_deg: Optional[float] = None
     experimental_camera_horizontal_confidence: Optional[float] = None
     experimental_camera_horizontal_status: Optional[str] = None
@@ -295,6 +303,10 @@ class Shot:
     descent_angle_deg: Optional[float] = None  # Chord through the measured late looks
     landing_angle_deg: Optional[float] = None  # Measured descent when present, else ballistic
     landing_angle_source: Optional[str] = None  # "ballistic" or "late_window_model_assisted"
+
+    def __post_init__(self) -> None:
+        if self.club_speed_mph is not None and self.club_speed_source is None:
+            self.club_speed_source = "ops"
 
     @property
     def ball_speed_ms(self) -> float:
@@ -388,6 +400,7 @@ class Shot:
             "ball_speed_mph": self.ball_speed_mph,
             "ball_speed_raw_mph": self.ball_speed_raw_mph,
             "club_speed_mph": self.club_speed_mph,
+            "club_speed_source": self.club_speed_source,
             "smash_factor": self.smash_factor,
             "estimated_carry_yards": self.estimated_carry_yards,
             "carry_range": list(self.estimated_carry_range),
@@ -428,6 +441,7 @@ class Shot:
             "iwr6843_horizontal_deg": self.iwr6843_horizontal_deg,
             "iwr6843_horizontal_confidence": self.iwr6843_horizontal_confidence,
             "iwr6843_onboard": self.iwr6843_onboard,
+            "iwr6843_ops_check": self.iwr6843_ops_check,
             "experimental_camera_horizontal_deg": self.experimental_camera_horizontal_deg,
             "experimental_camera_horizontal_confidence": (
                 self.experimental_camera_horizontal_confidence

@@ -58,6 +58,7 @@ def board(tmp_path_factory):
 def test_the_board_image_leaves_out_the_search_and_most_of_the_trace():
     assert dict(define.split("=", 1) for define in board_defines()) == {
         "L3_BALL_HYPOTHESES": "0",
+        "L3_BALL_RECOVER": "0",
         "L3_TRIG_TRACE_DEPTH": f"{BOARD_TRACE_DEPTH}U",
     }
 
@@ -104,6 +105,8 @@ def test_the_board_ball_track_drops_exactly_the_hypotheses(host, board):
     assert host_bytes == ctypes.sizeof(fw.BallTrack)
     saved = ctypes.sizeof(fw.BallHyps) + ctypes.sizeof(fw.BallHypVerdict)
     saved += ctypes.sizeof(fw.BallHypsCfg)  # the track's copy of its cfg
+    saved += ctypes.sizeof(fw.BallHistory)  # L3_BALL_RECOVER
+    saved += ctypes.sizeof(fw.BallRecoverCfg) + 8  # recover, historySnr
     assert board.l3_ball_track_struct_bytes() == host_bytes - saved
 
 
@@ -121,7 +124,14 @@ class OpaqueBallTrack:
 
     def run(self, scene: TwoTracks) -> list[tuple[int, str]]:
         origin = fw.Vec3(scene.origin_bin * BIN_M, 0.0, 0.0)
-        self.lib.l3_ball_track_arm(self.ptr, scene.origin_bin, ctypes.byref(origin), scene.gate_us)
+        anchor = fw.BallAnchor(
+            anchorBin=scene.origin_bin,
+            acceptFromBin=scene.origin_bin,
+            gateUs=scene.gate_us,
+            anchorUs=scene.gate_us,
+            anchorTolUs=15_000,
+        )
+        self.lib.l3_ball_track_arm(self.ptr, ctypes.byref(anchor), ctypes.byref(origin))
         seen = []
         for f in scene.build():
             arr = (fw.TargetObs * max(1, len(f.targets)))(*f.targets)

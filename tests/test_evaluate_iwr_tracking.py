@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
-from dataclasses import replace
+from dataclasses import asdict, replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -79,7 +79,7 @@ def test_split_frame_prefers_the_recorded_freeze(ev):
 
 
 def _outcome(ev, club, ball, present):
-    return ev.Outcome("x.l3dump", club, ball, present, None, 40.0)
+    return ev.Outcome("x.l3dump", club, ball, present, present, None, 40.0)
 
 
 def test_summarize_counts_every_category(ev):
@@ -93,6 +93,11 @@ def test_summarize_counts_every_category(ev):
         "club": {"club": 1, "stuck": 1, "few": 1},
         "ball": {"ok": 1, "wrong": 1, "none": 1},
         "ball_present": 2,
+        "ball_present_strict": 2,
+        "ball_by_presence": {
+            "present": {"ok": 1, "wrong": 1, "none": 0},
+            "absent": {"ok": 0, "wrong": 0, "none": 1},
+        },
     }
 
 
@@ -144,8 +149,8 @@ def test_a_modern_session_with_a_slant_range_but_no_triggercfg_is_still_a_case(e
     )
     cases = list(ev.iter_cases([tmp_path]))
     # The log holds the tape reading from the enclosure front: 1.372 m plus the array's
-    # 0.30 m is 1.672 m from the antenna, bin 36 (bin 29 was the tape reading alone).
-    assert len(cases) == 1 and cases[0].config.tee_bin == 36
+    # 30 mm is 1.402 m from the antenna, bin 30.
+    assert len(cases) == 1 and cases[0].config.tee_bin == 30
 
 
 def test_a_raw_adc_capture_is_skipped_instead_of_crashing_the_batch(ev, tmp_path):
@@ -233,7 +238,7 @@ def test_the_cli_passes_the_ball_search_through(ev, monkeypatch, tmp_path):
 
     def fake_evaluate(case, *, lib=None, ball_hypotheses=None, **_tuning):
         seen.append(ball_hypotheses)
-        return ev.Outcome("x", "club", "ok", True, 40.0, 40.0)
+        return ev.Outcome("x", "club", "ok", True, True, 40.0, 40.0)
 
     monkeypatch.setattr(ev, "evaluate", fake_evaluate)
     assert ev.main([str(tmp_path), "--ball-hypotheses", "on"]) == 0
@@ -255,9 +260,10 @@ def args_for(ev, *extra):
         fast_ball_from_club,
         band_bins=None,
         impact=False,
+        net_range_m=None,
     ):
         seen.update(tuning=tuning, from_club=fast_ball_from_club)
-        return ev.Outcome("x", "club", "ok", True, 40.0, 40.0)
+        return ev.Outcome("x", "club", "ok", True, True, 40.0, 40.0)
 
     return seen, fake_evaluate
 
@@ -282,19 +288,54 @@ def test_the_cli_passes_the_pi_detector_rules_through(ev, monkeypatch, tmp_path)
         "0.5",
         "--min-departure-mps",
         "15",
-        "--far-window-bins",
-        "3",
+        "--far-window-m",
+        "0.14",
+        "--corridor-gate",
+        "off",
+        "--impact-coast-ms",
+        "24",
+        "--max-decel",
+        "150",
+        "--classify-points",
+        "6",
+        "--recover",
+        "off",
+        "--recover-gate-m",
+        "0.05",
+        "--history-snr",
+        "0.7",
     ]
     assert ev.main(argv) == 0
     assert seen["tuning"] == ev.fr.BallTuning(
         fast_ball_mps=34.0,
         fast_support_fraction=0.5,
         min_departure_mps=15.0,
-        far_window_bins=3.0,
+        far_window_m=0.14,
+        corridor_gate=False,
+        impact_coast_ms=24.0,
+        max_decel_mps2=150.0,
+        classify_points=6,
+        recover=False,
+        recover_gate_m=0.05,
+        history_snr=0.7,
     )
+    assert ev.main([str(tmp_path), "--corridor-gate", "on", "--recover", "on"]) == 0
+    assert (seen["tuning"].corridor_gate, seen["tuning"].recover) == (True, True)
     assert seen["from_club"] is False
     assert ev.main([str(tmp_path), "--fast-ball", "club"]) == 0
     assert seen == {"tuning": None, "from_club": True}
+
+
+def pts(*rows):
+    return [SimpleNamespace(timestamp_us=us, range_m=m) for us, m in rows]
+
+
+def test_net_reached_when_the_track_arrives_on_time(ev):
+    # tee 2.0 m, net 4.5 m, 50 m/s from impact 0: due at 50 ms; 3 ms frames, +-6 ms
+    assert ev.net_reached(pts((47_000, 4.40), (50_000, 4.50)), 50.0, 0, 2.0, 4.5, 3000) is True
+    assert ev.net_reached(pts((60_000, 4.50)), 50.0, 0, 2.0, 4.5, 3000) is False
+    assert ev.net_reached(pts((30_000, 3.5)), 50.0, 0, 2.0, 4.5, 3000) is False  # never got there
+    assert ev.net_reached([], None, 0, 2.0, 4.5, 3000) is None  # no launch
 
 
 def test_a_bad_fast_ball_value_is_refused(ev, tmp_path):
@@ -316,9 +357,9 @@ def test_the_club_floor_fills_in_the_runs_tuning(ev, tmp_path):
     assert ev.tuning_for(case, None, fast_ball_from_club=True) == ev.fr.BallTuning(
         fast_ball_mps=50.0
     )
-    kept = ev.fr.BallTuning(far_window_bins=3.0, fast_ball_mps=20.0)
+    kept = ev.fr.BallTuning(far_window_m=0.14, fast_ball_mps=20.0)
     assert ev.tuning_for(case, kept, fast_ball_from_club=True) == ev.fr.BallTuning(
-        far_window_bins=3.0, fast_ball_mps=50.0
+        far_window_m=0.14, fast_ball_mps=50.0
     )
 
 
@@ -327,7 +368,14 @@ def test_band_bins_reaches_the_replay_config_only_when_given(ev, monkeypatch, tm
 
     def fake_replay(data, config, lib=None):
         configs.append(config)
-        return SimpleNamespace(config=config, frames=[], points=[], fired_frame=None, launch=None)
+        return SimpleNamespace(
+            config=config,
+            frames=[],
+            points=[],
+            fired_frame=None,
+            launch=None,
+            frozen_impact_timestamp_us=None,
+        )
 
     monkeypatch.setattr(ev.fr, "replay_dump", fake_replay)
     path = tmp_path / "x.l3dump"
@@ -342,7 +390,12 @@ def test_band_bins_reaches_the_replay_config_only_when_given(ev, monkeypatch, tm
 
 def test_evaluate_attaches_the_impact_outcome_only_when_asked(ev, monkeypatch, tmp_path):
     result = SimpleNamespace(
-        config=ev.fr.ReplayConfig(tee_bin=29), frames=[], points=[], fired_frame=None, launch=None
+        config=ev.fr.ReplayConfig(tee_bin=29),
+        frames=[],
+        points=[],
+        fired_frame=None,
+        launch=None,
+        frozen_impact_timestamp_us=None,
     )
     monkeypatch.setattr(ev.fr, "replay_dump", lambda data, config, lib=None: result)
     marker = object()
@@ -362,7 +415,7 @@ def test_the_cli_passes_band_bins_and_impact_through(ev, monkeypatch, tmp_path, 
     def fake_evaluate(case, *, band_bins=None, impact=False, **_rest):
         seen.append((band_bins, impact))
         return ev.Outcome(
-            "x", "club", "ok", True, 40.0, 40.0, impact=impact_outcome if impact else None
+            "x", "club", "ok", True, True, 40.0, 40.0, impact=impact_outcome if impact else None
         )
 
     impact_outcome = impact
@@ -375,3 +428,264 @@ def test_the_cli_passes_band_bins_and_impact_through(ev, monkeypatch, tmp_path, 
     assert seen == [(None, False), (6.0, True)]
     written = json.loads(out.read_text(encoding="utf-8"))
     assert written["impact"] == ev.impact_eval.summarize_impact([impact])
+
+
+STEP = 40.0 * 0.003 / BIN_M  # bins per 3 ms frame at 40 m/s
+
+
+def chain(frames_ms, start_bin=50.0, speed=40.0):
+    """One target per listed frame (3 ms apart) on a 40 m/s line from start_bin at 0 ms."""
+    return [frame_of(k, k * 3000, [start_bin + speed * (k * 0.003) / BIN_M]) for k in frames_ms]
+
+
+def test_gap_tolerant_ball_present_bridges_an_impact_gap(ev):
+    frames = chain([1, 5, 6])  # frames 2-4 missing: 9 ms gap
+    assert ev.ball_present(frames, 40.0, BIN_M) is False  # strict: consecutive only
+    assert ev.ball_present(frames, 40.0, BIN_M, max_gap_us=18_000) is True
+
+
+def test_gap_tolerant_ball_present_refuses_a_gap_longer_than_allowed(ev):
+    frames = chain([1, 9, 10])  # 24 ms gap
+    assert ev.ball_present(frames, 40.0, BIN_M, max_gap_us=18_000) is False
+
+
+def test_a_stationary_pair_is_not_a_ball_with_gaps_allowed(ev):
+    frames = [frame_of(k, k * 3000, [50.0, 53.0]) for k in range(1, 8)]
+    assert ev.ball_present(frames, 40.0, BIN_M, max_gap_us=18_000) is False
+
+
+def test_the_anchor_requires_the_chain_to_back_project_to_the_tee(ev):
+    frames = chain([4, 5, 6], start_bin=50.0)  # passes bin 50 at t = 0
+    assert ev.ball_present(frames, 40.0, BIN_M, max_gap_us=18_000, anchor=(50.0, 0, 15_000))
+    # The same chain judged against an impact 30 ms earlier does not back-project.
+    assert not ev.ball_present(
+        frames, 40.0, BIN_M, max_gap_us=18_000, anchor=(50.0, -30_000, 15_000)
+    )
+
+
+def test_ball_present_with_gaps_and_no_targets(ev):
+    assert ev.ball_present([], 40.0, BIN_M, max_gap_us=18_000) is False
+    assert ev.ball_present([frame_of(1, 3000, [])], 40.0, BIN_M, max_gap_us=18_000) is False
+
+
+def outcome(ev, ball, present, strict=None):
+    return ev.Outcome(
+        name="x",
+        club="club",
+        ball=ball,
+        ball_present=present,
+        ball_present_strict=present if strict is None else strict,
+        launch_mps=None,
+        ops_mps=40.0,
+    )
+
+
+def test_summarize_splits_the_ball_verdicts_by_presence(ev):
+    outs = [
+        outcome(ev, "ok", True),
+        outcome(ev, "none", True),
+        outcome(ev, "wrong", False, strict=False),
+        outcome(ev, "none", False),
+    ]
+    s = ev.summarize(outs)
+    assert s["ball_by_presence"] == {
+        "present": {"ok": 1, "wrong": 0, "none": 1},
+        "absent": {"ok": 0, "wrong": 1, "none": 1},
+    }
+    assert s["ball_present"] == 2 and s["ball_present_strict"] == 2
+
+
+def named(ev, name, ball, present, club="club"):
+    return ev.Outcome(
+        name=name,
+        club=club,
+        ball=ball,
+        ball_present=present,
+        ball_present_strict=present,
+        launch_mps=None,
+        ops_mps=40.0,
+    )
+
+
+def baseline_of(ev, outcomes) -> dict:
+    """A baseline JSON as --json writes it: the summary and every outcome."""
+    return {"summary": ev.summarize(outcomes), "outcomes": [asdict(o) for o in outcomes]}
+
+
+# The legacy baseline: a, b present; c, d absent.
+BASE_ROWS = [("a", "wrong", True), ("b", "none", True), ("c", "wrong", False), ("d", "ok", False)]
+
+
+def base_json(ev, club="club"):
+    return baseline_of(ev, [named(ev, n, b, p, club=club) for n, b, p in BASE_ROWS])
+
+
+def failures(ev, lines):
+    return [line for line in lines if not ev.is_informational(line)]
+
+
+def test_accept_split_passes_a_strict_improvement_under_the_same_labels(ev):
+    run = [
+        named(ev, "a", "ok", True),
+        named(ev, "b", "none", True),
+        named(ev, "c", "none", False),
+        named(ev, "d", "none", False),
+    ]
+    assert ev.accept_split(run, base_json(ev)) == []
+
+
+def test_accept_split_names_each_failure_under_the_same_labels(ev):
+    run = [
+        named(ev, "a", "wrong", True, club="stuck"),
+        named(ev, "b", "none", True),
+        named(ev, "c", "wrong", False),
+        named(ev, "d", "ok", False),
+    ]
+    problems = ev.accept_split(run, base_json(ev))
+    assert problems == [
+        "ball-present ok 0 not above 0",
+        "ball-absent none 0 not above 0",
+        "ball-absent wrong 1 not below 1",
+        "club at impact 3 < baseline 4",
+    ]
+    assert failures(ev, problems) == problems
+
+
+def test_accept_split_judges_the_run_by_the_baselines_labels(ev):
+    """The run's own label differs on c (its replay saw a ball there): c is
+    still judged as absent, so its 'none' counts; the difference is reported
+    as information, not as a failure."""
+    run = [
+        named(ev, "a", "ok", True),
+        named(ev, "b", "none", True),
+        named(ev, "c", "none", True),  # run says present, baseline absent
+        named(ev, "d", "none", False),
+    ]
+    lines = ev.accept_split(run, base_json(ev))
+    assert lines == ["label differs: c baseline=absent run=present"]
+    assert failures(ev, lines) == []
+
+
+def test_a_label_flip_cannot_buy_acceptance(ev):
+    """Under the run's own labels c ('wrong', now present) would leave the
+    absent side with no wrong; under the baseline's it is still absent wrong."""
+    run = [
+        named(ev, "a", "ok", True),
+        named(ev, "b", "none", True),
+        named(ev, "c", "wrong", True),
+        named(ev, "d", "none", False),
+    ]
+    lines = ev.accept_split(run, base_json(ev))
+    assert failures(ev, lines) == ["ball-absent wrong 1 not below 1"]
+    assert "label differs: c baseline=absent run=present" in lines
+
+
+def test_accept_split_refuses_different_capture_sets(ev):
+    run = [
+        named(ev, "a", "ok", True),
+        named(ev, "b", "none", True),
+        named(ev, "c", "none", False),
+        named(ev, "e", "none", False),
+    ]
+    problems = ev.accept_split(run, base_json(ev))
+    assert len(problems) == 1 and not ev.is_informational(problems[0])
+    assert "captures differ" in problems[0]
+    assert "only in the run: e" in problems[0] and "only in the baseline: d" in problems[0]
+
+
+def test_accept_split_refuses_duplicate_capture_names(ev):
+    run = [named(ev, n, b, p) for n, b, p in BASE_ROWS] + [named(ev, "a", "ok", True)]
+    problems = ev.accept_split(run, base_json(ev))
+    assert problems == ["duplicate capture names in the run: a"]
+
+
+@pytest.mark.parametrize(
+    ("mutate", "needle"),
+    [
+        (lambda b: b.pop("outcomes"), "no per-capture outcomes"),
+        (lambda b: b["summary"].pop("ball_by_presence"), "no ball_by_presence"),
+        (lambda b: b.pop("summary"), "no summary"),
+        (lambda b: b["outcomes"][0].pop("ball_present"), "no ball_present"),
+    ],
+)
+def test_an_old_baseline_is_a_readable_problem_not_a_key_error(ev, mutate, needle):
+    base = base_json(ev)
+    mutate(base)
+    run = [named(ev, n, b, p) for n, b, p in BASE_ROWS]
+    problems = ev.accept_split(run, base)
+    assert len(problems) == 1 and needle in problems[0]
+    assert not ev.is_informational(problems[0])
+
+
+def _run_main(ev, monkeypatch, tmp_path, run, *flags):
+    monkeypatch.setattr(ev, "iter_cases", lambda roots: iter(run))
+    monkeypatch.setattr(ev, "evaluate", lambda case, **_kw: case)
+    return ev.main([str(tmp_path), *flags])
+
+
+def test_the_cli_runs_accept_and_compare_both_and_fails_on_either(
+    ev, monkeypatch, tmp_path, capsys
+):
+    base = tmp_path / "base.json"
+    base.write_text(json.dumps(base_json(ev)), encoding="utf-8")
+    same = [named(ev, n, b, p) for n, b, p in BASE_ROWS]
+    code = _run_main(ev, monkeypatch, tmp_path, same, "--accept", str(base), "--compare", str(base))
+    out = capsys.readouterr().out
+    assert code == 1
+    assert "NOT ACCEPTED: ball-present ok 0 not above 0" in out
+    assert "REGRESSION" not in out  # the compare ran too and found nothing
+
+    worse = [named(ev, n, "none", p, club="stuck") for n, _b, p in BASE_ROWS]
+    code = _run_main(ev, monkeypatch, tmp_path, worse, "--accept", str(base), "--compare", str(base))
+    out = capsys.readouterr().out
+    assert code == 1
+    assert "NOT ACCEPTED" in out and "REGRESSION club at impact" in out
+
+
+def test_the_cli_prints_label_differences_without_failing(ev, monkeypatch, tmp_path, capsys):
+    base = tmp_path / "base.json"
+    base.write_text(json.dumps(base_json(ev)), encoding="utf-8")
+    run = [
+        named(ev, "a", "ok", True),
+        named(ev, "b", "none", True),
+        named(ev, "c", "none", True),
+        named(ev, "d", "none", False),
+    ]
+    assert _run_main(ev, monkeypatch, tmp_path, run, "--accept", str(base)) == 0
+    out = capsys.readouterr().out
+    assert "NOTE: label differs: c baseline=absent run=present" in out
+    assert "NOT ACCEPTED" not in out
+
+
+def test_the_cli_reports_an_old_baseline_and_fails(ev, monkeypatch, tmp_path, capsys):
+    base = tmp_path / "old.json"
+    old = base_json(ev)
+    del old["outcomes"]
+    base.write_text(json.dumps(old), encoding="utf-8")
+    run = [named(ev, n, b, p) for n, b, p in BASE_ROWS]
+    assert _run_main(ev, monkeypatch, tmp_path, run, "--accept", str(base)) == 1
+    assert "NOT ACCEPTED: " in capsys.readouterr().out
+
+
+def test_a_reviewed_label_overrides_the_heuristic(ev, tmp_path, monkeypatch):
+    labels = SimpleNamespace(reviewed=True, ball=(1, 2, 3))
+    monkeypatch.setattr(ev, "load_labels", lambda _path: labels)
+    assert ev.labelled_presence(tmp_path / "x.l3dump") is True
+    labels.ball = ()
+    assert ev.labelled_presence(tmp_path / "x.l3dump") is False
+
+
+def test_an_unreviewed_or_broken_label_falls_back_to_the_heuristic(
+    ev, tmp_path, monkeypatch, capsys
+):
+    monkeypatch.setattr(
+        ev, "load_labels", lambda _path: SimpleNamespace(reviewed=False, ball=(1, 2, 3))
+    )
+    assert ev.labelled_presence(tmp_path / "x.l3dump") is None
+
+    def broken(_path):
+        raise ev.LabelError("bad file")
+
+    monkeypatch.setattr(ev, "load_labels", broken)
+    assert ev.labelled_presence(tmp_path / "x.l3dump") is None
+    assert "bad file" in capsys.readouterr().err

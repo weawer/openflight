@@ -226,12 +226,14 @@ practice swing, or the ball was not where the destination bin said).
 `result verdict=` is the firmware's own VALID / PARTIAL / INVALID call, and
 `triggerLog result` also prints the packet `shot_result.py` parses.
 
-The server reads that packet itself after every self-triggered capture:
-the log line `IWR6843 onboard <verdict>: ball ... vs OPS ...` puts the
-firmware's numbers beside the host's, the shot record carries them as
+The server reads that packet itself after every capture, self- or
+sound-triggered. The shot's launch angles, club path and attack angle are
+the packet's usable values. The shot record carries the whole packet as
 `iwr6843_onboard`, and the kiosk shows a "TI onboard" strip under the Live
-tiles with MEASURED / ESTIMATED on each metric. Nothing there replaces the
-published numbers unless the server runs with `--iwr6843-onboard-metrics`.
+tiles with MEASURED / ESTIMATED on each metric. Only `--debug` reads the
+ring back; then the log line `IWR6843 onboard <verdict>: ball ... vs OPS ...`
+puts the firmware's numbers beside the host LCMF-v1's, which are never
+published.
 While the ball detector is on (the default), the kiosk's setup banner
 shows the same `setup=` advice as the `ball status` line above, refreshed
 every second.

@@ -86,6 +86,30 @@ class TestShot:
         shot = Shot(ball_speed_mph=150.0, timestamp=datetime.now())
         assert shot.smash_factor is None
 
+    def test_club_speed_from_construction_is_the_ops(self):
+        """Every Shot is built from the OPS pipeline; a later IWR fill relabels it."""
+        shot = Shot(ball_speed_mph=150.0, club_speed_mph=100.0, timestamp=datetime.now())
+        assert shot.club_speed_source == "ops"
+        assert shot.to_dict()["club_speed_source"] == "ops"
+
+    def test_no_club_speed_has_no_source(self):
+        shot = Shot(ball_speed_mph=150.0, timestamp=datetime.now())
+        assert shot.club_speed_source is None
+
+    def test_explicit_club_speed_source_is_kept(self):
+        shot = Shot(
+            ball_speed_mph=150.0,
+            club_speed_mph=100.0,
+            club_speed_source="iwr6843",
+            timestamp=datetime.now(),
+        )
+        assert shot.club_speed_source == "iwr6843"
+
+    def test_ops_check_defaults_to_none_and_rides_in_the_dict(self):
+        shot = Shot(ball_speed_mph=150.0, timestamp=datetime.now())
+        assert shot.iwr6843_ops_check is None
+        assert shot.to_dict()["iwr6843_ops_check"] is None
+
     def test_speed_unit_conversion(self):
         """Test mph to m/s conversion."""
         shot = Shot(
@@ -124,7 +148,8 @@ class TestShot:
         """Shot with launch angle should adjust carry distance."""
         shot_no_angle = Shot(ball_speed_mph=150.0, timestamp=datetime.now())
         shot_low_angle = Shot(
-            ball_speed_mph=150.0, timestamp=datetime.now(),
+            ball_speed_mph=150.0,
+            timestamp=datetime.now(),
             launch_angle_vertical=7.0,  # well below 11 optimal for driver
             launch_angle_confidence=1.0,
         )
@@ -140,11 +165,14 @@ class TestShot:
         """Shot with launch angle should have tighter carry range."""
         shot_no_angle = Shot(ball_speed_mph=150.0, timestamp=datetime.now())
         shot_angle = Shot(
-            ball_speed_mph=150.0, timestamp=datetime.now(),
+            ball_speed_mph=150.0,
+            timestamp=datetime.now(),
             launch_angle_vertical=11.0,
             launch_angle_confidence=0.5,
         )
-        no_angle_spread = shot_no_angle.estimated_carry_range[1] - shot_no_angle.estimated_carry_range[0]
+        no_angle_spread = (
+            shot_no_angle.estimated_carry_range[1] - shot_no_angle.estimated_carry_range[0]
+        )
         angle_spread = shot_angle.estimated_carry_range[1] - shot_angle.estimated_carry_range[0]
         assert angle_spread < no_angle_spread
 
@@ -215,7 +243,7 @@ class TestMultiObjectReporting:
 
         # Verify the method exists and handles single digits
         # Can't test actual command without hardware, but method should not raise
-        assert hasattr(radar, 'set_num_reports')
+        assert hasattr(radar, "set_num_reports")
 
     def test_direction_constants(self):
         """Verify direction enum values."""

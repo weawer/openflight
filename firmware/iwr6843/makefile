@@ -30,12 +30,14 @@ R4F_CFLAGS += $(L3_VARIANT_DEFS)
 # 96 KB IQ16 scratch, the 32 KB heap, .data, .bss and the stacks). The code
 # stays in the tree and the host build (firmware_host.py) keeps all of it, so
 # the replay and the tests still run it. Put one back on the make line, e.g.
-#   make L3_FEATURE_DEFS="--define=L3_BALL_HYPOTHESES=1"
+#   make L3_FEATURE_DEFS="--define=L3_BALL_HYPOTHESES=1 --define=L3_BALL_RECOVER=1"
 # (make clean first; this replaces the whole list).
 #   L3_BALL_HYPOTHESES=0  the ball-hypothesis search: off at run time until
 #                         the recorded captures say otherwise (~1.6 KB)
+#   L3_BALL_RECOVER=0     the post-impact target history and backward ball
+#                         recovery (needs L3_BALL_HYPOTHESES)
 #   L3_TRIG_TRACE_DEPTH=24 trigger raw-input trace, host 64 (~1.3 KB)
-L3_FEATURE_DEFS ?= --define=L3_BALL_HYPOTHESES=0 --define=L3_TRIG_TRACE_DEPTH=24U
+L3_FEATURE_DEFS ?= --define=L3_BALL_HYPOTHESES=0 --define=L3_BALL_RECOVER=0 --define=L3_TRIG_TRACE_DEPTH=24U
 R4F_CFLAGS += $(L3_FEATURE_DEFS)
 
 # Image identity for the CLI "stats version" sub-mode (see fw_version.h). The
@@ -91,7 +93,7 @@ MAP        = $(APPNAME)_mss.map
 OUT        = $(APPNAME)_mss.$(R4F_EXE_EXT)
 BIN        = $(APPNAME).bin
 APP_CMD    = mss_linker.cmd
-SOURCES    = l3_dump.c track_select.c detect_queue.c capture_plan.c compact_iq16.c live_selector.c l3_text.c l3_frames.c l3_angle.c l3_observation.c l3_band.c l3_trigger.c l3_ball.c l3_club_track.c l3_track_kf.c l3_impact_fit.c l3_ball_hyp.c l3_impact.c l3_leave.c l3_scan.c l3_shot.c l3_ball_track.c l3_ball_fit.c l3_launch.c l3_result.c l3_profile.c l3_adaptive.c l3_iq8.c l3_retain.c l3_iq16_stats.c l3_bin_score.c l3_channels.c l3_angle_queue.c l3_dsp_ipc.c l3_detect_core.c l3_timing.c l3_window.c
+SOURCES    = l3_dump.c track_select.c detect_queue.c capture_plan.c compact_iq16.c live_selector.c l3_text.c l3_frames.c l3_angle.c l3_observation.c l3_band.c l3_trigger.c l3_ball.c l3_club_track.c l3_track_kf.c l3_impact_fit.c l3_ball_anchor.c l3_ball_hyp.c l3_ball_recover.c l3_impact.c l3_leave.c l3_scan.c l3_shot.c l3_ball_track.c l3_ball_fit.c l3_launch.c l3_result.c l3_profile.c l3_adaptive.c l3_iq8.c l3_retain.c l3_iq16_stats.c l3_bin_score.c l3_channels.c l3_angle_queue.c l3_dsp_ipc.c l3_detect_core.c l3_timing.c l3_window.c
 DEPENDS    = $(addprefix $(PLATFORM_OBJDIR)/, $(SOURCES:.c=.$(R4F_DEP_EXT)))
 OBJECTS    = $(addprefix $(PLATFORM_OBJDIR)/, $(SOURCES:.c=.$(R4F_OBJ_EXT)))
 

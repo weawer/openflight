@@ -39,9 +39,16 @@ void l3_ball_track_cfg_defaults(l3_ball_track_cfg_t *cfg)
     cfg->snr = 1.0F;                  /* the floor itself: the ball is weak and moving */
     cfg->useHypotheses = 0U;          /* decided by the recorded captures */
     cfg->skipClubClaim = 1U;
+    cfg->gateTolUs = 15000U;          /* the gate is not the exact impact */
+    cfg->anchorMaxSigmaUs = 3000.0F;
     l3_ball_fit_cfg_defaults(&cfg->fit);
 #if L3_BALL_HYPOTHESES
     l3_ball_hyps_cfg_defaults(&cfg->hyps);
+#endif
+#if L3_BALL_RECOVER
+    cfg->recover = 1U;
+    cfg->historySnr = 0.0F;           /* the same as snr */
+    l3_ball_recover_cfg_defaults(&cfg->rec);
 #endif
 }
 
@@ -58,6 +65,14 @@ void l3_ball_track_init(l3_ball_track_t *track, const l3_ball_track_cfg_t *cfg)
     track->verdict.index = -1;
     l3_ball_hyps_init(&track->hyps, &track->cfg.hyps);
 #endif
+#if L3_BALL_RECOVER
+    /* Recovery shares the core's geometry and the hypotheses' tolerances. */
+    track->cfg.rec.binWidthM = cfg->core.binWidthM;
+    track->cfg.rec.velocitySpanMps = cfg->core.velocitySpanMps;
+    track->cfg.rec.maxResidualBins = track->cfg.hyps.maxResidualBins;
+    track->cfg.rec.dopplerToleranceMps = track->cfg.hyps.dopplerToleranceMps;
+    l3_ball_history_reset(&track->history);
+#endif
 }
 
 void l3_ball_track_reset(l3_ball_track_t *track)
@@ -71,24 +86,37 @@ void l3_ball_track_reset(l3_ball_track_t *track)
     track->originBin = 0.0F;
     track->lastTargetIndex = L3_TRACK_NO_TARGET;
     memset(&track->origin, 0, sizeof(track->origin));
+    memset(&track->anchor, 0, sizeof(track->anchor));
 #if L3_BALL_HYPOTHESES
     l3_ball_hyps_init(&track->hyps, &track->cfg.hyps);
     memset(&track->verdict, 0, sizeof(track->verdict));
     track->verdict.index = -1;
 #endif
+#if L3_BALL_RECOVER
+    l3_ball_history_reset(&track->history);
+#endif
 }
 
-void l3_ball_track_arm(l3_ball_track_t *track, float originBin, const l3_vec3_t *origin,
-                       uint32_t impactTimestampUs)
+void l3_ball_track_arm(l3_ball_track_t *track, const l3_ball_anchor_t *anchor,
+                       const l3_vec3_t *origin)
 {
     l3_ball_track_reset(track);
     track->armed = 1U;
-    track->originBin = originBin;
+    track->originBin = anchor->acceptFromBin;
     track->origin = *origin;
-    track->impactTimestampUs = impactTimestampUs;
+    track->impactTimestampUs = anchor->gateUs;
+    track->anchor = *anchor;
 #if L3_BALL_HYPOTHESES
-    l3_ball_hyps_arm(&track->hyps, originBin, impactTimestampUs);
+    l3_ball_hyps_arm(&track->hyps, anchor);
 #endif
+}
+
+void l3_ball_track_anchor(const l3_ball_track_t *track, float teeBin, float acceptFromBin,
+                          uint32_t gateUs, const l3_impact_fit_cfg_t *fitCfg,
+                          const l3_club_track_t *club, l3_ball_anchor_t *out)
+{
+    l3_ball_anchor_make(teeBin, acceptFromBin, gateUs, track->cfg.gateTolUs, fitCfg, club,
+                        track->cfg.anchorMaxSigmaUs, out);
 }
 
 static int32_t l3_ball_track_note(l3_ball_track_t *track, uint8_t why, int32_t appended)
@@ -297,19 +325,35 @@ static void l3_ball_track_quietHyps(l3_ball_track_t *track)
 }
 
 /* The classified hypothesis becomes the track: its points (angles included)
- * seed the core in order, and tracking carries on from them. */
+ * seed the core in order, and tracking carries on from them. With recovery
+ * the frames it missed are first recovered from the history and merged in. */
 static int32_t l3_ball_track_adopt(l3_ball_track_t *track, uint32_t index)
 {
     const l3_ball_hyp_t *hyp = &track->hyps.hyp[index];
+    const l3_ball_hyp_point_t *points = hyp->points;
+    uint32_t count = hyp->count;
     float gateBins = track->core.cfg.gateBins;
     uint32_t k;
+#if L3_BALL_RECOVER
+    static l3_ball_hyp_point_t merged[L3_TRACK_POINTS];
+    l3_ball_recover_result_t rec;
+
+    if (track->cfg.recover) {
+        count = l3_ball_recover(&track->cfg.rec, &track->history, hyp,
+                                track->anchor.acceptFromBin, merged, L3_TRACK_POINTS, &rec);
+        points = merged;
+        track->verdict.recovered = rec.recovered;
+        track->verdict.recoveredFirstFrame = rec.firstFrame;
+        track->verdict.recoveredMask = rec.mask;
+    }
+#endif
 
     l3_track_reset(&track->core);
     /* The points were associated on timestamps by the hypothesis already;
      * the core's frame-counted gate must not refuse them on the way in. */
     track->core.cfg.gateBins = 1.0e9F;
-    for (k = 0U; k < hyp->count; k++) {
-        const l3_ball_hyp_point_t *p = &hyp->points[k];
+    for (k = 0U; k < count; k++) {
+        const l3_ball_hyp_point_t *p = &points[k];
         l3_target_obs_t seed;
 
         memset(&seed, 0, sizeof(seed));
@@ -320,7 +364,7 @@ static int32_t l3_ball_track_adopt(l3_ball_track_t *track, uint32_t index)
         seed.stat = p->stat;
         seed.peak = p->stat;
         seed.dopplerAliasMps = p->dopplerAliasMps;
-        seed.coherence = 1.0F;
+        seed.coherence = p->coherence;
         seed.confidence = 1.0F;
         if (!l3_track_update(&track->core, &seed, 1U, p->frame, p->timestampUs)) {
             track->core.cfg.gateBins = gateBins;
@@ -341,7 +385,9 @@ static int32_t l3_ball_track_adopt(l3_ball_track_t *track, uint32_t index)
 }
 #endif /* L3_BALL_HYPOTHESES */
 
-int32_t l3_ball_track_update_joint(l3_ball_track_t *track, const l3_target_obs_t *targets,
+/* l3_ball_track_update_joint over the targets the track may use (the snr
+ * filter already applied); indices it reports are into these targets. */
+static int32_t l3_ball_track_joint(l3_ball_track_t *track, const l3_target_obs_t *targets,
                                    uint32_t n, uint32_t frame, uint32_t timestampUs,
                                    uint32_t clubIndex)
 {
@@ -376,10 +422,90 @@ int32_t l3_ball_track_update_joint(l3_ball_track_t *track, const l3_target_obs_t
 #endif
 }
 
+#if L3_BALL_RECOVER
+/* An index into the filtered targets back to the caller's list. */
+static uint32_t l3_ball_track_original(const uint32_t *original, uint32_t kept, uint32_t index)
+{
+    return (index < kept) ? original[index] : index;
+}
+#endif
+
+int32_t l3_ball_track_update_joint(l3_ball_track_t *track, const l3_target_obs_t *targets,
+                                   uint32_t n, uint32_t frame, uint32_t timestampUs,
+                                   uint32_t clubIndex)
+{
+#if L3_BALL_RECOVER
+    static l3_target_obs_t usable[L3_OBS_MAX_TARGETS];
+    static uint32_t original[L3_OBS_MAX_TARGETS];  /* usable index -> caller index */
+    uint32_t kept = 0U;
+    uint32_t keptClub = L3_TRACK_NO_TARGET;
+    uint32_t i;
+    int32_t appended;
+
+    if (!track->cfg.recover) {
+        return l3_ball_track_joint(track, targets, n, frame, timestampUs, clubIndex);
+    }
+    if (track->cfg.useHypotheses && track->armed && !track->done && !track->confirmed) {
+        /* Searching: the history keeps the whole frame, weaker returns included. */
+        l3_ball_history_push(&track->history, targets, n, frame, timestampUs, clubIndex);
+    }
+    if (!(track->cfg.historySnr > 0.0F && track->cfg.historySnr < track->cfg.snr)) {
+        return l3_ball_track_joint(track, targets, n, frame, timestampUs, clubIndex);
+    }
+    /* Of this track, only the history holds the returns under snr: every
+     * branch (legacy, search, confirmed) sees the caller's targets at snr, and
+     * every index it reports is mapped back into the caller's list. (The
+     * caller's club follow sees the lowered list: l3_ball_track_extract_snr.) */
+    for (i = 0U; i < n && i < L3_OBS_MAX_TARGETS; i++) {
+        if (targets[i].snr >= track->cfg.snr) {
+            if (i == clubIndex) {
+                keptClub = kept;
+            }
+            original[kept] = i;
+            usable[kept++] = targets[i];
+        }
+    }
+    appended = l3_ball_track_joint(track, usable, kept, frame, timestampUs, keptClub);
+    track->lastTargetIndex = l3_ball_track_original(original, kept, track->lastTargetIndex);
+    for (i = 0U; i < L3_BALL_HYP_MAX; i++) {
+        track->hyps.hyp[i].lastTargetIndex =
+            l3_ball_track_original(original, kept, track->hyps.hyp[i].lastTargetIndex);
+    }
+    return appended;
+#else
+    return l3_ball_track_joint(track, targets, n, frame, timestampUs, clubIndex);
+#endif
+}
+
 int32_t l3_ball_track_update(l3_ball_track_t *track, const l3_target_obs_t *targets, uint32_t n,
                              uint32_t frame, uint32_t timestampUs)
 {
     return l3_ball_track_update_joint(track, targets, n, frame, timestampUs, L3_TRACK_NO_TARGET);
+}
+
+void l3_ball_track_note_club(l3_ball_track_t *track, uint32_t frame, uint32_t clubIndex)
+{
+#if L3_BALL_RECOVER
+    l3_ball_history_mark_club(&track->history, frame, clubIndex);
+#else
+    (void)track;
+    (void)frame;
+    (void)clubIndex;
+#endif
+}
+
+float l3_ball_track_extract_snr(const l3_ball_track_cfg_t *cfg, float searchSnr)
+{
+#if L3_BALL_RECOVER
+    /* Only the search fills the history: the legacy acquisition keeps snr. */
+    if (cfg->recover && cfg->useHypotheses && cfg->historySnr > 0.0F &&
+        cfg->historySnr < searchSnr) {
+        return cfg->historySnr;
+    }
+#else
+    (void)cfg;
+#endif
+    return searchSnr;
 }
 
 uint32_t l3_ball_track_struct_bytes(void)
@@ -463,18 +589,23 @@ int32_t l3_ball_track_format_status(const l3_ball_track_t *track, char *out, uin
 {
     char originText[16];
     char binText[16];
+#if L3_BALL_HYPOTHESES
+    unsigned recovered = (unsigned)track->verdict.recovered;
+#else
+    unsigned recovered = 0U;
+#endif
 
     l3_text_fixed2(track->originBin, originText, sizeof(originText));
     l3_text_fixed2(track->core.lastBin, binText, sizeof(binText));
     return snprintf(out, cap,
                     "balltrack armed=%u confirmed=%u done=%u why=%s count=%u origin=%s bin=%s "
-                    "impact=%u acq=%u slow=%u fast=%u lost=%u",
+                    "impact=%u acq=%u slow=%u fast=%u lost=%u rec=%u",
                     (unsigned)track->armed, (unsigned)track->confirmed, (unsigned)track->done,
                     l3_ball_track_why_name(track->why), (unsigned)track->core.count, originText,
                     binText, (unsigned)track->impactTimestampUs,
                     (unsigned)track->counters[L3_BALL_TRACK_WHY_ACQUIRED],
                     (unsigned)track->counters[L3_BALL_TRACK_WHY_TOO_SLOW],
                     (unsigned)track->counters[L3_BALL_TRACK_WHY_TOO_FAST],
-                    (unsigned)track->counters[L3_BALL_TRACK_WHY_LOST]);
+                    (unsigned)track->counters[L3_BALL_TRACK_WHY_LOST], recovered);
 }
 

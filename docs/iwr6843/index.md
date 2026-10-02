@@ -29,7 +29,8 @@ Flash one configurable firmware image, then select a runtime profile:
 | Component | Current file or value |
 |---|---|
 | Firmware | `firmware/releases/l3_dump_configurable_capture_20260818.bin` |
-| Wide/default config | `config/iwr6843_l3dump_wide_24f3ms_53bin_iq16.cfg` |
+| Default config | `config/iwr6843_l3dump_wide_24f2ms_53bin_iq16_window_hann.cfg` (wide IQ16, 2 ms frames, Hann range window; the self-trigger was proven on it at the rig, 2026-10-01) |
+| Wide 3 ms config | `config/iwr6843_l3dump_wide_24f3ms_53bin_iq16.cfg` |
 | Dense/advanced config | `config/iwr6843_l3dump_dense_45f2ms_53bin_iq8.cfg` |
 | Dense/wide-late experimental config | `config/iwr6843_l3dump_dense_36f2ms_53bin_iq8_wide_late.cfg` |
 | Reference array calibration | `config/iwr6843_calibration_reference.json` |

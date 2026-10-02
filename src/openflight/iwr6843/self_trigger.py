@@ -17,9 +17,9 @@ import numpy as np
 from openflight.iwr6843.calibration import DEFAULT_TEE_RANGE_M
 
 # The firmware trigger's ``triggerCfg`` defaults as the Pi sends them for the
-# stock setup (tee 1.575 m from the enclosure front → array 1.875 m → bin 40,
+# stock setup (tee 1.575 m from the enclosure front → array 1.605 m → bin 34,
 # watched two bins short). The replay and the viewer start from the same values.
-FIRMWARE_TRIGGER_DEFAULT_BIN = 38
+FIRMWARE_TRIGGER_DEFAULT_BIN = 32
 FIRMWARE_TRIGGER_DEFAULT_SNR = 1.0
 # The ball tracker's own snr on the board (l3_ball_track_cfg_defaults), which
 # "trackCfg ballSnr 0" restores.

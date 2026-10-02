@@ -218,9 +218,10 @@ def _pause(seconds: float) -> None:
     time.sleep(seconds)
 
 
-# Default RF profile for the kiosk and live IWR scripts: adaptive16 keeps the
-# wide 53-bin IQ16 processing windows and retains a 141 ms movie (24/7/16).
-DEFAULT_IWR6843_CONFIG = "config/iwr6843_l3dump_adaptive_47f3ms_53bin_a16.cfg"
+# Default RF profile for the kiosk and live IWR scripts: the wide 53-bin IQ16
+# profile at 2 ms frames with a Hann range window, the one the self-trigger
+# was proven on at the rig (2026-10-01).
+DEFAULT_IWR6843_CONFIG = "config/iwr6843_l3dump_wide_24f2ms_53bin_iq16_window_hann.cfg"
 # A return short of the tee counts as a club target at this multiple of the
 # firmware's running noise floor. The board's triggerLog trace shows the snr
 # real swings and idle frames reach; tune from that.
@@ -233,19 +234,39 @@ SELF_TRIGGER_DEFAULT_BIN = FIRMWARE_TRIGGER_DEFAULT_BIN
 # bin: on 38 labelled swings the ball was best tracked 2 bins short of its rest
 # bin (470/552 ball points) and lost outright from 4-5 bins short.
 SELF_TRIGGER_TEE_LEAD_BINS = 2
+# How far downrange the kiosk moves that bin without --iwr6843-self-trigger-
+# offset-m: 0.2 m, 4 bins, past the ball. On the rig 2026-10-01 (tee set at
+# 1.7 m, hitting from 1.5 m) a swing's line carried through it and backswings
+# and waggles stopped firing. The ball search moves with it (above): on trial.
+SELF_TRIGGER_DEFAULT_OFFSET_M = 0.2
+SELF_TRIGGER_MAX_OFFSET_M = 1.0
 
 
-def self_trigger_bin(tee_from_front_m: float, config_path: str | Path, fft_size: int = 128) -> int:
+def self_trigger_bin(
+    tee_from_front_m: float,
+    config_path: str | Path,
+    fft_size: int = 128,
+    offset_m: float = 0.0,
+) -> int:
     """``triggerCfg`` bin for a tee tape from the enclosure front.
 
-    Adds the array depth, then aims ``SELF_TRIGGER_TEE_LEAD_BINS`` short of the
-    ball — the same default the kiosk uses without ``--iwr6843-self-trigger-bin``.
+    Adds the array depth, aims ``SELF_TRIGGER_TEE_LEAD_BINS`` short of the
+    ball, then moves ``offset_m`` downrange in whole bins (negative: toward
+    the radar). The board's every use of the bin moves with it: the impact,
+    the tee band, the ball search and the retained cells.
     """
     from openflight.iwr6843.calibration import antenna_range_m
 
+    if not math.isfinite(offset_m) or abs(offset_m) > SELF_TRIGGER_MAX_OFFSET_M:
+        raise ValueError(
+            f"self-trigger offset must be within +/-{SELF_TRIGGER_MAX_OFFSET_M:g} m, got {offset_m}"
+        )
     ball = tee_global_bin(antenna_range_m(tee_from_front_m), config_path, fft_size)
-    watched = ball - SELF_TRIGGER_TEE_LEAD_BINS
-    return check_first_window_bin(watched, config_path, f"self-trigger bin {watched}")
+    shift = int(round(offset_m / (RANGE_SPAN_M / fft_size)))
+    watched = ball - SELF_TRIGGER_TEE_LEAD_BINS + shift
+    return check_first_window_bin(
+        watched, config_path, f"self-trigger bin {watched} ({offset_m:+.2f} m offset)"
+    )
 
 
 @dataclass(frozen=True)
@@ -360,6 +381,12 @@ class IWR6843Capture:
     # the readback rearms the ring; None on firmware without it or without a
     # RESULT this shot.
     onboard_result: object | None = None
+    # The board's result showed no ball flight, so the readback was skipped
+    # (IWR6843CaptureMonitor.veto_no_ball).
+    vetoed: bool = False
+    # The monitor runs without readback (IWR6843CaptureMonitor.readback):
+    # onboard_result is all this capture has, by design rather than failure.
+    onboard_only: bool = False
 
     @property
     def valid(self) -> bool:
@@ -399,7 +426,30 @@ class IWR6843CaptureMonitor:
         tee_band_bins: float = TEE_BAND_DEFAULT_BINS,
         ball_snr: float | None = None,
         board_calibration: BoardCalibration | None = None,
+        veto_no_ball: bool = False,
+        readback: bool = True,
+        full_capture: bool = False,
     ):
+        if save_dumps and not readback:
+            raise ValueError("save_dumps needs the readback: without it there is no dump to save")
+        if full_capture and not readback:
+            raise ValueError("full_capture needs the readback: without it nothing is read")
+        # Read the whole ring (l3dump) even when the firmware tracker or the
+        # host planner could pick cells: the --debug diagnostic dump. The
+        # tracker stays configured, since its limits feed the onboard result.
+        self.full_capture = full_capture
+        # Read the frozen ring back for the host pipeline. Off, the board's
+        # own result is the shot's only IWR data and the ring is just
+        # released: no l3track/l3sparse/l3dump traffic.
+        self.readback = readback
+        if veto_no_ball and self_trigger is None:
+            raise ValueError(
+                "veto_no_ball needs the self-trigger: only it reads the board's result"
+            )
+        # Skip the readback when the board's result shows no ball flight
+        # (raking a ball over, a waggle). Off by default: the board's ball
+        # tracker still misses real balls.
+        self.veto_no_ball = veto_no_ball
         # "not <=" also refuses NaN.
         if not 0.0 <= tee_band_bins <= TEE_BAND_MAX_BINS:
             raise ValueError(
@@ -931,8 +981,11 @@ class IWR6843CaptureMonitor:
 
         Firmware-tracked cells (``l3track``), then host-planned cells
         (``l3sparse``), then the full ring (``l3dump``). Each step falls back
-        only when the firmware refused before streaming.
+        only when the firmware refused before streaming. A full capture goes
+        straight to the full ring.
         """
+        if self.full_capture:
+            return self.radar.read_dump(), None, None
         if self.onboard_tracking:
             try:
                 tracked = self.radar.read_tracked()
@@ -1002,18 +1055,27 @@ class IWR6843CaptureMonitor:
         metadata = None
         noise_power = None
         onboard_track = None
-        onboard_result = self._read_onboard_result() if self.watch_self_trigger else None
-        try:
-            logger.info("[IWR6843] Trigger #%d: reading track samples", sequence)
-            raw, noise_power, onboard_track = self._read_capture()
-            metadata = self._validate_dump(raw)
-            if self.save_dumps:
-                path = self._capture_path(sequence, edge_timestamp)
-                path.write_bytes(raw)
-        except Exception as exc:  # pylint: disable=broad-exception-caught
-            error = str(exc)
-            raw = None
-            logger.warning("[IWR6843] Capture #%d failed: %s", sequence, exc, exc_info=True)
+        # Every edge, self-trigger or sound: the result carries the shot's angles.
+        onboard_result = self._read_onboard_result()
+        # No result (not ready, unreadable) never vetoes: the capture is kept.
+        vetoed = self.veto_no_ball and onboard_result is not None and not onboard_result.ball_flight
+        if vetoed:
+            error = "vetoed: no ball flight"
+            logger.info("[IWR6843] Trigger #%d: no ball flight, readback skipped", sequence)
+        elif not self.readback:
+            logger.info("[IWR6843] Trigger #%d: onboard result only, no readback", sequence)
+        else:
+            try:
+                logger.info("[IWR6843] Trigger #%d: reading track samples", sequence)
+                raw, noise_power, onboard_track = self._read_capture()
+                metadata = self._validate_dump(raw)
+                if self.save_dumps:
+                    path = self._capture_path(sequence, edge_timestamp)
+                    path.write_bytes(raw)
+            except Exception as exc:  # pylint: disable=broad-exception-caught
+                error = str(exc)
+                raw = None
+                logger.warning("[IWR6843] Capture #%d failed: %s", sequence, exc, exc_info=True)
         completed = time.time()
         capture = IWR6843Capture(
             sequence=sequence,
@@ -1029,6 +1091,8 @@ class IWR6843CaptureMonitor:
             noise_power=noise_power,
             onboard_track=onboard_track,
             onboard_result=onboard_result,
+            vetoed=vetoed,
+            onboard_only=not self.readback,
         )
         with self._condition:
             self._capture_active = False
@@ -1037,7 +1101,7 @@ class IWR6843CaptureMonitor:
         logger.info(
             "[IWR6843] Capture #%d complete: %s in %.2fs",
             sequence,
-            f"{len(raw)} bytes" if raw is not None else error,
+            f"{len(raw)} bytes" if raw is not None else (error or "onboard result only"),
             capture.dump_duration_s,
         )
         # Always, success or not: a readback that failed can leave the ring

@@ -101,6 +101,16 @@ def test_keep_short_with_an_invalid_band_keeps_everything(lib):
     assert [arr[i].rangeBin for i in range(3)] == [47.0, 30.0, 60.0]
 
 
+def arm_at(lib, ball, bin_: float) -> None:
+    """Arm the ball track at bin_ with the gate (time 0) as the anchor."""
+    anchor = fw.BallAnchor(
+        anchorBin=bin_,
+        acceptFromBin=bin_,
+        anchorTolUs=ball.cfg.gateTolUs,
+    )
+    lib.l3_ball_track_arm(ctypes.byref(ball), ctypes.byref(anchor), ctypes.byref(fw.Vec3()))
+
+
 def test_ball_track_armed_at_band_edge_acquires_a_departing_ball(lib):
     """The ball's first points beyond the band are inside the tracker's
     origin gate only when it is armed at the band's far edge."""
@@ -109,8 +119,7 @@ def test_ball_track_armed_at_band_edge_acquires_a_departing_ball(lib):
     lib.l3_ball_track_cfg_defaults(ctypes.byref(cfg))
     ball = fw.BallTrack()
     lib.l3_ball_track_init(ctypes.byref(ball), ctypes.byref(cfg))
-    origin = fw.Vec3()
-    lib.l3_ball_track_arm(ctypes.byref(ball), b.hiBin, ctypes.byref(origin), 0)
+    arm_at(lib, ball, b.hiBin)
     acquired = False
     # 2.5 bins per 3 ms frame (39 m/s): inside the core's 3-bin association gate.
     for frame, bin_ in enumerate((54.5, 57.0, 59.5, 62.0), start=1):
@@ -134,8 +143,7 @@ def depart(lib, b, arm_bin: float, bins) -> fw.BallTrack:
     lib.l3_ball_track_cfg_defaults(ctypes.byref(cfg))
     ball = fw.BallTrack()
     lib.l3_ball_track_init(ctypes.byref(ball), ctypes.byref(cfg))
-    origin = fw.Vec3()
-    lib.l3_ball_track_arm(ctypes.byref(ball), arm_bin, ctypes.byref(origin), 0)
+    arm_at(lib, ball, arm_bin)
     for frame, bin_ in enumerate(bins, start=1):
         arr = targets(bin_)
         arr[0].frame, arr[0].timestampUs, arr[0].confidence = frame, frame * 3000, 0.9

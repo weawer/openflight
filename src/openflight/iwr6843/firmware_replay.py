@@ -262,25 +262,47 @@ class BallTuning:
     ``fast_ball_mps`` / ``fast_support_fraction`` are its fastest-credible
     selection among the hypotheses, ``min_departure_mps`` its hard speed floor
     (set on both the legacy acquisition and the hypotheses) and
-    ``far_window_bins`` its separate far range window.
+    ``far_window_m`` its separate far range window.
     """
 
     fast_ball_mps: float | None = None
     fast_support_fraction: float | None = None
     min_departure_mps: float | None = None
-    far_window_bins: float | None = None
+    far_window_m: float | None = None
+    corridor_gate: bool | None = None
+    impact_coast_ms: float | None = None
+    max_decel_mps2: float | None = None
+    classify_points: int | None = None
+    recover: bool | None = None
+    recover_gate_m: float | None = None
+    history_snr: float | None = None
 
     def apply(self, cfg: fw.BallTrackCfg) -> None:
         """Write the set overrides into a ball-track configuration."""
+        hyps = cfg.hyps
         if self.fast_ball_mps is not None:
-            cfg.hyps.fastBallMps = self.fast_ball_mps
+            hyps.fastBallMps = self.fast_ball_mps
         if self.fast_support_fraction is not None:
-            cfg.hyps.fastSupportFraction = self.fast_support_fraction
+            hyps.fastSupportFraction = self.fast_support_fraction
         if self.min_departure_mps is not None:
             cfg.minDepartureMps = self.min_departure_mps
-            cfg.hyps.minDepartureMps = self.min_departure_mps
-        if self.far_window_bins is not None:
-            cfg.hyps.farWindowBins = self.far_window_bins
+            hyps.minDepartureMps = self.min_departure_mps
+        if self.far_window_m is not None:
+            hyps.farWindowM = self.far_window_m
+        if self.corridor_gate is not None:
+            hyps.corridorGate = 1 if self.corridor_gate else 0
+        if self.impact_coast_ms is not None:
+            hyps.impactCoastUs = round(self.impact_coast_ms * 1000)
+        if self.max_decel_mps2 is not None:
+            hyps.maxDecelMps2 = self.max_decel_mps2
+        if self.classify_points is not None:
+            hyps.classifyPoints = self.classify_points
+        if self.recover is not None:
+            cfg.recover = 1 if self.recover else 0
+        if self.recover_gate_m is not None:
+            cfg.rec.gateM = self.recover_gate_m
+        if self.history_snr is not None:
+            cfg.historySnr = self.history_snr
 
 
 @dataclass(frozen=True)
@@ -600,6 +622,7 @@ class ReplayResult:
     # the dump said (retention report / window change) or it fell back to all.
     ball_track_frames: int = 0
     ball_track_frames_known: bool = False
+    recovered_frames: tuple[int, ...] = ()  # frames the backward pass added at adoption
 
     @property
     def retain_windows(self) -> list[RetainSummary]:
@@ -680,6 +703,16 @@ def _delivery_summary(delivery: fw.Delivery) -> DeliverySummary | None:
             float(delivery.velocity.y),
             float(delivery.velocity.z),
         ),
+    )
+
+
+def recovered_frames(verdict: fw.BallHypVerdict) -> tuple[int, ...]:
+    """The frames the backward pass added at adoption: bit k of recoveredMask
+    is frame recoveredFirstFrame + k."""
+    return tuple(
+        int(verdict.recoveredFirstFrame) + bit
+        for bit in range(32)
+        if verdict.recoveredMask >> bit & 1
     )
 
 
@@ -1114,11 +1147,8 @@ def replay_dump(
                 ball_elevation,
                 ctypes.byref(ball_position),
             )
-            lib.l3_ball_track_arm(
-                ctypes.byref(ball_track),
-                _ball_arm_bin(band, destination),
-                ctypes.byref(ball_position),
-                timestamp_us,
+            _arm_ball(
+                lib, ball_track, fit_cfg, track, band, destination, ball_position, timestamp_us
             )
             forced_in = fw.ShotInput()
             forced_in.ballLocked = 1 if config.dest_bin is not None else 0
@@ -1374,10 +1404,14 @@ def replay_dump(
             == fw.SHOT_STATE_NAMES.index("impact")
             and shot.impactFrame == frame
         ):
-            lib.l3_ball_track_arm(
-                ctypes.byref(ball_track),
-                _ball_arm_bin(band, destination),
-                ctypes.byref(ball_position),
+            _arm_ball(
+                lib,
+                ball_track,
+                fit_cfg,
+                track,
+                band,
+                destination,
+                ball_position,
                 shot_in.impactTimestampUs,
             )
         if fired and left and ball_track.armed:
@@ -1459,6 +1493,7 @@ def replay_dump(
         frozen_impact_timestamp_us=frozen_impact_us,
         ball_track_frames=int(shot_cfg.ballTrackFrames),
         ball_track_frames_known=known_post is not None,
+        recovered_frames=recovered_frames(ball_track.verdict),
         speed_mps=club_speed,
         fit_slope_bins_per_s=club_slope,
         fit_residual_bins=club_residual,
@@ -1755,6 +1790,25 @@ def _ball_arm_bin(band: fw.Band, destination: int) -> float:
     return float(band.hiBin) if band.valid else float(destination)
 
 
+def _arm_ball(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    lib, ball_track, fit_cfg, track, band, destination, ball_position, gate_us
+) -> None:
+    """l3_shotObserve's arm: the anchor from the tee and the club, then the track."""
+    anchor = fw.BallAnchor()
+    lib.l3_ball_track_anchor(
+        ctypes.byref(ball_track),
+        float(destination),
+        _ball_arm_bin(band, destination),
+        int(gate_us),
+        ctypes.byref(fit_cfg),
+        ctypes.byref(track),
+        ctypes.byref(anchor),
+    )
+    lib.l3_ball_track_arm(
+        ctypes.byref(ball_track), ctypes.byref(anchor), ctypes.byref(ball_position)
+    )
+
+
 def _club_fit(lib, track: fw.ClubTrack) -> tuple[float, float, float]:
     """The club track's (speed m/s, range-rate slope bins/s, fit residual bins)."""
     slope = ctypes.c_float()
@@ -1869,7 +1923,12 @@ def _replay_post_frame(  # pylint: disable=too-many-arguments,too-many-locals
     through the scene the ball leaves (the ball's claim and rate, the band it
     coasts across), angles for the ball point, the launch fit and the shot
     machine's post-impact transitions."""
-    ball_params = fw.ObsParams(params.stat, ball_track.cfg.snr, params.loopPeriodS, params.subBin)
+    ball_params = fw.ObsParams(
+        params.stat,
+        lib.l3_ball_track_extract_snr(ctypes.byref(ball_track.cfg), ball_track.cfg.snr),
+        params.loopPeriodS,
+        params.subBin,
+    )
     if scan_cfg is not None and frozen_floor is not None and band.valid:
         found, count, floor = _scan_post_impact(
             lib,
@@ -1911,6 +1970,8 @@ def _replay_post_frame(  # pylint: disable=too-many-arguments,too-many-locals
         lib, shot, ball_track, band, destination, bin_width_m, frame_us, ball_claim
     )
     track_bin = _follow_club(lib, track, targets, found, frame, timestamp_us, follow, points)
+    # The club's claim reaches the ball's history now (l3_considerBallTrack).
+    lib.l3_ball_track_note_club(ctypes.byref(ball_track), frame, track.lastTargetIndex)
     ball_bin = None
     angle = None
     if appended:

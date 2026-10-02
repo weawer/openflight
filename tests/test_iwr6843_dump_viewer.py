@@ -80,10 +80,10 @@ def test_default_pitch_is_ten_degrees():
     assert dv.ViewerOptions().pitch_deg == pytest.approx(10.0)
 
 
-def test_default_tee_and_dest_bins_are_thirty_eight():
+def test_default_tee_and_dest_bins_are_thirty_two():
     options = dv.ViewerOptions()
-    assert options.tee_bin == 38
-    assert options.dest_bin == 38
+    assert options.tee_bin == 32
+    assert options.dest_bin == 32
 
 
 def test_options_coerce_form_strings_and_skip_blanks():
@@ -99,7 +99,7 @@ def test_options_coerce_form_strings_and_skip_blanks():
         }
     )
     assert options.tee_bin == 41
-    assert options.dest_bin == 38  # blank means unset → form default
+    assert options.dest_bin == 32  # blank means unset → form default
     assert options.snr == 6.5
     assert options.stat == "energy"
     assert options.stop_at_fire is False
@@ -131,9 +131,8 @@ def test_tee_bin_is_explicit_or_the_rounded_slant_range_when_cleared():
     assert dv.tee_bin_for(dv.ViewerOptions(tee_bin=12)) == 12
     # The tee distance is what was measured from the enclosure face (and logged):
     # the array sits ARRAY_DEPTH_M behind it, and the bin is range from the array.
-    assert dv.tee_bin_for(dv.ViewerOptions(tee_bin=None, tee_range_m=1.845)) == 46
-    # 2026-08-24's log holds 1.524 m; the ball rested at bins 39-41.
-    assert dv.tee_bin_for(dv.ViewerOptions(tee_bin=None, tee_range_m=1.524)) == 39
+    assert dv.tee_bin_for(dv.ViewerOptions(tee_bin=None, tee_range_m=1.845)) == 40
+    assert dv.tee_bin_for(dv.ViewerOptions(tee_bin=None, tee_range_m=1.524)) == 33
     assert dv.bin_width_m() == pytest.approx(6.0 / 128)
 
 
@@ -340,15 +339,15 @@ def test_a_whole_shot_carries_the_band_and_the_impact_fit():
 
 
 def test_default_options_are_the_boards():
-    """Tee and dest bin 38, trigger and ball snr 1 on the peak statistic, a 6-bin band."""
+    """Tee and dest bin 32, trigger and ball snr 1 on the peak statistic, a 6-bin band."""
     options = dv.ViewerOptions()
-    assert options.tee_bin == 38
-    assert options.dest_bin == 38
+    assert options.tee_bin == 32
+    assert options.dest_bin == 32
     assert options.snr == 1.0
     assert options.stat == "peak"
     assert options.band_bins == 6.0
     assert options.ball_snr == 1.0
-    assert dv.tee_bin_for(options) == 38
+    assert dv.tee_bin_for(options) == 32
 
 
 @needs_compiler

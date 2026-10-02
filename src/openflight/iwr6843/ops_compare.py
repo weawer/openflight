@@ -27,6 +27,32 @@ CONFIDENCE_BANDS = ((0.9, 1.01, "high"), (0.7, 0.9, "medium"), (0.0, 0.7, "low")
 
 
 @dataclass(frozen=True)
+class AgreementTolerance:
+    """How far (percent of the OPS speed) the IWR may sit from the OPS and still agree.
+
+    The tolerance widens as the IWR's own confidence drops, base_pct at
+    confidence 1, up to max_pct.
+    """
+
+    base_pct: float
+    max_pct: float
+
+    def pct(self, confidence: float) -> float:
+        if confidence < MIN_AGREEMENT_CONFIDENCE:
+            raise ValueError(
+                f"confidence {confidence} is below {MIN_AGREEMENT_CONFIDENCE}: nothing to check"
+            )
+        return min(self.max_pct, self.base_pct / confidence)
+
+
+# Placeholders: retune from scripts/analysis/ops_validation.py on real sessions.
+BALL_TOLERANCE = AgreementTolerance(base_pct=3.0, max_pct=9.0)
+CLUB_TOLERANCE = AgreementTolerance(base_pct=5.0, max_pct=15.0)
+# Below this the IWR value is too doubtful to call either way: "unchecked".
+MIN_AGREEMENT_CONFIDENCE = 0.3
+
+
+@dataclass(frozen=True)
 class OpsComparison:
     """One shot: the OPS speeds beside the IWR's, with the IWR's confidence."""
 
@@ -60,6 +86,38 @@ class OpsComparison:
     def club_percent(self) -> float | None:
         return _percent(self.iwr_club_speed_mph, self.ops_club_speed_mph)
 
+    @property
+    def ball_tolerance_pct(self) -> float | None:
+        return self._tolerance_pct(self.ball_percent, self.iwr_ball_confidence, BALL_TOLERANCE)
+
+    @property
+    def club_tolerance_pct(self) -> float | None:
+        return self._tolerance_pct(self.club_percent, self.iwr_club_confidence, CLUB_TOLERANCE)
+
+    @property
+    def ball_agreement(self) -> str:
+        """agree, disagree, or unchecked when there is no fair comparison."""
+        return _agreement(self.ball_percent, self.ball_tolerance_pct)
+
+    @property
+    def club_agreement(self) -> str:
+        return _agreement(self.club_percent, self.club_tolerance_pct)
+
+    def _tolerance_pct(
+        self, percent: float | None, confidence: float | None, tolerance: AgreementTolerance
+    ) -> float | None:
+        """The tolerance this comparison is judged by, None when it is unchecked.
+
+        Unchecked: no onboard result or an invalid one, either speed missing
+        (an implausible IWR value is already None), or an IWR confidence
+        below MIN_AGREEMENT_CONFIDENCE.
+        """
+        if self.verdict in (None, "invalid") or percent is None:
+            return None
+        if confidence is None or confidence < MIN_AGREEMENT_CONFIDENCE:
+            return None
+        return tolerance.pct(confidence)
+
     def to_dict(self) -> dict:
         data = asdict(self)
         data.update(
@@ -67,6 +125,10 @@ class OpsComparison:
             club_delta_mph=self.club_delta_mph,
             ball_percent=self.ball_percent,
             club_percent=self.club_percent,
+            ball_tolerance_pct=self.ball_tolerance_pct,
+            club_tolerance_pct=self.club_tolerance_pct,
+            ball_agreement=self.ball_agreement,
+            club_agreement=self.club_agreement,
         )
         return data
 
@@ -103,6 +165,12 @@ def _delta(a: float | None, b: float | None) -> float | None:
     if a is None or b is None:
         return None
     return a - b
+
+
+def _agreement(percent: float | None, tolerance_pct: float | None) -> str:
+    if percent is None or tolerance_pct is None:
+        return "unchecked"
+    return "agree" if abs(percent) <= tolerance_pct else "disagree"
 
 
 def _percent(a: float | None, b: float | None) -> float | None:
