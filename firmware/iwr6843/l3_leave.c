@@ -21,6 +21,8 @@ void l3_leave_cfg_defaults(l3_leave_cfg_t *cfg)
     cfg->clubHoldFrames = 10U;   /* the ball left 5-8 frames after the club was last seen */
     cfg->clubNearBins = 10.0F;   /* last seen 4-7.4 bins short of the band */
     cfg->newBins = 1.0F;         /* a standing ridge jitters about a bin a frame */
+    cfg->minStepUs = 2500U;      /* one frame at 3 ms, two at 2 ms */
+    cfg->minStepBins = 1.5F;     /* over a bin's wobble; minSpeedMps is 1.41 bins at 3 ms */
 }
 
 uint8_t l3_leave_club_near(const l3_leave_cfg_t *cfg, uint8_t active, uint32_t count,
@@ -152,12 +154,19 @@ static uint8_t l3_leave_step(l3_leave_t *leave, const l3_target_obs_t *targets, 
         return L3_LEAVE_WHY_IDLE;
     }
     if (leave->started) {
+        uint8_t early = 1U;
+
         for (i = 0U; i < n; i++) {
             /* Wrap-safe: the difference of two timestamps. */
-            float dtS = (float)(int32_t)(targets[i].timestampUs - leave->startUs) * 1.0e-6F;
+            int32_t dtUs = (int32_t)(targets[i].timestampUs - leave->startUs);
+            float dtS = (float)dtUs * 1.0e-6F;
             float stepBins = targets[i].rangeBin - leave->startBin;
             float speed;
 
+            if (dtUs < (int32_t)leave->cfg.minStepUs && stepBins < leave->cfg.minStepBins) {
+                continue;
+            }
+            early = 0U;
             if (dtS <= 0.0F || stepBins <= 0.0F) {
                 continue;
             }
@@ -172,6 +181,10 @@ static uint8_t l3_leave_step(l3_leave_t *leave, const l3_target_obs_t *targets, 
                 leave->impactTimestampUs = leave->startUs - l3_round_us(backS * 1.0e6F);
                 return L3_LEAVE_WHY_FIRED;
             }
+        }
+        if (early && n > 0U) {
+            /* Too soon after the start to judge: keep it for the next frame. */
+            return L3_LEAVE_WHY_STARTED;
         }
         /* Nothing moved out at a ball's speed: the newest return continues it. */
         (void)l3_leave_start(leave, &targets[nearest], edgeBin);

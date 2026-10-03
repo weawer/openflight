@@ -23,6 +23,9 @@ void l3_impact_fit_cfg_defaults(l3_impact_fit_cfg_t *cfg)
     cfg->maxSigmaUs = 3000.0F;    /* one 3 ms frame */
     cfg->bandSearchBins = 10.0F;
     cfg->clutterSigmas = 0.0F;    /* off until the labelled replays settle it */
+    /* 4 points span 9 ms at 3 ms frames; at 2 ms the same span takes 6. Under
+     * 9 ms so a 3 ms frame's few-us jitter never adds a fifth point. */
+    cfg->fitSpanUs = 8500U;
 }
 
 void l3_impact_fit_reset(l3_impact_fit_t *fit)
@@ -123,6 +126,19 @@ void l3_impact_fit_track(const l3_impact_fit_cfg_t *cfg, uint8_t which, l3_point
         return;
     }
     n = (count < want) ? count : want;
+    /* Club in: older points until the fit spans fitSpanUs (l3_impact_fit_cfg_t). */
+    while (which == L3_FIT_CLUB_IN && cfg->fitSpanUs > 0U && n >= 2U && n < count &&
+           n < L3_FIT_MAX_POINTS) {
+        l3_track_point_t a;
+        l3_track_point_t b;
+        uint32_t lo = count - n;
+
+        if (pointAt(ctx, lo, &a) == 0 || pointAt(ctx, lo + n - 1U, &b) == 0 ||
+            (uint32_t)(b.timestampUs - a.timestampUs) >= cfg->fitSpanUs) {
+            break;
+        }
+        n++;
+    }
     first = (which == L3_FIT_CLUB_IN) ? count - n : 0U;
     out->points = n;
     if (n < 3U || n < cfg->minPoints) {

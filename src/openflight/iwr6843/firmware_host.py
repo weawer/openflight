@@ -948,6 +948,8 @@ class LeaveCfg(ctypes.Structure):
         ("clubHoldFrames", ctypes.c_uint32),
         ("clubNearBins", ctypes.c_float),
         ("newBins", ctypes.c_float),
+        ("minStepUs", ctypes.c_uint32),
+        ("minStepBins", ctypes.c_float),
     ]
 
 
@@ -1017,6 +1019,7 @@ class ImpactFitCfg(ctypes.Structure):
         ("maxSigmaUs", ctypes.c_float),
         ("bandSearchBins", ctypes.c_float),
         ("clutterSigmas", ctypes.c_float),
+        ("fitSpanUs", ctypes.c_uint32),
     ]
 
 

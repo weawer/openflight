@@ -61,6 +61,13 @@ typedef struct {
      * (the band's noise map, learned with no club track) by this many
      * spreads (l3_band_clutter_filter); 0 turns it off. */
     float    clutterSigmas;
+    /* Club in only (the self-trigger): the fit takes fitPoints, then older
+     * points until first to last spans at least this, up to
+     * L3_FIT_MAX_POINTS, so its speed is no noisier at 2 ms than at 3 ms. The
+     * outs keep fitPoints: their tracks are short and a later point may be a
+     * standing return (20260927_144341: the ball stuck at 52.6). 0 keeps
+     * fitPoints alone. */
+    uint32_t fitSpanUs;
 } l3_impact_fit_cfg_t;
 
 typedef struct {

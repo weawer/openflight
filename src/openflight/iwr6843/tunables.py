@@ -81,6 +81,7 @@ TUNABLES: tuple[Tunable, ...] = (
     _t("ball", "fit.radarHeightM", "float", 0.05, 0.6, 0.01),
     _t("ball", "fit.teeBallHeightM", "float", 0.0, 0.6, 0.01),
     _t("fit", "fitPoints", "int", 3, 8, 1),
+    _t("fit", "fitSpanUs", "int", 0, 12000, 500),  # 0: fitPoints alone
     _t("fit", "minPoints", "int", 2, 5, 1),
     _t("fit", "ballMinMps", "float", 5.0, 30.0, 2.5),
     _t("fit", "clutterSigmas", "float", 0.0, 8.0, 0.5),  # 0: no clutter filter

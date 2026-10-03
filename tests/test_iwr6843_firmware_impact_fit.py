@@ -211,6 +211,78 @@ def test_the_club_in_floor_itself_is_accepted(lib):
     assert estimate(lib, CLUB_IN, line(17.0, CLUB_IN_T)).why == WHY["ok"]
 
 
+# --- the fit covers a time span, not a point count (2026-10-03) ----------------
+#
+# fitPoints is 4: 9 ms first to last at 3 ms frames, but only 6 ms at 2 ms, so
+# the same range jitter made a fitted speed 1.5x noisier. On the rig at 2 ms
+# every one of ~15 backswings fired the trigger, at fitted club speeds of
+# 26-60 m/s; at 3 ms none did. The fit now takes older points until they span
+# fitSpanUs.
+
+CLUB_IN_2MS_T = (8_000, 10_000, 12_000, 14_000, 16_000, 18_000)
+BALL_OUT_2MS_T = (34_000, 36_000, 38_000, 40_000, 42_000, 44_000)
+
+
+def test_the_fit_spans_8_5_ms_by_default(lib):
+    assert cfg(lib).fitSpanUs == 8500
+
+
+@pytest.mark.parametrize("which, times", [(CLUB_IN, CLUB_IN_T), (BALL_OUT, BALL_OUT_T)])
+def test_at_3_ms_the_fit_still_takes_four_points(lib, which, times):
+    """Four points already span 9 ms: 3 ms behaviour is unchanged."""
+    speed = 30.0 if which == CLUB_IN else 60.0
+    extra = (6_000,) if which == CLUB_IN else (48_000,)
+    samples = sorted(line(speed, tuple(times) + extra))
+    assert estimate(lib, which, samples).points == 4
+
+
+def test_at_2_ms_the_club_in_fit_takes_six_points_to_span_the_same_time(lib):
+    e = estimate(lib, CLUB_IN, line(30.0, CLUB_IN_2MS_T))
+    assert e.points == 6 and e.why == WHY["ok"]
+    assert e.timeUs == pytest.approx(IMPACT_US, abs=2.0)
+
+
+@pytest.mark.parametrize("which, speed", [(CLUB_OUT, 25.0), (BALL_OUT, 60.0)])
+def test_the_outs_keep_four_points_at_2_ms(lib, which, speed):
+    """Post-impact tracks are short and may end on a standing return; the
+    span is for the trigger's club in only."""
+    assert estimate(lib, which, line(speed, BALL_OUT_2MS_T)).points == 4
+
+
+def test_fit_span_zero_keeps_the_point_count(lib):
+    assert estimate(lib, CLUB_IN, line(30.0, CLUB_IN_2MS_T), fitSpanUs=0).points == 4
+
+
+def test_a_short_track_fits_what_it_has(lib):
+    assert estimate(lib, CLUB_IN, line(30.0, CLUB_IN_2MS_T[-3:])).points == 3
+
+
+def test_the_span_never_takes_more_than_the_buffer(lib):
+    """At 1 ms frames 8.5 ms would need 10 points; the fit holds 8."""
+    times = tuple(range(6_000, 19_000, 1_000))
+    assert estimate(lib, CLUB_IN, line(30.0, times)).points == 8
+
+
+# Range jitter on the newest four points: two low, two high, as a return
+# hopping between bins does. 0.35 bin either way.
+JITTER_M = (0.0, 0.0, -0.35 * BIN_M, -0.35 * BIN_M, 0.35 * BIN_M, 0.35 * BIN_M)
+
+
+def test_a_jittered_backswing_does_not_pass_the_floor_at_3_ms(lib):
+    """The reference: the same jitter on a 12 m/s backswing at 3 ms."""
+    e = estimate(lib, CLUB_IN, line(12.0, CLUB_IN_T, noise_m=JITTER_M[2:]))
+    assert e.why == WHY["speed_bounds"], f"{e.speedMps:.1f} m/s"
+
+
+def test_a_jittered_backswing_does_not_pass_the_floor_at_2_ms(lib):
+    """The bug: over 6 ms the jitter adds ~6.6 m/s and a 12 m/s backswing reads
+    18.6 m/s, over the 17 m/s club floor, so the trigger fired."""
+    e = estimate(lib, CLUB_IN, line(12.0, CLUB_IN_2MS_T, noise_m=JITTER_M))
+    assert e.why == WHY["speed_bounds"], f"{e.speedMps:.1f} m/s"
+    old = estimate(lib, CLUB_IN, line(12.0, CLUB_IN_2MS_T, noise_m=JITTER_M), fitSpanUs=0)
+    assert old.why == WHY["ok"] and old.speedMps > 17.0, "the four-point fit is what fired"
+
+
 def test_crawling_club_out_is_too_uncertain_to_time(lib):
     # After impact the club only slows and there is no speed floor but "moving
     # away"; at 3 m/s, though, a bin of quantisation is 4.5 ms, over the cap.
