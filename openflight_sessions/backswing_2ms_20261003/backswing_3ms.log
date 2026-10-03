@@ -1,0 +1,831 @@
+IWR6843 on /dev/ttyUSB0. Stop the kiosk before swinging.
+Measuring the empty lane for 2s. Keep it clear.
+floor p95 149138; threshold 149138 at snr 1
+armed triggerCfg 42 1.0 1. Ctrl+C to stop.
+watching     floor=146954  threshold=149138  latched=0  enabled=1
+watching     floor=144404  threshold=149138  latched=0  enabled=1
+toward       floor=148012  threshold=149138  latched=0
+watching     floor=148456  threshold=149138  latched=0
+toward       floor=140893  threshold=149138  latched=0
+watching     floor=145152  threshold=149138  latched=0
+toward       floor=142322  threshold=149138  latched=0
+  Triggered
+
+swing 1:
+  clubtrack active=1 why=coasted count=4 total=9 misses=1 bin=35.02 dest=42 dist=6.98 vel=1.55 speed=23.13 fit=4 residual=0.31 acq=3 assoc=6 coast=8 drop=1
+  delivery points=3 az=0 el=0 speed=20.76 radial=20.76 path=0.00 attack=0.00 residualmm=639.65 conf=0.00 valid=s
+  angle az=48.59 el=-40.00 coh=0.35 peak=1.0 psi=3.32 conf=0.00 valid=ae estimates=281
+  range impact fired=1 why=fired cause=end offsetms=-3.00 t=11235000 pending=1 passed=0 fired_n=1 armed=1
+  leave fired=0 why=idle start=0.00 speed=0.00 t=0 fired_n=0
+  impactfit verdict=none t=0 spreadus=0 dtrigus=0 dropped=- nolock=0 club_in=missing club_out=missing ball_out=missing
+  p frame=3741 t=11223000 bin=28.83 dist=13.17 range=1.35 vr=0.00 vd=-1.52 coh=10 conf=0.21 angles=none
+  p frame=3742 t=11226000 bin=31.14 dist=10.86 range=1.46 vr=35.99 vd=-6.02 coh=9 conf=0.02 az=14.48 el=-40.00
+  p frame=3743 t=11229000 bin=31.93 dist=10.07 range=1.50 vr=24.19 vd=5.10 coh=11 conf=0.04 az=-48.59 el=-40.00
+  p frame=3745 t=11235000 bin=35.02 dist=6.98 range=1.64 vr=24.14 vd=-7.43 coh=12 conf=0.00 az=48.59 el=-40.00
+  l3dump:/>shot state=ball_track since=3748 impact=11235000 source=range origin=1.97,0.00,0.00 club=4 post=3 transitions=10
+  balltrack armed=1 confirmed=0 done=0 why=nocandidate count=0 origin=42.00 bin=0.00 impact=11235000 acq=0 slow=0 fast=0 lost=0 rec=0 post=4
+  launch points=0 speed=0.00 radial=0.00 hla=0.00 vla=0.00 residualmm=0.00 conf=0.00 angles=0 rms=0.00 why=none valid=none
+  p frame=3752 t=11253000 bin=43.61 dist=-1.61 range=2.04 vr=0.00 vd=-6.47 coh=5 conf=0.06 angles=none
+  l3dump:/>
+  PASS  the club track's range impact fired: 9 club points, speed 23.1 m/s
+
+watching. swing when ready.
+watching     floor=146061  threshold=149138  latched=0
+toward       floor=142029  threshold=149138  latched=0
+watching     floor=147638  threshold=149138  latched=0
+watching     floor=143853  threshold=149138  latched=0  enabled=1
+watching     floor=140672  threshold=149138  latched=0  enabled=1
+watching     floor=145077  threshold=149138  latched=0  enabled=1
+toward       floor=143994  threshold=149138  latched=0
+watching     floor=141132  threshold=149138  latched=0
+watching     floor=146382  threshold=149138  latched=0  enabled=1
+toward       floor=141009  threshold=149138  latched=0
+watching     floor=140569  threshold=149138  latched=0
+watching     floor=145326  threshold=149138  latched=0  enabled=1
+toward       floor=144394  threshold=149138  latched=0
+watching     floor=143982  threshold=149138  latched=0
+toward       floor=143776  threshold=149138  latched=0
+watching     floor=143896  threshold=149138  latched=0
+watching     floor=142693  threshold=149138  latched=0  enabled=1
+watching     floor=149478  threshold=149138  latched=0  enabled=1
+watching     floor=148999  threshold=149138  latched=0  enabled=1
+toward       floor=146580  threshold=149138  latched=0
+watching     floor=147982  threshold=149138  latched=0
+toward       floor=148356  threshold=149138  latched=0
+watching     floor=147580  threshold=149138  latched=0
+toward       floor=146132  threshold=149138  latched=0
+watching     floor=148458  threshold=149138  latched=0
+watching     floor=145000  threshold=149138  latched=0  enabled=1
+toward       floor=145080  threshold=149138  latched=0
+  Triggered
+
+swing 2:
+  clubtrack active=0 why=released count=0 total=30 misses=0 bin=0.00 dest=42 dist=42.00 vel=0.00 speed=0.00 fit=0 residual=0.00 acq=12 assoc=18 coast=19 drop=4
+  delivery points=0 az=0 el=0 speed=0.00 radial=0.00 path=0.00 attack=0.00 residualmm=0.00 conf=0.00 valid=none
+  angle az=-48.59 el=-40.00 coh=0.35 peak=1.0 psi=4.34 conf=0.00 valid=ae estimates=298
+  range impact fired=1 why=fired cause=end offsetms=-3.00 t=28644000 pending=3 passed=0 fired_n=2 armed=1
+  leave fired=0 why=idle start=0.00 speed=0.00 t=0 fired_n=0
+  impactfit verdict=none t=0 spreadus=0 dtrigus=0 dropped=- nolock=0 club_in=missing club_out=missing ball_out=missing
+  l3dump:/>shot state=ball_track since=9551 impact=28644000 source=range origin=1.97,0.00,0.00 club=0 post=2 transitions=36
+  balltrack armed=1 confirmed=1 done=0 why=confirmed count=2 origin=42.00 bin=51.48 impact=28644000 acq=2 slow=0 fast=0 lost=0 rec=0 post=3
+  launch points=3 speed=45.52 radial=45.52 hla=0.00 vla=0.00 residualmm=855.80 conf=0.00 angles=0 rms=0.00 why=none valid=s
+  p frame=9551 t=28650000 bin=49.96 dist=-7.96 range=2.34 vr=0.00 vd=3.67 coh=4 conf=0.10 angles=none
+  p frame=9552 t=28653000 bin=51.48 dist=-9.48 range=2.41 vr=23.73 vd=-2.13 coh=4 conf=0.06 az=-20.47 el=-22.57
+  p frame=9553 t=28656000 bin=55.79 dist=-13.79 range=2.62 vr=45.52 vd=7.87 coh=18 conf=0.05 az=24.65 el=13.65
+  p frame=9554 t=28659000 bin=58.12 dist=-16.12 range=2.72 vr=40.94 vd=-6.51 coh=13 conf=0.09 az=42.70 el=-0.72
+  p frame=9555 t=28662000 bin=58.77 dist=-16.77 range=2.75 vr=25.58 vd=-8.22 coh=12 conf=0.02 az=0.76 el=18.02
+  p frame=9556 t=28665000 bin=62.10 dist=-20.10 range=2.91 vr=38.83 vd=-7.01 coh=15 conf=0.07 az=-15.90 el=0.60
+  p frame=9557 t=28668000 bin=65.54 dist=-23.54 range=3.07 vr=46.29 vd=7.52 coh=9 conf=0.01 az=-33.08 el=-11.26
+  p frame=9558 t=28671000 bin=69.75 dist=-27.75 range=3.27 vr=55.99 vd=7.24 coh=26 conf=0.03 az=-8.41 el=36.72
+  l3dump:/>
+  PASS  the club track's range impact fired: 30 club points, speed 0.0 m/s
+
+watching. swing when ready.
+watching     floor=148081  threshold=149138  latched=0
+toward       floor=142621  threshold=149138  latched=0
+watching     floor=143574  threshold=149138  latched=0
+watching     floor=144495  threshold=149138  latched=0  enabled=1
+watching     floor=144878  threshold=149138  latched=0  enabled=1
+watching     floor=145501  threshold=149138  latched=0  enabled=1
+watching     floor=148416  threshold=149138  latched=0  enabled=1
+watching     floor=150934  threshold=149138  latched=0  enabled=1
+watching     floor=141863  threshold=149138  latched=0  enabled=1
+watching     floor=143176  threshold=149138  latched=0  enabled=1
+watching     floor=145429  threshold=149138  latched=0  enabled=1
+watching     floor=142437  threshold=149138  latched=0  enabled=1
+watching     floor=146690  threshold=149138  latched=0  enabled=1
+watching     floor=147525  threshold=149138  latched=0  enabled=1
+watching     floor=143259  threshold=149138  latched=0  enabled=1
+watching     floor=144576  threshold=149138  latched=0  enabled=1
+toward       floor=142942  threshold=149138  latched=0
+watching     floor=150730  threshold=149138  latched=0
+watching     floor=146870  threshold=149138  latched=0  enabled=1
+toward       floor=140351  threshold=149138  latched=0
+watching     floor=141806  threshold=149138  latched=0
+watching     floor=143877  threshold=149138  latched=0  enabled=1
+toward       floor=147350  threshold=149138  latched=0
+watching     floor=144901  threshold=149138  latched=0
+watching     floor=143705  threshold=149138  latched=0  enabled=1
+toward       floor=145440  threshold=149138  latched=0
+watching     floor=148502  threshold=149138  latched=0
+watching     floor=139588  threshold=149138  latched=0  enabled=1
+toward       floor=149722  threshold=149138  latched=0
+watching     floor=147251  threshold=149138  latched=0
+toward       floor=162889  threshold=149138  latched=0
+  Triggered
+
+swing 3:
+  clubtrack active=1 why=coasted count=4 total=52 misses=1 bin=38.20 dest=42 dist=3.80 vel=2.78 speed=42.67 fit=4 residual=0.69 acq=20 assoc=32 coast=35 drop=8
+  delivery points=3 az=0 el=0 speed=54.32 radial=54.32 path=0.00 attack=0.00 residualmm=204.60 conf=0.00 valid=s
+  angle az=-14.48 el=-40.00 coh=0.35 peak=1.0 psi=5.50 conf=0.00 valid=ae estimates=324
+  range impact fired=1 why=fired cause=end offsetms=-3.00 t=39687000 pending=4 passed=0 fired_n=3 armed=1
+  leave fired=0 why=idle start=0.00 speed=0.00 t=0 fired_n=0
+  impactfit verdict=none t=0 spreadus=0 dtrigus=0 dropped=- nolock=0 club_in=missing club_out=missing ball_out=missing
+  p frame=13226 t=39678000 bin=30.33 dist=11.67 range=1.42 vr=0.00 vd=2.72 coh=65 conf=0.41 angles=none
+  p frame=13227 t=39681000 bin=31.24 dist=10.76 range=1.46 vr=14.27 vd=3.44 coh=40 conf=0.14 az=48.59 el=-40.00
+  p frame=13228 t=39684000 bin=34.95 dist=7.05 range=1.64 vr=36.12 vd=1.80 coh=16 conf=0.03 az=-5.88 el=-40.00
+  p frame=13229 t=39687000 bin=38.20 dist=3.80 range=1.79 vr=43.39 vd=-6.74 coh=12 conf=0.00 az=-14.48 el=-40.00
+  l3dump:/>shot state=ball_track since=13232 impact=39687000 source=range origin=1.97,0.00,0.00 club=4 post=4 transitions=58
+  balltrack armed=1 confirmed=1 done=0 why=tracked count=5 origin=47.00 bin=70.64 impact=39687000 acq=3 slow=0 fast=0 lost=0 rec=0 post=5
+  launch points=5 speed=81.29 radial=81.29 hla=0.00 vla=0.00 residualmm=1933.06 conf=0.00 angles=0 rms=0.00 why=none valid=s
+  p frame=13232 t=39693000 bin=50.62 dist=-3.62 range=2.37 vr=0.00 vd=2.31 coh=14 conf=0.10 angles=none
+  p frame=13233 t=39696000 bin=54.72 dist=-7.72 range=2.57 vr=64.03 vd=1.02 coh=48 conf=0.53 az=3.08 el=11.72
+  p frame=13234 t=39699000 bin=60.96 dist=-13.96 range=2.86 vr=80.72 vd=2.20 coh=14 conf=0.05 az=-22.26 el=-6.32
+  p frame=13235 t=39702000 bin=65.21 dist=-18.21 range=3.06 vr=73.62 vd=2.82 coh=49 conf=0.30 az=-67.44 el=15.24
+  p frame=13236 t=39705000 bin=70.64 dist=-23.64 range=3.31 vr=79.24 vd=2.38 coh=13 conf=0.03 az=55.89 el=17.13
+  p frame=13237 t=39708000 bin=74.29 dist=-27.29 range=3.48 vr=68.13 vd=-0.10 coh=58 conf=0.79 az=-15.30 el=6.36
+  p frame=13238 t=39711000 bin=78.68 dist=-31.68 range=3.69 vr=68.36 vd=-0.29 coh=56 conf=0.78 az=64.61 el=8.68
+  p frame=13239 t=39714000 bin=81.57 dist=-34.57 range=3.82 vr=56.69 vd=-0.43 coh=42 conf=0.41 az=5.10 el=-0.24
+  p frame=13240 t=39717000 bin=86.89 dist=-39.89 range=4.07 vr=69.90 vd=0.87 coh=55 conf=0.75 az=-15.99 el=40.00
+  p frame=13241 t=39720000 bin=93.14 dist=-46.14 range=4.37 vr=83.85 vd=0.86 coh=58 conf=0.51 az=16.36 el=7.39
+  p frame=13242 t=39723000 bin=97.48 dist=-50.48 range=4.57 vr=75.77 vd=1.06 coh=61 conf=0.37 az=-6.17 el=6.24
+  p frame=13243 t=39726000 bin=97.94 dist=-50.94 range=4.59 vr=41.49 vd=1.08 coh=51 conf=0.50 az=20.84 el=40.00
+  p frame=13244 t=39729000 bin=97.69 dist=-50.69 range=4.58 vr=18.82 vd=1.19 coh=60 conf=0.57 az=-32.72 el=6.11
+  p frame=13245 t=39732000 bin=98.15 dist=-51.15 range=4.60 vr=12.99 vd=1.23 coh=54 conf=0.53 az=12.45 el=11.39
+  l3dump:/>
+  PASS  the club track's range impact fired: 52 club points, speed 42.7 m/s
+
+watching. swing when ready.
+toward       floor=172053  threshold=149138  latched=0
+watching     floor=189853  threshold=149138  latched=0
+toward       floor=190781  threshold=149138  latched=0
+watching     floor=187264  threshold=149138  latched=0
+toward       floor=201740  threshold=149138  latched=0
+watching     floor=196548  threshold=149138  latched=0
+toward       floor=187971  threshold=149138  latched=0
+watching     floor=183148  threshold=149138  latched=0
+toward       floor=187460  threshold=149138  latched=0
+watching     floor=190014  threshold=149138  latched=0
+toward       floor=201512  threshold=149138  latched=0
+watching     floor=216054  threshold=149138  latched=0
+toward       floor=217218  threshold=149138  latched=0
+watching     floor=212935  threshold=149138  latched=0
+toward       floor=226950  threshold=149138  latched=0
+watching     floor=227241  threshold=149138  latched=0
+toward       floor=236395  threshold=149138  latched=0
+watching     floor=287258  threshold=149138  latched=0
+toward       floor=297381  threshold=149138  latched=0
+watching     floor=319808  threshold=149138  latched=0
+toward       floor=408143  threshold=149138  latched=0
+watching     floor=380700  threshold=149138  latched=0
+toward       floor=424965  threshold=149138  latched=0
+watching     floor=427460  threshold=149138  latched=0
+toward       floor=552661  threshold=149138  latched=0
+watching     floor=561769  threshold=149138  latched=0
+toward       floor=545715  threshold=149138  latched=0
+watching     floor=574235  threshold=149138  latched=0
+toward       floor=632787  threshold=149138  latched=0
+watching     floor=619825  threshold=149138  latched=0
+toward       floor=613913  threshold=149138  latched=0
+watching     floor=581647  threshold=149138  latched=0
+toward       floor=577706  threshold=149138  latched=0
+watching     floor=587076  threshold=149138  latched=0
+toward       floor=799468  threshold=149138  latched=0
+watching     floor=855123  threshold=149138  latched=0
+toward       floor=986018  threshold=149138  latched=0
+watching     floor=956261  threshold=149138  latched=0
+toward       floor=888618  threshold=149138  latched=0
+watching     floor=873978  threshold=149138  latched=0
+toward       floor=871551  threshold=149138  latched=0
+watching     floor=878084  threshold=149138  latched=0
+toward       floor=849198  threshold=149138  latched=0
+watching     floor=823674  threshold=149138  latched=0
+toward       floor=311522  threshold=149138  latched=0
+watching     floor=334755  threshold=149138  latched=0
+toward       floor=313091  threshold=149138  latched=0
+watching     floor=310513  threshold=149138  latched=0
+toward       floor=2983231  threshold=149138  latched=0
+watching     floor=3141335  threshold=149138  latched=0
+toward       floor=3163739  threshold=149138  latched=0
+watching     floor=3024269  threshold=149138  latched=0
+toward       floor=1757942  threshold=149138  latched=0
+watching     floor=1770162  threshold=149138  latched=0
+toward       floor=1604727  threshold=149138  latched=0
+watching     floor=1573092  threshold=149138  latched=0
+toward       floor=3254699  threshold=149138  latched=0
+watching     floor=5055378  threshold=149138  latched=0
+toward       floor=7336246  threshold=149138  latched=0
+watching     floor=7567054  threshold=149138  latched=0
+toward       floor=9071196  threshold=149138  latched=0
+watching     floor=10544836  threshold=149138  latched=0
+toward       floor=7861067  threshold=149138  latched=0
+watching     floor=8677416  threshold=149138  latched=0
+toward       floor=67478208  threshold=149138  latched=0
+watching     floor=72688968  threshold=149138  latched=0
+toward       floor=66336396  threshold=149138  latched=0
+watching     floor=67832648  threshold=149138  latched=0
+toward       floor=59261100  threshold=149138  latched=0
+watching     floor=59300088  threshold=149138  latched=0
+toward       floor=64877760  threshold=149138  latched=0
+watching     floor=60045564  threshold=149138  latched=0
+toward       floor=61254296  threshold=149138  latched=0
+watching     floor=64243192  threshold=149138  latched=0
+toward       floor=18979902  threshold=149138  latched=0
+watching     floor=19225160  threshold=149138  latched=0
+toward       floor=18725056  threshold=149138  latched=0
+watching     floor=16794852  threshold=149138  latched=0
+toward       floor=16175390  threshold=149138  latched=0
+watching     floor=14995700  threshold=149138  latched=0
+toward       floor=13940212  threshold=149138  latched=0
+watching     floor=16367927  threshold=149138  latched=0
+toward       floor=15547021  threshold=149138  latched=0
+watching     floor=17830696  threshold=149138  latched=0
+toward       floor=153153  threshold=149138  latched=0
+watching     floor=154542  threshold=149138  latched=0
+watching     floor=165295  threshold=149138  latched=0  enabled=1
+toward       floor=151564  threshold=149138  latched=0
+watching     floor=150168  threshold=149138  latched=0
+toward       floor=159020  threshold=149138  latched=0
+watching     floor=159642  threshold=149138  latched=0
+toward       floor=155822  threshold=149138  latched=0
+watching     floor=158570  threshold=149138  latched=0
+toward       floor=300957  threshold=149138  latched=0
+watching     floor=293404  threshold=149138  latched=0
+toward       floor=218502  threshold=149138  latched=0
+watching     floor=210982  threshold=149138  latched=0
+toward       floor=188533  threshold=149138  latched=0
+watching     floor=184868  threshold=149138  latched=0
+toward       floor=177623  threshold=149138  latched=0
+watching     floor=175899  threshold=149138  latched=0
+toward       floor=198956  threshold=149138  latched=0
+watching     floor=200384  threshold=149138  latched=0
+toward       floor=203851  threshold=149138  latched=0
+watching     floor=202211  threshold=149138  latched=0
+toward       floor=145504  threshold=149138  latched=0
+watching     floor=145560  threshold=149138  latched=0
+toward       floor=147604  threshold=149138  latched=0
+watching     floor=145288  threshold=149138  latched=0
+toward       floor=145633  threshold=149138  latched=0
+watching     floor=147418  threshold=149138  latched=0
+toward       floor=163429  threshold=149138  latched=0
+watching     floor=168904  threshold=149138  latched=0
+toward       floor=176126  threshold=149138  latched=0
+watching     floor=175715  threshold=149138  latched=0
+toward       floor=178864  threshold=149138  latched=0
+watching     floor=180843  threshold=149138  latched=0
+toward       floor=219698  threshold=149138  latched=0
+watching     floor=230320  threshold=149138  latched=0
+toward       floor=166449  threshold=149138  latched=0
+watching     floor=158693  threshold=149138  latched=0
+toward       floor=156248  threshold=149138  latched=0
+watching     floor=158794  threshold=149138  latched=0
+toward       floor=141849  threshold=149138  latched=0
+watching     floor=142863  threshold=149138  latched=0
+toward       floor=431150  threshold=149138  latched=0
+watching     floor=396740  threshold=149138  latched=0
+toward       floor=220472  threshold=149138  latched=0
+watching     floor=216398  threshold=149138  latched=0
+toward       floor=183735  threshold=149138  latched=0
+watching     floor=183693  threshold=149138  latched=0
+toward       floor=210890  threshold=149138  latched=0
+watching     floor=206914  threshold=149138  latched=0
+toward       floor=154664  threshold=149138  latched=0
+watching     floor=150867  threshold=149138  latched=0
+toward       floor=150994  threshold=149138  latched=0
+watching     floor=156454  threshold=149138  latched=0
+toward       floor=148059  threshold=149138  latched=0
+watching     floor=147152  threshold=149138  latched=0
+toward       floor=142593  threshold=149138  latched=0
+watching     floor=142835  threshold=149138  latched=0
+toward       floor=190899  threshold=149138  latched=0
+watching     floor=193623  threshold=149138  latched=0
+toward       floor=165675  threshold=149138  latched=0
+watching     floor=169336  threshold=149138  latched=0
+toward       floor=185951  threshold=149138  latched=0
+watching     floor=186181  threshold=149138  latched=0
+toward       floor=183998  threshold=149138  latched=0
+watching     floor=180501  threshold=149138  latched=0
+toward       floor=166643  threshold=149138  latched=0
+watching     floor=157901  threshold=149138  latched=0
+toward       floor=147473  threshold=149138  latched=0
+watching     floor=147180  threshold=149138  latched=0
+toward       floor=377134  threshold=149138  latched=0
+watching     floor=357412  threshold=149138  latched=0
+toward       floor=291869  threshold=149138  latched=0
+watching     floor=276041  threshold=149138  latched=0
+toward       floor=231338  threshold=149138  latched=0
+watching     floor=203856  threshold=149138  latched=0
+toward       floor=182641  threshold=149138  latched=0
+watching     floor=177088  threshold=149138  latched=0
+toward       floor=152381  threshold=149138  latched=0
+watching     floor=155106  threshold=149138  latched=0
+toward       floor=162798  threshold=149138  latched=0
+watching     floor=163675  threshold=149138  latched=0
+toward       floor=168019  threshold=149138  latched=0
+watching     floor=174912  threshold=149138  latched=0
+toward       floor=187951  threshold=149138  latched=0
+watching     floor=227621  threshold=149138  latched=0
+toward       floor=223039  threshold=149138  latched=0
+watching     floor=221499  threshold=149138  latched=0
+toward       floor=225034  threshold=149138  latched=0
+watching     floor=223579  threshold=149138  latched=0
+toward       floor=153851  threshold=149138  latched=0
+watching     floor=154920  threshold=149138  latched=0
+toward       floor=148308  threshold=149138  latched=0
+watching     floor=149657  threshold=149138  latched=0
+toward       floor=178715  threshold=149138  latched=0
+watching     floor=187051  threshold=149138  latched=0
+toward       floor=166614  threshold=149138  latched=0
+watching     floor=163334  threshold=149138  latched=0
+toward       floor=163214  threshold=149138  latched=0
+watching     floor=167048  threshold=149138  latched=0
+toward       floor=185745  threshold=149138  latched=0
+watching     floor=185288  threshold=149138  latched=0
+toward       floor=245707  threshold=149138  latched=0
+watching     floor=250765  threshold=149138  latched=0
+toward       floor=252366  threshold=149138  latched=0
+watching     floor=275563  threshold=149138  latched=0
+toward       floor=157273  threshold=149138  latched=0
+watching     floor=155069  threshold=149138  latched=0
+toward       floor=144319  threshold=149138  latched=0
+watching     floor=143099  threshold=149138  latched=0
+toward       floor=149743  threshold=149138  latched=0
+watching     floor=150830  threshold=149138  latched=0
+toward       floor=367842  threshold=149138  latched=0
+watching     floor=320986  threshold=149138  latched=0
+toward       floor=228441  threshold=149138  latched=0
+watching     floor=228296  threshold=149138  latched=0
+toward       floor=178659  threshold=149138  latched=0
+watching     floor=176616  threshold=149138  latched=0
+toward       floor=177267  threshold=149138  latched=0
+watching     floor=177558  threshold=149138  latched=0
+toward       floor=177631  threshold=149138  latched=0
+watching     floor=177721  threshold=149138  latched=0
+toward       floor=230388  threshold=149138  latched=0
+watching     floor=232189  threshold=149138  latched=0
+toward       floor=150817  threshold=149138  latched=0
+watching     floor=150785  threshold=149138  latched=0
+toward       floor=156638  threshold=149138  latched=0
+watching     floor=158597  threshold=149138  latched=0
+toward       floor=176747  threshold=149138  latched=0
+watching     floor=176064  threshold=149138  latched=0
+toward       floor=176591  threshold=149138  latched=0
+watching     floor=174756  threshold=149138  latched=0
+toward       floor=170149  threshold=149138  latched=0
+watching     floor=177208  threshold=149138  latched=0
+toward       floor=214223  threshold=149138  latched=0
+watching     floor=216205  threshold=149138  latched=0
+toward       floor=166702  threshold=149138  latched=0
+watching     floor=163304  threshold=149138  latched=0
+toward       floor=146461  threshold=149138  latched=0
+watching     floor=146853  threshold=149138  latched=0
+toward       floor=290885  threshold=149138  latched=0
+watching     floor=275060  threshold=149138  latched=0
+toward       floor=216412  threshold=149138  latched=0
+watching     floor=214930  threshold=149138  latched=0
+toward       floor=212642  threshold=149138  latched=0
+watching     floor=237303  threshold=149138  latched=0
+toward       floor=186578  threshold=149138  latched=0
+watching     floor=181891  threshold=149138  latched=0
+toward       floor=295047  threshold=149138  latched=0
+watching     floor=253003  threshold=149138  latched=0
+toward       floor=149026  threshold=149138  latched=0
+watching     floor=149376  threshold=149138  latched=0
+toward       floor=145117  threshold=149138  latched=0
+watching     floor=146248  threshold=149138  latched=0
+toward       floor=172016  threshold=149138  latched=0
+watching     floor=174382  threshold=149138  latched=0
+toward       floor=157257  threshold=149138  latched=0
+watching     floor=157079  threshold=149138  latched=0
+toward       floor=153480  threshold=149138  latched=0
+watching     floor=153100  threshold=149138  latched=0
+toward       floor=156860  threshold=149138  latched=0
+watching     floor=156198  threshold=149138  latched=0
+toward       floor=151226  threshold=149138  latched=0
+watching     floor=153171  threshold=149138  latched=0
+toward       floor=154525  threshold=149138  latched=0
+watching     floor=153453  threshold=149138  latched=0
+toward       floor=303335  threshold=149138  latched=0
+watching     floor=290635  threshold=149138  latched=0
+toward       floor=194173  threshold=149138  latched=0
+watching     floor=184138  threshold=149138  latched=0
+toward       floor=181255  threshold=149138  latched=0
+watching     floor=178871  threshold=149138  latched=0
+toward       floor=185121  threshold=149138  latched=0
+watching     floor=194512  threshold=149138  latched=0
+toward       floor=196410  threshold=149138  latched=0
+watching     floor=196596  threshold=149138  latched=0
+toward       floor=179483  threshold=149138  latched=0
+watching     floor=177343  threshold=149138  latched=0
+toward       floor=183392  threshold=149138  latched=0
+watching     floor=183397  threshold=149138  latched=0
+toward       floor=232961  threshold=149138  latched=0
+watching     floor=243153  threshold=149138  latched=0
+toward       floor=223954  threshold=149138  latched=0
+watching     floor=222137  threshold=149138  latched=0
+toward       floor=155709  threshold=149138  latched=0
+watching     floor=153329  threshold=149138  latched=0
+toward       floor=151470  threshold=149138  latched=0
+watching     floor=152529  threshold=149138  latched=0
+toward       floor=151916  threshold=149138  latched=0
+watching     floor=152608  threshold=149138  latched=0
+  Triggered
+
+swing 4:
+  clubtrack active=0 why=idle count=0 total=332 misses=0 bin=0.00 dest=42 dist=42.00 vel=0.00 speed=0.00 fit=0 residual=0.00 acq=165 assoc=168 coast=128 drop=35
+  delivery points=0 az=0 el=0 speed=0.00 radial=0.00 path=0.00 attack=0.00 residualmm=0.00 conf=0.00 valid=none
+  angle az=63.84 el=-40.00 coh=0.79 peak=1.0 psi=0.76 conf=0.00 valid=ae estimates=363
+  range impact fired=0 why=nodelivery cause=none offsetms=19.91 t=0 pending=7 passed=0 fired_n=3 armed=0
+  leave fired=1 why=fired start=48.17 speed=28.33 t=22982926 fired_n=1
+  impactfit verdict=none t=0 spreadus=0 dtrigus=0 dropped=- nolock=0 club_in=missing club_out=missing ball_out=missing
+  l3dump:/>shot state=ball_track since=7666 impact=22982926 source=range origin=1.97,0.00,0.00 club=0 post=2 transitions=347
+  balltrack armed=1 confirmed=1 done=0 why=coasted count=4 origin=47.00 bin=52.57 impact=22982926 acq=3 slow=0 fast=0 lost=0 rec=0 post=3
+  launch points=4 speed=25.06 radial=25.06 hla=0.00 vla=0.00 residualmm=773.32 conf=0.00 angles=0 rms=0.00 why=none valid=s
+  p frame=7663 t=22989000 bin=48.17 dist=-1.17 range=2.26 vr=0.00 vd=-0.17 coh=67 conf=1.00 angles=none
+  p frame=7664 t=22992000 bin=49.98 dist=-2.98 range=2.34 vr=28.33 vd=0.24 coh=64 conf=1.00 angles=none
+  p frame=7666 t=22995000 bin=52.83 dist=-5.83 range=2.48 vr=50.54 vd=-0.36 coh=44 conf=0.08 az=-12.63 el=-11.77
+  p frame=7667 t=22998000 bin=52.57 dist=-5.57 range=2.46 vr=10.62 vd=-0.31 coh=39 conf=0.04 az=-77.56 el=10.77
+  l3dump:/>
+  FAIL  the range impact did not fire (why=nodelivery): 332 club points, speed 0.0 m/s
+
+watching. swing when ready.
+toward       floor=152042  threshold=149138  latched=0
+watching     floor=151446  threshold=149138  latched=0
+toward       floor=193267  threshold=149138  latched=0
+watching     floor=194395  threshold=149138  latched=0
+toward       floor=160940  threshold=149138  latched=0
+watching     floor=157622  threshold=149138  latched=0
+toward       floor=161743  threshold=149138  latched=0
+watching     floor=159882  threshold=149138  latched=0
+toward       floor=195408  threshold=149138  latched=0
+watching     floor=197750  threshold=149138  latched=0
+toward       floor=292118  threshold=149138  latched=0
+watching     floor=294725  threshold=149138  latched=0
+toward       floor=158800  threshold=149138  latched=0
+watching     floor=154605  threshold=149138  latched=0
+toward       floor=142752  threshold=149138  latched=0
+watching     floor=143582  threshold=149138  latched=0
+toward       floor=149729  threshold=149138  latched=0
+watching     floor=149809  threshold=149138  latched=0
+toward       floor=399848  threshold=149138  latched=0
+watching     floor=328104  threshold=149138  latched=0
+toward       floor=266826  threshold=149138  latched=0
+watching     floor=254850  threshold=149138  latched=0
+toward       floor=234333  threshold=149138  latched=0
+watching     floor=222736  threshold=149138  latched=0
+toward       floor=222236  threshold=149138  latched=0
+watching     floor=216762  threshold=149138  latched=0
+toward       floor=234662  threshold=149138  latched=0
+watching     floor=234577  threshold=149138  latched=0
+toward       floor=207519  threshold=149138  latched=0
+watching     floor=219065  threshold=149138  latched=0
+toward       floor=146603  threshold=149138  latched=0
+watching     floor=144446  threshold=149138  latched=0
+toward       floor=150950  threshold=149138  latched=0
+watching     floor=151016  threshold=149138  latched=0
+toward       floor=165139  threshold=149138  latched=0
+watching     floor=164695  threshold=149138  latched=0
+toward       floor=171231  threshold=149138  latched=0
+watching     floor=176879  threshold=149138  latched=0
+toward       floor=187868  threshold=149138  latched=0
+watching     floor=182179  threshold=149138  latched=0
+toward       floor=175263  threshold=149138  latched=0
+watching     floor=173854  threshold=149138  latched=0
+toward       floor=176996  threshold=149138  latched=0
+watching     floor=180758  threshold=149138  latched=0
+toward       floor=179659  threshold=149138  latched=0
+watching     floor=178531  threshold=149138  latched=0
+toward       floor=190800  threshold=149138  latched=0
+watching     floor=208792  threshold=149138  latched=0
+toward       floor=281846  threshold=149138  latched=0
+watching     floor=288550  threshold=149138  latched=0
+toward       floor=158491  threshold=149138  latched=0
+watching     floor=156759  threshold=149138  latched=0
+toward       floor=147162  threshold=149138  latched=0
+watching     floor=142567  threshold=149138  latched=0
+toward       floor=149573  threshold=149138  latched=0
+watching     floor=151553  threshold=149138  latched=0
+toward       floor=428595  threshold=149138  latched=0
+watching     floor=398848  threshold=149138  latched=0
+toward       floor=245934  threshold=149138  latched=0
+watching     floor=239079  threshold=149138  latched=0
+toward       floor=216086  threshold=149138  latched=0
+watching     floor=217636  threshold=149138  latched=0
+toward       floor=148942  threshold=149138  latched=0
+watching     floor=150419  threshold=149138  latched=0
+toward       floor=142639  threshold=149138  latched=0
+watching     floor=143931  threshold=149138  latched=0
+toward       floor=149085  threshold=149138  latched=0
+watching     floor=147666  threshold=149138  latched=0
+toward       floor=148873  threshold=149138  latched=0
+watching     floor=148714  threshold=149138  latched=0
+toward       floor=196200  threshold=149138  latched=0
+watching     floor=210157  threshold=149138  latched=0
+toward       floor=213904  threshold=149138  latched=0
+watching     floor=211378  threshold=149138  latched=0
+toward       floor=155047  threshold=149138  latched=0
+watching     floor=153123  threshold=149138  latched=0
+toward       floor=146126  threshold=149138  latched=0
+watching     floor=146413  threshold=149138  latched=0
+toward       floor=456262  threshold=149138  latched=0
+watching     floor=389527  threshold=149138  latched=0
+toward       floor=223179  threshold=149138  latched=0
+watching     floor=215200  threshold=149138  latched=0
+toward       floor=171852  threshold=149138  latched=0
+watching     floor=171931  threshold=149138  latched=0
+toward       floor=170175  threshold=149138  latched=0
+watching     floor=165444  threshold=149138  latched=0
+toward       floor=182407  threshold=149138  latched=0
+watching     floor=196357  threshold=149138  latched=0
+toward       floor=199936  threshold=149138  latched=0
+watching     floor=200744  threshold=149138  latched=0
+toward       floor=227114  threshold=149138  latched=0
+watching     floor=216060  threshold=149138  latched=0
+toward       floor=152016  threshold=149138  latched=0
+watching     floor=150778  threshold=149138  latched=0
+toward       floor=145701  threshold=149138  latched=0
+watching     floor=145364  threshold=149138  latched=0
+toward       floor=161074  threshold=149138  latched=0
+watching     floor=194774  threshold=149138  latched=0
+toward       floor=210277  threshold=149138  latched=0
+watching     floor=210805  threshold=149138  latched=0
+toward       floor=157537  threshold=149138  latched=0
+watching     floor=159210  threshold=149138  latched=0
+toward       floor=155157  threshold=149138  latched=0
+watching     floor=153395  threshold=149138  latched=0
+toward       floor=163988  threshold=149138  latched=0
+watching     floor=163805  threshold=149138  latched=0
+toward       floor=203302  threshold=149138  latched=0
+watching     floor=222867  threshold=149138  latched=0
+toward       floor=207531  threshold=149138  latched=0
+watching     floor=206477  threshold=149138  latched=0
+toward       floor=209481  threshold=149138  latched=0
+watching     floor=221205  threshold=149138  latched=0
+toward       floor=256923  threshold=149138  latched=0
+watching     floor=261105  threshold=149138  latched=0
+toward       floor=302775  threshold=149138  latched=0
+watching     floor=285266  threshold=149138  latched=0
+toward       floor=207954  threshold=149138  latched=0
+watching     floor=210637  threshold=149138  latched=0
+toward       floor=167819  threshold=149138  latched=0
+watching     floor=164816  threshold=149138  latched=0
+toward       floor=159492  threshold=149138  latched=0
+watching     floor=158842  threshold=149138  latched=0
+toward       floor=175185  threshold=149138  latched=0
+watching     floor=179220  threshold=149138  latched=0
+toward       floor=175664  threshold=149138  latched=0
+watching     floor=173380  threshold=149138  latched=0
+toward       floor=158119  threshold=149138  latched=0
+watching     floor=152437  threshold=149138  latched=0
+toward       floor=147587  threshold=149138  latched=0
+watching     floor=144208  threshold=149138  latched=0
+toward       floor=146161  threshold=149138  latched=0
+watching     floor=150173  threshold=149138  latched=0
+toward       floor=1933604  threshold=149138  latched=0
+watching     floor=1784474  threshold=149138  latched=0
+toward       floor=217511  threshold=149138  latched=0
+watching     floor=210305  threshold=149138  latched=0
+toward       floor=202025  threshold=149138  latched=0
+watching     floor=198595  threshold=149138  latched=0
+toward       floor=173210  threshold=149138  latched=0
+watching     floor=170203  threshold=149138  latched=0
+toward       floor=165916  threshold=149138  latched=0
+watching     floor=167289  threshold=149138  latched=0
+toward       floor=206526  threshold=149138  latched=0
+watching     floor=200759  threshold=149138  latched=0
+toward       floor=151629  threshold=149138  latched=0
+watching     floor=147881  threshold=149138  latched=0
+toward       floor=141279  threshold=149138  latched=0
+watching     floor=142920  threshold=149138  latched=0
+toward       floor=246511  threshold=149138  latched=0
+watching     floor=230500  threshold=149138  latched=0
+toward       floor=160205  threshold=149138  latched=0
+watching     floor=160820  threshold=149138  latched=0
+toward       floor=145759  threshold=149138  latched=0
+watching     floor=147610  threshold=149138  latched=0
+toward       floor=434720  threshold=149138  latched=0
+watching     floor=428210  threshold=149138  latched=0
+toward       floor=270528  threshold=149138  latched=0
+watching     floor=251954  threshold=149138  latched=0
+toward       floor=247629  threshold=149138  latched=0
+watching     floor=259679  threshold=149138  latched=0
+toward       floor=167177  threshold=149138  latched=0
+watching     floor=166848  threshold=149138  latched=0
+toward       floor=162007  threshold=149138  latched=0
+watching     floor=161364  threshold=149138  latched=0
+toward       floor=228579  threshold=149138  latched=0
+watching     floor=249476  threshold=149138  latched=0
+  Triggered
+
+swing 5:
+  clubtrack active=0 why=idle count=0 total=497 misses=0 bin=0.00 dest=42 dist=42.00 vel=0.00 speed=0.00 fit=0 residual=0.00 acq=254 assoc=246 coast=190 drop=53
+  delivery points=0 az=0 el=0 speed=0.00 radial=0.00 path=0.00 attack=0.00 residualmm=0.00 conf=0.00 valid=none
+  angle az=-63.84 el=-40.00 coh=0.79 peak=1.0 psi=0.93 conf=0.00 valid=ae estimates=379
+  range impact fired=0 why=nodelivery cause=none offsetms=14.85 t=0 pending=11 passed=0 fired_n=3 armed=0
+  leave fired=1 why=fired start=48.14 speed=32.76 t=17295787 fired_n=2
+  impactfit verdict=none t=0 spreadus=0 dtrigus=0 dropped=- nolock=0 club_in=missing club_out=missing ball_out=missing
+  p frame=5770 t=17307000 bin=49.65 dist=-7.65 range=2.33 vr=0.00 vd=-0.15 coh=70 conf=0.85 angles=none
+  l3dump:/>shot state=result since=5771 impact=17295787 source=range origin=1.97,0.00,0.00 club=0 post=2 transitions=523
+  balltrack armed=1 confirmed=1 done=1 why=lost count=2 origin=47.00 bin=50.24 impact=17295787 acq=3 slow=0 fast=0 lost=14 rec=0 post=3
+  launch points=0 speed=0.00 radial=0.00 hla=0.00 vla=0.00 residualmm=0.00 conf=0.00 angles=0 rms=0.00 why=few_angles valid=none
+  p frame=5767 t=17301000 bin=48.14 dist=-1.14 range=2.26 vr=0.00 vd=-0.46 coh=71 conf=1.00 angles=none
+  p frame=5768 t=17304000 bin=50.24 dist=-3.24 range=2.35 vr=32.76 vd=-0.31 coh=65 conf=1.00 angles=none
+  l3dump:/>
+  FAIL  the range impact did not fire (why=nodelivery): 497 club points, speed 0.0 m/s
+
+watching. swing when ready.
+toward       floor=223831  threshold=149138  latched=0
+watching     floor=215193  threshold=149138  latched=0
+toward       floor=145058  threshold=149138  latched=0
+watching     floor=145891  threshold=149138  latched=0
+toward       floor=181057  threshold=149138  latched=0
+watching     floor=179014  threshold=149138  latched=0
+toward       floor=168136  threshold=149138  latched=0
+watching     floor=168699  threshold=149138  latched=0
+toward       floor=186659  threshold=149138  latched=0
+watching     floor=188899  threshold=149138  latched=0
+toward       floor=153397  threshold=149138  latched=0
+watching     floor=152255  threshold=149138  latched=0
+toward       floor=149186  threshold=149138  latched=0
+watching     floor=152289  threshold=149138  latched=0
+toward       floor=151145  threshold=149138  latched=0
+watching     floor=151761  threshold=149138  latched=0
+toward       floor=235128  threshold=149138  latched=0
+watching     floor=246026  threshold=149138  latched=0
+toward       floor=351173  threshold=149138  latched=0
+watching     floor=346279  threshold=149138  latched=0
+toward       floor=329939  threshold=149138  latched=0
+watching     floor=352830  threshold=149138  latched=0
+toward       floor=334582  threshold=149138  latched=0
+watching     floor=323829  threshold=149138  latched=0
+toward       floor=284859  threshold=149138  latched=0
+watching     floor=269555  threshold=149138  latched=0
+toward       floor=173539  threshold=149138  latched=0
+watching     floor=170703  threshold=149138  latched=0
+toward       floor=200715  threshold=149138  latched=0
+watching     floor=201616  threshold=149138  latched=0
+toward       floor=148975  threshold=149138  latched=0
+watching     floor=152095  threshold=149138  latched=0
+toward       floor=166166  threshold=149138  latched=0
+watching     floor=168714  threshold=149138  latched=0
+toward       floor=145077  threshold=149138  latched=0
+watching     floor=148325  threshold=149138  latched=0
+toward       floor=151816  threshold=149138  latched=0
+watching     floor=148929  threshold=149138  latched=0
+toward       floor=145012  threshold=149138  latched=0
+watching     floor=145218  threshold=149138  latched=0
+toward       floor=145835  threshold=149138  latched=0
+watching     floor=145634  threshold=149138  latched=0
+toward       floor=477874  threshold=149138  latched=0
+watching     floor=446046  threshold=149138  latched=0
+toward       floor=392893  threshold=149138  latched=0
+watching     floor=328001  threshold=149138  latched=0
+toward       floor=179066  threshold=149138  latched=0
+watching     floor=176820  threshold=149138  latched=0
+toward       floor=234604  threshold=149138  latched=0
+watching     floor=234248  threshold=149138  latched=0
+toward       floor=151555  threshold=149138  latched=0
+watching     floor=148993  threshold=149138  latched=0
+toward       floor=150644  threshold=149138  latched=0
+watching     floor=150729  threshold=149138  latched=0
+toward       floor=192378  threshold=149138  latched=0
+watching     floor=194819  threshold=149138  latched=0
+toward       floor=190234  threshold=149138  latched=0
+watching     floor=191949  threshold=149138  latched=0
+toward       floor=176836  threshold=149138  latched=0
+watching     floor=175958  threshold=149138  latched=0
+toward       floor=156808  threshold=149138  latched=0
+watching     floor=156082  threshold=149138  latched=0
+toward       floor=173465  threshold=149138  latched=0
+watching     floor=179211  threshold=149138  latched=0
+toward       floor=247630  threshold=149138  latched=0
+watching     floor=231819  threshold=149138  latched=0
+toward       floor=157611  threshold=149138  latched=0
+watching     floor=155524  threshold=149138  latched=0
+toward       floor=149024  threshold=149138  latched=0
+watching     floor=147723  threshold=149138  latched=0
+toward       floor=148909  threshold=149138  latched=0
+watching     floor=146996  threshold=149138  latched=0
+toward       floor=167007  threshold=149138  latched=0
+watching     floor=168184  threshold=149138  latched=0
+toward       floor=167229  threshold=149138  latched=0
+watching     floor=171524  threshold=149138  latched=0
+toward       floor=232871  threshold=149138  latched=0
+watching     floor=228065  threshold=149138  latched=0
+toward       floor=231503  threshold=149138  latched=0
+watching     floor=221919  threshold=149138  latched=0
+toward       floor=148411  threshold=149138  latched=0
+watching     floor=148969  threshold=149138  latched=0
+toward       floor=150095  threshold=149138  latched=0
+watching     floor=150312  threshold=149138  latched=0
+toward       floor=157409  threshold=149138  latched=0
+watching     floor=157451  threshold=149138  latched=0
+toward       floor=166726  threshold=149138  latched=0
+watching     floor=165789  threshold=149138  latched=0
+toward       floor=187576  threshold=149138  latched=0
+watching     floor=191720  threshold=149138  latched=0
+toward       floor=264546  threshold=149138  latched=0
+watching     floor=268388  threshold=149138  latched=0
+toward       floor=157924  threshold=149138  latched=0
+watching     floor=157523  threshold=149138  latched=0
+toward       floor=328474  threshold=149138  latched=0
+watching     floor=346921  threshold=149138  latched=0
+toward       floor=30148788  threshold=149138  latched=0
+watching     floor=30605692  threshold=149138  latched=0
+toward       floor=15602241  threshold=149138  latched=0
+watching     floor=15156430  threshold=149138  latched=0
+toward       floor=7359588  threshold=149138  latched=0
+watching     floor=6254231  threshold=149138  latched=0
+toward       floor=5203814  threshold=149138  latched=0
+watching     floor=4729523  threshold=149138  latched=0
+toward       floor=3150458  threshold=149138  latched=0
+watching     floor=2533554  threshold=149138  latched=0
+toward       floor=2231276  threshold=149138  latched=0
+watching     floor=2147380  threshold=149138  latched=0
+toward       floor=1930594  threshold=149138  latched=0
+watching     floor=1815330  threshold=149138  latched=0
+toward       floor=1298392  threshold=149138  latched=0
+watching     floor=1291910  threshold=149138  latched=0
+toward       floor=1100043  threshold=149138  latched=0
+watching     floor=1257748  threshold=149138  latched=0
+toward       floor=1395213  threshold=149138  latched=0
+watching     floor=1545506  threshold=149138  latched=0
+toward       floor=1505128  threshold=149138  latched=0
+watching     floor=1535019  threshold=149138  latched=0
+toward       floor=1166372  threshold=149138  latched=0
+watching     floor=1167235  threshold=149138  latched=0
+toward       floor=1364531  threshold=149138  latched=0
+watching     floor=1333173  threshold=149138  latched=0
+toward       floor=929110  threshold=149138  latched=0
+watching     floor=777133  threshold=149138  latched=0
+toward       floor=689942  threshold=149138  latched=0
+watching     floor=674470  threshold=149138  latched=0
+toward       floor=639000  threshold=149138  latched=0
+watching     floor=585472  threshold=149138  latched=0
+toward       floor=542159  threshold=149138  latched=0
+watching     floor=593914  threshold=149138  latched=0
+toward       floor=620752  threshold=149138  latched=0
+watching     floor=695455  threshold=149138  latched=0
+toward       floor=672310  threshold=149138  latched=0
+watching     floor=639890  threshold=149138  latched=0
+toward       floor=599871  threshold=149138  latched=0
+watching     floor=629313  threshold=149138  latched=0
+toward       floor=585728  threshold=149138  latched=0
+watching     floor=564687  threshold=149138  latched=0
+toward       floor=566278  threshold=149138  latched=0
+watching     floor=685108  threshold=149138  latched=0
+toward       floor=716834  threshold=149138  latched=0
+watching     floor=688313  threshold=149138  latched=0
+toward       floor=563391  threshold=149138  latched=0
+watching     floor=539690  threshold=149138  latched=0
+toward       floor=533706  threshold=149138  latched=0
+watching     floor=605726  threshold=149138  latched=0
+toward       floor=340933  threshold=149138  latched=0
+watching     floor=349719  threshold=149138  latched=0
+toward       floor=346187  threshold=149138  latched=0
+watching     floor=343015  threshold=149138  latched=0
+toward       floor=355781  threshold=149138  latched=0
+watching     floor=364428  threshold=149138  latched=0
+toward       floor=371009  threshold=149138  latched=0
+watching     floor=404046  threshold=149138  latched=0
+toward       floor=445877  threshold=149138  latched=0
+watching     floor=451057  threshold=149138  latched=0
+toward       floor=446057  threshold=149138  latched=0
+watching     floor=428796  threshold=149138  latched=0
+toward       floor=436348  threshold=149138  latched=0
+watching     floor=434881  threshold=149138  latched=0
+toward       floor=443217  threshold=149138  latched=0
+watching     floor=425625  threshold=149138  latched=0
+toward       floor=415457  threshold=149138  latched=0
+watching     floor=400988  threshold=149138  latched=0
+toward       floor=387496  threshold=149138  latched=0
+watching     floor=373825  threshold=149138  latched=0
+toward       floor=273919  threshold=149138  latched=0
+watching     floor=263039  threshold=149138  latched=0
+toward       floor=254922  threshold=149138  latched=0
+watching     floor=246167  threshold=149138  latched=0
+toward       floor=194687  threshold=149138  latched=0
+watching     floor=196373  threshold=149138  latched=0
+toward       floor=175221  threshold=149138  latched=0
+watching     floor=168469  threshold=149138  latched=0
+toward       floor=144534  threshold=149138  latched=0
+watching     floor=145333  threshold=149138  latched=0
+toward       floor=149604  threshold=149138  latched=0
+watching     floor=149382  threshold=149138  latched=0
+toward       floor=143171  threshold=149138  latched=0
+watching     floor=144490  threshold=149138  latched=0
+toward       floor=145659  threshold=149138  latched=0
+watching     floor=146900  threshold=149138  latched=0
+watching     floor=148105  threshold=149138  latched=0  enabled=1
+watching     floor=145038  threshold=149138  latched=0  enabled=1
+watching     floor=139939  threshold=149138  latched=0  enabled=1
+watching     floor=145563  threshold=149138  latched=0  enabled=1
+toward       floor=144058  threshold=149138  latched=0
+watching     floor=145122  threshold=149138  latched=0
+watching     floor=143510  threshold=149138  latched=0  enabled=1
+watching     floor=147536  threshold=149138  latched=0  enabled=1
+toward       floor=143099  threshold=149138  latched=0
+watching     floor=145900  threshold=149138  latched=0
+watching     floor=144668  threshold=149138  latched=0  enabled=1
+
+3/5 swings fired on the club track
+Traceback (most recent call last):
+  File "/home/jamorro/openflight_test/openflight/scripts/iwr6843/swing_trigger.py", line 257, in <module>
+    main()
+  File "/home/jamorro/openflight_test/openflight/scripts/iwr6843/swing_trigger.py", line 253, in main
+    radar.close()
+  File "/home/jamorro/openflight_test/openflight/src/openflight/iwr6843/driver.py", line 761, in close
+    self.ser.close()
+  File "/home/jamorro/openflight_test/openflight/.venv/lib/python3.11/site-packages/serial/serialposix.py", line 533, in close
+    os.close(self.fd)
+KeyboardInterrupt
