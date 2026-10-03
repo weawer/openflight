@@ -4415,6 +4415,17 @@ def start_monitor(
         monitor.start(shot_callback=on_shot_detected, live_callback=on_live_reading)
 
 
+def _cloud_raw_uploads_enabled() -> bool:
+    """True when this Pi has opted in to raw cloud uploads. Never raises."""
+    try:
+        from .cloud.config import load_config
+
+        config = load_config()
+        return bool(config and config.is_active() and config.upload_raw)
+    except Exception:  # pylint: disable=broad-exception-caught
+        return False
+
+
 def _fire_cloud_push(session_logger):
     """Best-effort, non-blocking cloud push on session end.
 
@@ -5288,7 +5299,10 @@ def main():
     parser.add_argument(
         "--iwr6843-output-dir",
         default=None,
-        help=("Raw TI dump directory when --debug is enabled (default: <session-log-dir>/iwr6843)"),
+        help=(
+            "Raw TI dump directory, used when --debug or cloud raw uploads "
+            "(openflight-cloud raw on) are enabled (default: <session-log-dir>/iwr6843)"
+        ),
     )
     parser.add_argument(
         "--iwr6843-azimuth-offset-deg",
@@ -5628,6 +5642,9 @@ def main():
             )
             / "iwr6843"
         )
+        # Raw cloud uploads need the dumps on disk to send them. On this tree
+        # that is the debug readback: a full capture, saved.
+        iwr_debug = args.debug or _cloud_raw_uploads_enabled()
         if init_iwr6843(
             port=args.iwr6843_port,
             config_path=args.iwr6843_config,
@@ -5644,7 +5661,7 @@ def main():
             ball_height_m=args.iwr6843_ball_height_m,
             azimuth_offset_deg=args.iwr6843_azimuth_offset_deg,
             horizontal_phase_reference_rad=args.iwr6843_horizontal_phase_reference_rad,
-            debug=args.debug,
+            debug=iwr_debug,
             self_trigger=self_trigger_config,
             onboard_track=args.iwr6843_onboard_track,
             full_capture=args.iwr6843_full_capture,
@@ -5663,7 +5680,7 @@ def main():
                 "IWR6843 enabled (onboard launch angles, "
                 f"BCM{args.iwr6843_trigger_pin}, {iwr6843_runtime.tx_order} TX order)"
             )
-            if args.debug:
+            if iwr_debug:
                 print(f"IWR6843 raw dumps enabled: {iwr_output_dir}")
             startup_status.ready("ti", "TI radar connected")
         else:
