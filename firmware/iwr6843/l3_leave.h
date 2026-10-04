@@ -47,14 +47,6 @@ typedef struct {
     uint32_t clubHoldFrames; /* armed this many frames after the club was near the ball */
     float clubNearBins;   /* near: the club's newest point within this of the band's near edge */
     float newBins;        /* a start from nothing had no return within this last frame */
-    /* A step under minStepBins is judged only minStepUs or more after the
-     * start: at 2 ms a bin's range wobble reads 23 m/s over one frame, past
-     * minSpeedMps, but 12 m/s over two (2026-10-03). A step of minStepBins
-     * or more is judged at once: at 2 ms a ball may show beyond the band on
-     * only two frames. At 3 ms every step is judged on the next frame, as
-     * before. minStepUs 0: every step on the next frame. */
-    uint32_t minStepUs;
-    float minStepBins;
 } l3_leave_cfg_t;
 
 enum {

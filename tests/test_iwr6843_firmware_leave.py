@@ -186,14 +186,18 @@ def test_a_standing_or_slow_return_does_not_fire(lib, mps):
     assert state.fired == 0 and state.why == WHY["slow"]
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason="known 2 ms weakness, kept (2026-10-04): judging a step under 1.5 bins over "
+    "two frames stopped this wobble but fired a real ball a frame late on 1 of 76 "
+    "annotated shots (20260809_110251: its step was 0.95 bins), and on the rig it "
+    "stopped one backswing fire of three",
+)
 @pytest.mark.parametrize("jitter_bins", [1.0, 1.2, 1.4])
 def test_range_jitter_that_does_not_fire_at_3_ms_does_not_fire_at_2_ms(lib, jitter_bins):
-    """A standing return's measured range wobbles about a bin frame to frame
-    (l3_leave_cfg_defaults: newBins). The rule reads a two-frame step as a
-    speed, so the same wobble reads 1.5x faster at 2 ms than at 3 ms: a 1-bin
-    wobble is 15.6 m/s at 3 ms but 23.4 m/s at 2 ms, over minSpeedMps (22).
-    Reported 2026-10-03: with the 2 ms profile the default, the trigger fires
-    on backswings. Whatever the frame period, the wobble must not fire."""
+    """The rule reads a two-frame step as a speed, so a standing return's range
+    wobble reads 1.5x faster at 2 ms than at 3 ms: a 1-bin wobble is 15.6 m/s at
+    3 ms but 23.4 m/s at 2 ms, over minSpeedMps (22)."""
     at_3_ms = leave(lib)
     frame(lib, at_3_ms, 10, 47.0, frame_us=3000)
     assert frame(lib, at_3_ms, 11, 47.0 + jitter_bins, frame_us=3000) == 0
@@ -203,58 +207,6 @@ def test_range_jitter_that_does_not_fire_at_3_ms_does_not_fire_at_2_ms(lib, jitt
     assert frame(lib, at_2_ms, 11, 47.0 + jitter_bins, frame_us=2000) == 0, (
         f"a {jitter_bins}-bin wobble fired at 2 ms ({at_2_ms.speedMps:.1f} m/s)"
     )
-
-
-def test_a_small_step_is_judged_over_at_least_2_5_ms_by_default(lib):
-    cfg = fw.LeaveCfg()
-    lib.l3_leave_cfg_defaults(ctypes.byref(cfg))
-    assert (cfg.minStepUs, cfg.minStepBins) == (2500, pytest.approx(1.5))
-
-
-def test_at_2_ms_a_ball_stepping_1_5_bins_or_more_fires_on_the_next_frame(lib):
-    """20260809_111337_707_002: the ball shows beyond the band on two frames
-    only (48.55 then 50.18, 38 m/s); waiting for a third lost it."""
-    state = leave(lib)
-    assert frame(lib, state, 15, 48.55, frame_us=2000) == 0
-    assert frame(lib, state, 16, 50.18, frame_us=2000) == 1
-    assert state.speedMps == pytest.approx(1.63 * BIN_M / 2000e-6, rel=1e-3)
-
-
-def test_at_2_ms_a_slow_ball_fires_on_the_second_frame_after_its_start(lib):
-    """Under 1.5 bins a frame (25 m/s is 1.07) the frame in between keeps the
-    start; over two frames (4 ms) it is judged as at 3 ms."""
-    state = leave(lib)
-    step = 25.0 * 2000e-6 / BIN_M
-    assert frame(lib, state, 10, 47.0, frame_us=2000) == 0
-    assert frame(lib, state, 11, 47.0 + step, frame_us=2000) == 0
-    assert state.why == WHY["started"] and state.startBin == pytest.approx(47.0)
-    assert frame(lib, state, 12, 47.0 + 2 * step, frame_us=2000) == 1
-    assert state.speedMps == pytest.approx(25.0, rel=1e-4)
-    # The line through 47.0 at 25 m/s reaches the rest bin 4 bins earlier.
-    back_us = 4.0 * BIN_M / 25.0 * 1e6
-    assert state.impactTimestampUs == pytest.approx(20_000 - back_us, abs=1)
-
-
-def test_at_2_ms_a_wobble_over_two_frames_reads_slow(lib):
-    state = leave(lib)
-    frame(lib, state, 10, 47.0, frame_us=2000)
-    frame(lib, state, 11, 48.0, frame_us=2000)
-    assert frame(lib, state, 12, 47.6, frame_us=2000) == 0
-    assert state.fired == 0 and state.why == WHY["slow"]
-
-
-def test_min_step_zero_judges_the_next_frame_as_before(lib):
-    state = leave(lib, minStepUs=0)
-    frame(lib, state, 10, 47.0, frame_us=2000)
-    assert frame(lib, state, 11, 48.0, frame_us=2000) == 1
-
-
-def test_at_2_ms_the_ball_missing_on_the_frame_in_between_restarts_it(lib):
-    """As at 3 ms: a frame with nothing beyond the edge forgets the start."""
-    state = leave(lib)
-    frame(lib, state, 10, 47.0, frame_us=2000)
-    assert frame(lib, state, 11, frame_us=2000) == 0
-    assert state.why == WHY["idle"] and state.started == 0
 
 
 def test_a_return_moving_inward_does_not_fire(lib):
