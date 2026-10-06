@@ -16,7 +16,13 @@ from typing import Callable
 
 from openflight.gpio_factory import ensure_lgpio_pin_factory
 from openflight.iwr6843.board_calibration import BoardCalibration
-from openflight.iwr6843.driver import IWR6843Radar, UnsupportedCommand
+from openflight.iwr6843.driver import (
+    CANDIDATE_NOTICE,
+    REJECTED_NOTICE,
+    TRIGGER_NOTICE,
+    IWR6843Radar,
+    UnsupportedCommand,
+)
 from openflight.iwr6843.dsp_link import DspLinkError
 from openflight.iwr6843.dump import HEADER, parse_header, payload_nbytes
 from openflight.iwr6843.firmware_version import FirmwareVersion
@@ -41,6 +47,10 @@ _GRACEFUL_DUMP_SHUTDOWN_S = 12.0
 _LISTENER_ERROR_BACKOFF_S = 0.5
 # Between attempts to rearm the board after a capture (l3release, else a restart).
 _REARM_RETRY_BACKOFF_S = 0.5
+# Confirm mode: the board decides a candidate within its window (24 ms by
+# default) or at the end of the post movie. A candidate still undecided after
+# this long is released, so a missed verdict cannot leave the ring frozen.
+_CONFIRM_VERDICT_TIMEOUT_S = 0.5
 # The board's state in a ``stats`` reply: a capture running, the trigger latched.
 _STATS_ACTIVE = re.compile(r"\bactive=(\d+)")
 _STATS_LATCHED = re.compile(r"\blatched=(\d+)")
@@ -429,6 +439,7 @@ class IWR6843CaptureMonitor:
         veto_no_ball: bool = False,
         readback: bool = True,
         full_capture: bool = False,
+        confirm_flight: bool = True,
     ):
         if save_dumps and not readback:
             raise ValueError("save_dumps needs the readback: without it there is no dump to save")
@@ -450,6 +461,14 @@ class IWR6843CaptureMonitor:
         # (raking a ball over, a waggle). Off by default: the board's ball
         # tracker still misses real balls.
         self.veto_no_ball = veto_no_ball
+        # With the self-trigger, the board tells the host only once the ball's
+        # flight confirms a fire ("trackCfg confirm", l3_confirm.h): a
+        # backswing or an empty lane never sends S!. False until the firmware
+        # acknowledged it; older firmware fires at once.
+        self.confirm_flight = confirm_flight
+        self.confirm_applied = False
+        # Candidates the board rejected (no ball flight) since start.
+        self.confirm_rejections = 0
         # "not <=" also refuses NaN.
         if not 0.0 <= tee_band_bins <= TEE_BAND_MAX_BINS:
             raise ValueError(
@@ -499,6 +518,8 @@ class IWR6843CaptureMonitor:
         self._trigger_notice = b""
         # A frozen ring nobody will read. Retried until the release succeeds.
         self._release_pending = False
+        # When the board's undecided candidate arrived (monotonic), else None.
+        self._candidate_since: float | None = None
         # After every capture the board is left armed (_ensure_armed); edges
         # while that runs are refused as busy. A restart repeats start()'s
         # configuration (kept here) and then runs the restart hooks.
@@ -628,7 +649,8 @@ class IWR6843CaptureMonitor:
 
     def _configure_radar(self) -> None:
         """The radar as start() leaves it: the cfg, the tee band, the ball snr,
-        the board calibration, the onboard tracker and the self-trigger.
+        the board calibration, the onboard tracker, the flight confirmation and
+        the self-trigger.
 
         Also how _ensure_armed restarts a board a failed capture left stopped,
         so the two cannot drift apart. Raises on failure; _sensor_configured
@@ -669,6 +691,9 @@ class IWR6843CaptureMonitor:
         # Before triggerCfg: an armed detector latched on the MSS cannot keep
         # up at 2 ms, starves the CLI, and the board stops answering.
         self._apply_detect_core()
+        # A candidate from before the restart has no frozen ring left.
+        self._candidate_since = None
+        self._apply_confirm()
         self._apply_self_trigger()
 
     def add_restart_hook(self, hook: Callable[[IWR6843Radar], None]) -> None:
@@ -815,6 +840,18 @@ class IWR6843CaptureMonitor:
             "[IWR6843] Self-trigger detect core: %s (active=%s)", status.requested, status.active
         )
 
+    def _apply_confirm(self) -> None:
+        """``trackCfg confirm`` for the self-trigger, on or off: the firmware
+        keeps it across ``sensorStart``, so a restart without it must clear it."""
+        if self.self_trigger is None:
+            return
+        self.confirm_applied = self.radar.set_confirm(self.confirm_flight) and self.confirm_flight
+        if self.confirm_flight and not self.confirm_applied:
+            logger.warning(
+                "[IWR6843] Firmware has no flight confirmation (trackCfg confirm): "
+                "the self-trigger fires on every candidate, backswings included"
+            )
+
     def _apply_self_trigger(self) -> None:
         """Send ``triggerCfg`` for the configured self-trigger, if any."""
         if self.self_trigger is None:
@@ -918,18 +955,44 @@ class IWR6843CaptureMonitor:
         return self.output_dir / f"iwr6843_{timestamp}_{sequence:03d}.l3dump"
 
     def _listen_for_self_trigger(self) -> None:
-        """Block briefly on the CLI for the firmware's ``Triggered`` line.
+        """Block briefly on the CLI for the firmware's next notice.
 
         The read returns as soon as a byte arrives, so the trigger reaches the
         OPS within about a millisecond of the notice instead of a poll period.
+        In confirm mode a ``Candidate`` comes first; its ``Triggered`` is the
+        shot, and its ``Rejected`` (or no verdict in time) a frozen ring with
+        no ball in it, released here.
         """
         if not self._release_pending:
-            found, self._trigger_notice = self.radar.wait_trigger_notice(self._trigger_notice)
-            if not found or self.notify_trigger():
+            notice, self._trigger_notice = self.radar.wait_notice(self._trigger_notice)
+            if notice == CANDIDATE_NOTICE:
+                self._candidate_since = time.monotonic()
                 return
-            # Disarmed, busy or a duplicate: the firmware froze its ring and
-            # waits for l3sparse, but no capture will ask for it.
-            logger.info("[IWR6843] Releasing an unaccepted self-trigger capture")
+            if notice == TRIGGER_NOTICE:
+                self._candidate_since = None
+                if self.notify_trigger():
+                    return
+                # Disarmed, busy or a duplicate: the firmware froze its ring and
+                # waits for l3sparse, but no capture will ask for it.
+                logger.info("[IWR6843] Releasing an unaccepted self-trigger capture")
+            elif notice == REJECTED_NOTICE:
+                self._candidate_since = None
+                self.confirm_rejections += 1
+                logger.info(
+                    "[IWR6843] Self-trigger candidate showed no ball flight; releasing the ring"
+                )
+            elif (
+                self._candidate_since is not None
+                and time.monotonic() - self._candidate_since > _CONFIRM_VERDICT_TIMEOUT_S
+            ):
+                self._candidate_since = None
+                logger.warning(
+                    "[IWR6843] No verdict on a self-trigger candidate within %.1f s; "
+                    "releasing the ring",
+                    _CONFIRM_VERDICT_TIMEOUT_S,
+                )
+            else:
+                return
             self._release_pending = True
         # Raises on failure; the caller backs off and this retries next pass.
         self.radar.release_sparse_freeze()

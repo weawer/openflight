@@ -549,6 +549,7 @@ def test_watch_script_releases_a_trigger_in_the_arming_reply(monkeypatch):
         "debugCfg 1",
         "debugCfg 0",
     ]
+    radar.set_confirm.assert_called_once_with(False)
     radar.close.assert_called_once()
 
 
@@ -839,7 +840,8 @@ def test_set_radar_cal_and_elements_send_the_track_cfg_sub_modes(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "reply", ["Error: trackCfg <loopPeriodS> ...\n", "'trackCfg' is not recognized as a CLI command\n"]
+    "reply",
+    ["Error: trackCfg <loopPeriodS> ...\n", "'trackCfg' is not recognized as a CLI command\n"],
 )
 def test_calibration_refused_by_old_firmware_returns_false_for_any_values(monkeypatch, reply):
     radar = IWR6843Radar.__new__(IWR6843Radar)
@@ -857,3 +859,111 @@ def test_calibration_on_a_silent_board_fails(monkeypatch):
         radar.set_elements((0.28,) + (0.0,) * 7, (0.95,) + (1.0,) * 7)
     with pytest.raises(RuntimeError, match="did not acknowledge"):
         radar.set_radar_cal((10.4, 0, 0, 0, 0, 0.066))
+
+
+# --- confirm mode: Candidate, then Triggered or Rejected ---------------------
+
+
+def test_a_candidate_and_its_verdict_in_one_read_are_reported_in_order():
+    radar = _notice_radar([b"Candidate\nRejected\n"])
+
+    notice, pending = radar.wait_notice()
+    assert notice == b"Candidate"
+    notice, pending = radar.wait_notice(pending)
+    assert notice == b"Rejected"
+    assert radar.wait_notice(pending)[0] == b""
+
+
+@pytest.mark.parametrize("notice", [b"Candidate", b"Rejected"])
+def test_a_confirm_notice_split_across_reads_is_reported_on_the_second(notice):
+    radar = _notice_radar([b"..." + notice[:4], notice[4:] + b"\n"])
+
+    found, pending = radar.wait_notice()
+    assert found == b""
+    found, pending = radar.wait_notice(pending)
+    assert found == notice
+    assert pending == b""
+
+
+@pytest.mark.parametrize("notice", [b"Candidate\n", b"Rejected\n"])
+def test_the_trigger_only_wait_is_false_for_a_candidate_or_a_rejection(notice):
+    """A caller that leaves confirm mode off must not send S! on either."""
+    assert _notice_radar([notice]).wait_trigger_notice()[0] is False
+
+
+def test_a_candidate_then_triggered_reports_the_trigger_after_the_candidate():
+    radar = _notice_radar([b"Candidate\n", b"Triggered\n"])
+
+    assert radar.wait_trigger_notice()[0] is False
+    assert radar.wait_trigger_notice()[0] is True
+
+
+def test_notices_inside_a_command_reply_all_survive_until_the_listener():
+    radar = _command_radar(b"", reply=b"Done\nl3dump:/>Candidate\nstats x=1\nRejected\n")
+
+    assert "Done" in radar.cmd("stats")
+
+    notice, pending = radar.wait_notice()
+    assert notice == b"Candidate"
+    notice, pending = radar.wait_notice(pending)
+    assert notice == b"Rejected"
+    assert radar.wait_notice(pending)[0] == b""
+
+
+def test_a_remembered_candidate_keeps_a_split_verdict_head():
+    radar = _command_radar(b"", reply=b"Done\nl3dump:/>Candidate\nTrig")
+    radar.cmd("stats")
+    radar.ser.payload.extend(b"gered\n")
+
+    notice, pending = radar.wait_notice()
+    assert notice == b"Candidate"
+    assert radar.wait_notice(pending)[0] == b"Triggered"
+
+
+def test_reading_the_frozen_capture_consumes_remembered_confirm_notices():
+    radar = _command_radar(b"Candidate\nTriggered\n")
+    radar.cmd("stats")
+    radar.ser.reply = b""
+
+    try:
+        radar.read_dump(timeout_s=0.05, stall_tolerance_s=0.01)
+    except (RuntimeError, TimeoutError):
+        pass
+
+    assert radar.wait_notice()[0] == b""
+
+
+def test_set_confirm_sends_the_track_cfg_sub_mode(monkeypatch):
+    radar = IWR6843Radar.__new__(IWR6843Radar)
+    calls = []
+    monkeypatch.setattr(radar, "cmd", lambda command, window: calls.append(command) or "Done\n")
+
+    assert radar.set_confirm(True) is True
+    assert radar.set_confirm(False) is True
+    assert radar.set_confirm(True, window_ms=30) is True
+
+    assert calls == ["trackCfg confirm 1", "trackCfg confirm 0", "trackCfg confirm 1 30"]
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        "Error: trackCfg <loopPeriodS> <rangeResM> ...\n",
+        "'trackCfg' is not recognized as a CLI command\n",
+    ],
+)
+def test_firmware_without_confirm_mode_refuses_it_without_an_error(monkeypatch, reply):
+    """It fires on every candidate, as confirm off does: False, for either value."""
+    radar = IWR6843Radar.__new__(IWR6843Radar)
+    monkeypatch.setattr(radar, "cmd", lambda *_args, **_kwargs: reply)
+
+    assert radar.set_confirm(True) is False
+    assert radar.set_confirm(False) is False
+
+
+def test_set_confirm_on_a_silent_board_fails(monkeypatch):
+    radar = IWR6843Radar.__new__(IWR6843Radar)
+    monkeypatch.setattr(radar, "cmd", lambda *_args, **_kwargs: "")
+
+    with pytest.raises(RuntimeError, match="did not acknowledge"):
+        radar.set_confirm(True)

@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **The IWR6843 self-trigger fires only on a ball flight.** Backswings and
+  static scenes no longer reach the OPS. At the kiosk's snr 1 a backswing or
+  the golfer shifting starts a club track that walks through noise to the
+  ball and fires, and each such fire blinded the radars for about 7.8 s, losing
+  the downswing.
+  - **Candidates.** In the new firmware confirm mode (`trackCfg confirm`,
+    `l3_confirm.c`) a club or ball-leave fire is only a candidate. The ring
+    freezes as before.
+  - **Verdict.** The board writes `Triggered` once the ball track shows a
+    flight (three points stepping outward at a ball's speed, with a Doppler
+    that matches the range rate), and the host sends S! as before. No flight
+    within 24 ms gives `Rejected`, and the host releases the ring without
+    S!. The OPS keeps about 100 ms before its S!, so the short wait costs
+    it nothing.
+  - **Default on.** The Pi enables it with the self-trigger;
+    `--iwr6843-no-confirm-flight` restores the old behaviour. Firmware
+    without it fires on every candidate as before, and the Pi warns.
+  - **Replayed.** 52 of the 58 labelled swings that fire still confirm, and
+    none of the fires without a ball does.
+  - **Needs a reflash** for the new firmware.
 - **The kiosk's IWR6843 launch angles come from the firmware.** Vertical and
   horizontal launch, club path and attack angle are the board's result packet,
   read after every capture whether it was self-triggered or sound-triggered.

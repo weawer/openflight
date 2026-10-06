@@ -93,7 +93,7 @@ MAP        = $(APPNAME)_mss.map
 OUT        = $(APPNAME)_mss.$(R4F_EXE_EXT)
 BIN        = $(APPNAME).bin
 APP_CMD    = mss_linker.cmd
-SOURCES    = l3_dump.c track_select.c detect_queue.c capture_plan.c compact_iq16.c live_selector.c l3_text.c l3_frames.c l3_angle.c l3_observation.c l3_band.c l3_trigger.c l3_ball.c l3_club_track.c l3_track_kf.c l3_impact_fit.c l3_ball_anchor.c l3_ball_hyp.c l3_ball_recover.c l3_impact.c l3_leave.c l3_scan.c l3_shot.c l3_ball_track.c l3_ball_fit.c l3_launch.c l3_result.c l3_profile.c l3_adaptive.c l3_iq8.c l3_retain.c l3_iq16_stats.c l3_bin_score.c l3_channels.c l3_angle_queue.c l3_dsp_ipc.c l3_detect_core.c l3_timing.c l3_window.c
+SOURCES    = l3_dump.c track_select.c detect_queue.c capture_plan.c compact_iq16.c live_selector.c l3_text.c l3_frames.c l3_angle.c l3_observation.c l3_band.c l3_trigger.c l3_ball.c l3_club_track.c l3_track_kf.c l3_impact_fit.c l3_ball_anchor.c l3_ball_hyp.c l3_ball_recover.c l3_impact.c l3_leave.c l3_confirm.c l3_scan.c l3_shot.c l3_ball_track.c l3_ball_fit.c l3_launch.c l3_result.c l3_profile.c l3_adaptive.c l3_iq8.c l3_retain.c l3_iq16_stats.c l3_bin_score.c l3_channels.c l3_angle_queue.c l3_dsp_ipc.c l3_detect_core.c l3_timing.c l3_window.c
 DEPENDS    = $(addprefix $(PLATFORM_OBJDIR)/, $(SOURCES:.c=.$(R4F_DEP_EXT)))
 OBJECTS    = $(addprefix $(PLATFORM_OBJDIR)/, $(SOURCES:.c=.$(R4F_OBJ_EXT)))
 

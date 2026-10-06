@@ -77,6 +77,7 @@ The supported angle radar.
 | `--iwr6843-self-trigger-offset-m` | float; default `0.2` | Move the default trigger bin this far downrange, in whole bins (0.2 m = 4 bins); negative moves it toward the radar. A swing's line must carry past the ball, which backswings and waggles do not. The board's tee band, ball search and retained cells move with it. Not with `--iwr6843-self-trigger-bin`. Requires --iwr6843-self-trigger |
 | `--iwr6843-self-trigger-snr` | float | Club target threshold as a multiple of the firmware's running noise floor, at least 1 (default: 1). Requires --iwr6843-self-trigger |
 | `--iwr6843-ball-snr` | float | The firmware ball tracker's target threshold as a multiple of its noise floor, 1..1e6, set apart from the trigger's (`trackCfg ballSnr`; default: the firmware's, 1). The Pi sends it at every start (0 on the wire restores the firmware default) |
+| `--iwr6843-no-confirm-flight` | flag | Fire the self-trigger on every club or ball-leave candidate, as before, instead of only once the ball's flight confirms it (`trackCfg confirm`). Confirmation keeps backswings and static scenes from firing; firmware without it fires on every candidate and the Pi logs a warning. Requires --iwr6843-self-trigger |
 | `--iwr6843-tilt-deg` | float | Override mount tilt from the TI calibration JSON |
 | `--iwr6843-radar-height-m` | float | Override antenna-center height from the TI calibration JSON |
 | `--iwr6843-ball-height-m` | float; default `0.04` | Ball-center height above the floor/mat (default: 0.040) |

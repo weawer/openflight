@@ -64,6 +64,7 @@
 #include "l3_band.h"
 #include "l3_impact.h"
 #include "l3_leave.h"
+#include "l3_confirm.h"
 #include "l3_scan.h"
 #include "l3_impact_fit.h"
 #include "l3_iq8.h"
@@ -473,6 +474,13 @@ static int32_t             gRangeWindowCoeffs[N_SAMPLES / 2U];
 static uint8_t             gBandFrozen;
 static l3_impact_t         gRangeImpact;   /* range-only fire (l3_impact_update_range) */
 static l3_leave_t          gLeave;         /* ball-leave fallback (l3_leave_update) */
+/* "trackCfg confirm": a club or leave fire is a candidate the ball's flight
+ * confirms before the host is told (l3_confirm.h). Off by default; the
+ * setting survives triggerCfg and sensorStart, as the band does. */
+static l3_confirm_cfg_t    gConfirmCfg;
+static uint8_t             gConfirmCfgSet;
+static l3_confirm_t        gConfirm;
+static uint32_t            gConfirmUnarmed; /* candidates fired at once: no ball tracker */
 static l3_scan_cfg_t       gScanCfg;       /* which bins a frame scores (l3_scan.h) */
 static uint32_t            gMapCursor;     /* band-interior chunk the next idle frame refreshes */
 static float               gLeaveFloor;    /* the fallback's median beyond the band: post floor */
@@ -3426,6 +3434,7 @@ static void l3_trigRearm(void)
     l3_track_reset(&gClubTrack);
     l3_impact_rearm(&gRangeImpact);
     l3_leave_rearm(&gLeave);
+    l3_confirm_rearm(&gConfirm);
     l3_impact_fit_reset(&gImpactFit);
     l3_shot_rearm(&gShot);
     l3_ball_track_reset(&gBallTrack);
@@ -3463,6 +3472,10 @@ static void l3_ensureRadarCal(void)
         l3_band_noise_reset(&gBandNoise);
         gImpactFitCfgSet = 1U;
     }
+    if (!gConfirmCfgSet) {
+        l3_confirm_cfg_defaults(&gConfirmCfg);
+        gConfirmCfgSet = 1U;
+    }
 }
 
 /* The club track's configuration follows the trigger's arm: statistic and
@@ -3492,6 +3505,10 @@ static void l3_clubTrackConfigure(void)
         leaveCfg.binWidthM = cfg.binWidthM;
         l3_leave_init(&gLeave, &leaveCfg);
     }
+    /* The confirmation reads the ball track, which shares this geometry. */
+    gConfirmCfg.binWidthM = cfg.binWidthM;
+    gConfirmCfg.velocitySpanMps = cfg.velocitySpanMps;
+    l3_confirm_init(&gConfirm, &gConfirmCfg);
     l3_scan_cfg_defaults(&gScanCfg);
     l3_impact_fit_reset(&gImpactFit);
     /* The ball track shares the club track's geometry; the shot machine
@@ -3624,6 +3641,45 @@ static void l3_impactFitRun(void)
                       (uint8_t)(gTrigDestBall ? 0U : 1U), gShot.impactTimestampUs, &gImpactFit);
     if (gImpactFit.verdict != L3_FIT_VERDICT_NONE && gImpactFit.impactUs > 0.0F) {
         gShot.impactTimestampUs = l3_round_us(gImpactFit.impactUs);
+    }
+}
+
+/* Confirm mode: the fire dated impactUs is a candidate. The ring froze as
+ * before and the post movie fills; the host hears "Candidate" now and
+ * "Triggered" or "Rejected" once the ball's flight decides
+ * (l3_confirmStep). Without an armed ball tracker nothing could confirm it,
+ * so it fires at once, as without confirm mode, and is counted. */
+static void l3_confirmCandidate(uint32_t impactUs)
+{
+    if (!gBallTrack.armed) {
+        gConfirmUnarmed++;
+        l3_queueNotice("Triggered\n");
+        return;
+    }
+    l3_confirm_arm(&gConfirm, impactUs);
+    l3_queueNotice("Candidate\n");
+}
+
+/* After each scored post frame: the ball track confirms a pending candidate
+ * ("Triggered": the host sends S!), or the window or the post movie ends
+ * without a flight ("Rejected": the host releases the ring). */
+static void l3_confirmStep(void)
+{
+    l3_fit_span_t ballSpan = { &gBallTrack.core, 0U, gBallTrack.core.count };
+    uint8_t verdict;
+
+    if (gConfirm.verdict != L3_CONFIRM_PENDING) {
+        return;
+    }
+    verdict = l3_confirm_update(&gConfirm, l3_fit_span_point, &ballSpan,
+                                gBallTrack.core.count, gPostTimestampUs);
+    if (verdict == L3_CONFIRM_PENDING && gPostFramesScored >= gCapturePlan.postFrames) {
+        verdict = l3_confirm_end(&gConfirm, gPostTimestampUs);
+    }
+    if (verdict == L3_CONFIRM_CONFIRMED) {
+        l3_queueNotice("Triggered\n");
+    } else if (verdict == L3_CONFIRM_REJECTED) {
+        l3_queueNotice("Rejected\n");
     }
 }
 
@@ -4190,14 +4246,20 @@ static void l3_considerSelfTrigger(uint32_t slot)
         gHwaFreezeRequests++;
         Hwi_restore(key);
         gDetectEvent.flags |= (uint8_t)L3_TIMING_FLAG_FIRED;
-        /* The notice first: the host's S! waits on it, the debug line does not. */
-        l3_queueNotice("Triggered\n");
+        /* The notice first: the host's S! waits on it, the debug line does
+         * not. In confirm mode the ball's flight sends it (l3_confirmStep). */
+        if (!gConfirm.cfg.enabled) {
+            l3_queueNotice("Triggered\n");
+        }
         /* Then every pending club angle, so the shot freezes them with the
          * trajectory, and the delivery again from them. */
         l3_angleQueueDrain();
         (void)l3_track_delivery(&gClubTrack, 8U, &gDelivery);
     }
     l3_shotObserve(teeBin, fired, impactUs);
+    if (fired && gConfirm.cfg.enabled) {
+        l3_confirmCandidate(impactUs);
+    }
     if (left && gBallTrack.armed) {
         /* The fallback fired (the club's rule may have too, as late): the
          * ball is already too smeared to acquire, so its two points start
@@ -4253,6 +4315,7 @@ static void l3_detectTask(UArg arg0, UArg arg1)
         if (epoch == L3_DETECT_POST_EPOCH && queuedSlot >= gCapturePlan.preFrames) {
             gDetectEvent.flags = (uint8_t)L3_TIMING_FLAG_POST;
             l3_considerBallTrack(queuedSlot);
+            l3_confirmStep();
             l3_detectFinish();
             continue;
         }
@@ -5193,6 +5256,42 @@ static int32_t l3_cli_trackCfgBallSnr(int32_t argc, char *argv[])
     return 0;
 }
 
+/* "trackCfg confirm <0|1> [windowMs]": confirm mode (l3_confirm.h) on or
+ * off, and optionally the window the ball's flight must show in. A sub-mode
+ * for the same reason as impactFit; kept across triggerCfg and sensorStart.
+ * Takes effect at the next fire. */
+static int32_t l3_cli_trackCfgConfirm(int32_t argc, char *argv[])
+{
+    float values[2];
+    l3_confirm_cfg_t cfg;
+
+    l3_ensureRadarCal();
+    cfg = gConfirmCfg;
+    /* !(...) also refuses a NaN strtof accepted. */
+    if ((argc != 3 && argc != 4) ||
+        l3_parseFloats(argc, argv, 2, (uint32_t)(argc - 2), values) != 0 ||
+        !(values[0] == 0.0F || values[0] == 1.0F)) {
+        CLI_write("Error: trackCfg confirm <0|1> [windowMs 1..100]\n");
+        return -1;
+    }
+    cfg.enabled = (uint32_t)values[0];
+    if (argc == 4) {
+        if (!(values[1] >= 1.0F) || values[1] > (float)(L3_CONFIRM_MAX_WINDOW_US / 1000U)) {
+            CLI_write("Error: trackCfg confirm <0|1> [windowMs 1..100]\n");
+            return -1;
+        }
+        cfg.windowUs = (uint32_t)(values[1] * 1000.0F);
+    }
+    if (l3_confirm_cfg_check(&cfg) != 0) {
+        CLI_write("Error: trackCfg confirm settings refused\n");
+        return -1;
+    }
+    gConfirmCfg = cfg;
+    gConfirm.cfg = cfg;
+    CLI_write("Done\n");
+    return 0;
+}
+
 /* CLI "trackCfg <loopPeriodS> <rangeResM> <maxRangeM> <clubLoM> <clubHiM>":
  * the rig limits from IWR6843Runtime.track_config_command. maxRangeM of 0
  * disables the net clamp; clubHiM <= clubLoM disables the club cells.
@@ -5225,6 +5324,9 @@ static int32_t l3_cli_trackCfg(int32_t argc, char *argv[])
     if (argc >= 2 && strcmp(argv[1], "ballSnr") == 0) {
         return l3_cli_trackCfgBallSnr(argc, argv);
     }
+    if (argc >= 2 && strcmp(argv[1], "confirm") == 0) {
+        return l3_cli_trackCfgConfirm(argc, argv);
+    }
     if (argc == 3 && strcmp(argv[1], "subbin") == 0) {
         /* "trackCfg subbin centroid|parabolic": how targets read their
          * sub-bin range (l3_observation.h). */
@@ -5241,7 +5343,8 @@ static int32_t l3_cli_trackCfg(int32_t argc, char *argv[])
     }
     if (argc != 6) {
         CLI_write("Error: trackCfg <loopPeriodS> <rangeResM> <maxRangeM> <clubLoM> <clubHiM> "
-                  "| cal ... | elem ... | impact ... | impactFit ... | ballSnr ... | subbin ...\n");
+                  "| cal ... | elem ... | impact ... | impactFit ... | ballSnr ... | confirm ... "
+                  "| subbin ...\n");
         return -1;
     }
     for (i = 0; i < 5; i++) {
@@ -5567,6 +5670,8 @@ static int32_t l3_cli_triggerLog(int32_t argc, char *argv[])
         CLI_write("range %s\n", line);
         (void)l3_leave_format(&gLeave, line, sizeof(line));
         CLI_write("%s\n", line);
+        (void)l3_confirm_format(&gConfirm, line, sizeof(line));
+        CLI_write("%s unarmed=%u\n", line, (unsigned)gConfirmUnarmed);
         (void)l3_impact_fit_format(&gImpactFit, line, sizeof(line));
         CLI_write("%s\n", line);
         for (index = 0U; l3_track_point(&gClubTrack, index, &point); index++) {

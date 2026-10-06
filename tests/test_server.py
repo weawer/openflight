@@ -681,6 +681,20 @@ class TestIWR6843ShotIntegration:
         assert server_module.iwr6843_runtime_config["veto_no_ball"] is True
         server_module.iwr6843_runtime = None
 
+    def test_init_iwr6843_confirms_the_flight_by_default(self, monkeypatch, tmp_path):
+        captured = self._init_capturing_monitor_kwargs(monkeypatch, tmp_path)
+
+        assert captured["confirm_flight"] is True
+        assert server_module.iwr6843_runtime_config["confirm_flight"] is True
+        server_module.iwr6843_runtime = None
+
+    def test_init_iwr6843_passes_confirm_off_to_the_monitor(self, monkeypatch, tmp_path):
+        captured = self._init_capturing_monitor_kwargs(monkeypatch, tmp_path, confirm_flight=False)
+
+        assert captured["confirm_flight"] is False
+        assert server_module.iwr6843_runtime_config["confirm_flight"] is False
+        server_module.iwr6843_runtime = None
+
     def test_init_iwr6843_passes_the_tee_band_to_the_monitor(self, monkeypatch, tmp_path):
         captured = self._init_capturing_monitor_kwargs(monkeypatch, tmp_path, tee_band_bins=6.0)
 
@@ -5851,6 +5865,7 @@ class TestSelfTriggerCli:
             (["--iwr6843", "--iwr6843-self-trigger-bin", "3"], "requires --iwr6843-self-trigger"),
             (["--iwr6843-self-trigger"], "requires --iwr6843"),
             (["--iwr6843", "--iwr6843-veto-no-ball"], "requires --iwr6843-self-trigger"),
+            (["--iwr6843", "--iwr6843-no-confirm-flight"], "requires --iwr6843-self-trigger"),
             (["--iwr6843", "--iwr6843-full-capture"], "--iwr6843-full-capture requires --debug"),
             (
                 ["--iwr6843", "--iwr6843-self-trigger", "--trigger", "speed"],

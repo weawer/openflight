@@ -14,6 +14,7 @@ import pytest
 
 import openflight.iwr6843.monitor as iwr_monitor
 from openflight.iwr6843.board_calibration import BoardCalibration
+from openflight.iwr6843.driver import next_notice
 from openflight.iwr6843.dsp_link import DETECT_CORES, DspLinkError
 from openflight.iwr6843.dump import pack_dump
 from openflight.iwr6843.firmware_version import FirmwareVersion
@@ -66,6 +67,8 @@ class FakeRadar:
         self.read_started_at = None
         self.shutdown_events = []
         self.ball_snrs = []
+        self.confirms: list[bool] = []
+        self.confirm_supported = True
         self.stats_replies: list[str | Exception] = []
         self.stats_reads = 0
         self.releases = 0
@@ -106,6 +109,11 @@ class FakeRadar:
         """The monitor sends the ball snr (0: the firmware default) at every start."""
         self.ball_snrs.append(snr)
         return True
+
+    def set_confirm(self, enabled: bool) -> bool:
+        """The monitor sends the flight confirmation (on or off) with the self-trigger."""
+        self.confirms.append(enabled)
+        return self.confirm_supported
 
     def set_radar_cal(self, args):
         """The monitor sends the board calibration (identity included) at every start."""
@@ -527,14 +535,15 @@ class SelfTriggerRadar(FakeRadar):
             raise self.result_error
         return self.result
 
-    def wait_trigger_notice(self, pending: bytes = b"") -> tuple[bool, bytes]:
+    def wait_notice(self, pending: bytes = b"") -> tuple[bytes, bytes]:
+        """The driver's parsing over queued chunks, one chunk per read."""
+        notice, rest = next_notice(pending)
+        if notice:
+            return notice, rest
         if not self.notices:
             time.sleep(0.002)
-            return False, pending
-        pending += self.notices.pop(0)
-        if b"Triggered" in pending:
-            return True, b""
-        return False, pending
+            return b"", pending
+        return next_notice(pending + self.notices.pop(0))
 
     def read_sparse(self, planner):
         del planner
@@ -1087,7 +1096,7 @@ def test_tee_bin_needs_a_capture_window(tmp_path):
 def test_listener_serial_error_does_not_kill_the_worker(tmp_path):
     radar = SelfTriggerRadar(_raw_dump())
     failures = {"left": 1}
-    original = radar.wait_trigger_notice
+    original = radar.wait_notice
 
     def flaky(pending=b""):
         if failures["left"]:
@@ -1095,7 +1104,7 @@ def test_listener_serial_error_does_not_kill_the_worker(tmp_path):
             raise OSError("device reports readiness to read but returned no data")
         return original(pending)
 
-    radar.wait_trigger_notice = flaky
+    radar.wait_notice = flaky
     monitor = _self_trigger_monitor(tmp_path, radar)
     monitor.start()
     radar.notices.append(b"Triggered\n")
@@ -2024,3 +2033,146 @@ def test_the_veto_needs_the_self_trigger(tmp_path):
             button_factory=FakeButton,
             veto_no_ball=True,
         )
+
+
+# --- confirm mode: only a ball flight reaches the OPS ------------------------
+
+
+def test_the_flight_confirmation_is_sent_with_the_self_trigger_before_triggercfg(tmp_path):
+    radar = SelfTriggerRadar(_raw_dump())
+    order = []
+    radar.set_confirm = lambda enabled: order.append(("confirm", enabled)) or True
+    original_cmd = radar.cmd
+    radar.cmd = lambda line, window=1.5: order.append(("cmd", line)) or original_cmd(line, window)
+    monitor = _self_trigger_monitor(tmp_path, radar)
+    monitor.start()
+
+    assert ("confirm", True) in order
+    triggers = [
+        i for i, (kind, line) in enumerate(order) if kind == "cmd" and line.startswith("triggerCfg")
+    ]
+    assert order.index(("confirm", True)) < triggers[0]
+    assert monitor.confirm_applied is True
+    monitor.stop()
+
+
+def test_confirm_off_is_still_sent_so_a_restart_clears_it(tmp_path):
+    radar = SelfTriggerRadar(_raw_dump())
+    monitor = _self_trigger_monitor(tmp_path, radar, confirm_flight=False)
+    monitor.start()
+
+    assert radar.confirms == [False]
+    assert monitor.confirm_applied is False
+    monitor.stop()
+
+
+def test_without_the_self_trigger_confirm_mode_is_left_alone(tmp_path):
+    config = tmp_path / "radar.cfg"
+    config.write_text("sensorStart\n", encoding="utf-8")
+    radar = FakeRadar(_raw_dump())
+    monitor = IWR6843CaptureMonitor(
+        config_path=config, output_dir=tmp_path / "dumps", radar=radar, button_factory=FakeButton
+    )
+    monitor.start()
+
+    assert radar.confirms == []
+    monitor.stop()
+
+
+def test_firmware_without_confirm_mode_still_starts_and_warns(tmp_path, caplog):
+    radar = SelfTriggerRadar(_raw_dump())
+    radar.confirm_supported = False
+    monitor = _self_trigger_monitor(tmp_path, radar)
+
+    with caplog.at_level(logging.WARNING, logger="openflight.iwr6843.monitor"):
+        monitor.start()
+
+    assert monitor.confirm_applied is False
+    assert "no flight confirmation" in caplog.text
+    monitor.stop()
+
+
+def test_a_confirmed_candidate_is_captured_without_a_release(tmp_path):
+    radar = SelfTriggerRadar(_raw_dump())
+    observed = []
+    monitor = _self_trigger_monitor(tmp_path, radar, trigger_observers=[observed.append])
+    monitor.start()
+    radar.notices.append(b"Candidate\n")
+    radar.notices.append(b"Triggered\n")
+
+    capture = monitor.capture_for_shot(None, timeout_s=1.0)
+
+    assert capture is not None and capture.valid
+    assert len(observed) == 1, "S! goes out once, on the confirmation"
+    assert radar.releases == 0
+    monitor.stop()
+
+
+def test_a_candidate_and_its_confirmation_in_one_read_are_captured(tmp_path):
+    radar = SelfTriggerRadar(_raw_dump())
+    monitor = _self_trigger_monitor(tmp_path, radar)
+    monitor.start()
+    radar.notices.append(b"Candidate\nTriggered\n")
+
+    capture = monitor.capture_for_shot(None, timeout_s=1.0)
+
+    assert capture is not None and capture.valid
+    assert radar.releases == 0
+    monitor.stop()
+
+
+@pytest.mark.parametrize("chunks", [[b"Candidate\n", b"Rejected\n"], [b"Rejected\n"]])
+def test_a_rejected_candidate_is_released_and_never_reaches_the_ops(tmp_path, chunks):
+    """A backswing or an empty lane: the ring froze, no ball flew, no S!."""
+    radar = SelfTriggerRadar(_raw_dump())
+    observed = []
+    monitor = _self_trigger_monitor(tmp_path, radar, trigger_observers=[observed.append])
+    monitor.start()
+    radar.notices.extend(chunks)
+
+    assert _wait_until(lambda: radar.releases == 1)
+    assert observed == []
+    assert radar.read_started_at is None
+    assert monitor.confirm_rejections == 1
+    monitor.stop()
+
+
+def test_a_candidate_without_a_verdict_is_released_after_the_timeout(tmp_path, monkeypatch):
+    monkeypatch.setattr(iwr_monitor, "_CONFIRM_VERDICT_TIMEOUT_S", 0.05)
+    radar = SelfTriggerRadar(_raw_dump())
+    observed = []
+    monitor = _self_trigger_monitor(tmp_path, radar, trigger_observers=[observed.append])
+    monitor.start()
+    radar.notices.append(b"Candidate\n")
+
+    assert _wait_until(lambda: radar.releases == 1)
+    assert observed == []
+    time.sleep(0.15)
+    assert radar.releases == 1, "released once, not on every quiet read"
+    monitor.stop()
+
+
+def test_a_candidate_is_not_released_before_its_timeout(tmp_path):
+    radar = SelfTriggerRadar(_raw_dump())
+    monitor = _self_trigger_monitor(tmp_path, radar)
+    monitor.start()
+    radar.notices.append(b"Candidate\n")
+
+    time.sleep(0.1)
+
+    assert radar.releases == 0
+    radar.notices.append(b"Triggered\n")
+    assert monitor.capture_for_shot(None, timeout_s=1.0) is not None
+    monitor.stop()
+
+
+def test_a_failed_release_of_a_rejected_candidate_is_retried(tmp_path, monkeypatch):
+    monkeypatch.setattr(iwr_monitor, "_LISTENER_ERROR_BACKOFF_S", 0.0)
+    radar = _FlakyReleaseRadar(_raw_dump(), failures=1)
+    monitor = _self_trigger_monitor(tmp_path, radar)
+    monitor.start()
+    radar.notices.append(b"Candidate\nRejected\n")
+
+    assert _wait_until(lambda: radar.releases == 1)
+    assert radar.attempts == 2
+    monitor.stop()

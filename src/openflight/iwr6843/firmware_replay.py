@@ -358,6 +358,12 @@ class ReplayConfig:
     # as the recordings were made. board_calibration.replay_overrides fills it.
     elem_phase_rad: tuple[float, ...] | None = None
     elem_gain: tuple[float, ...] | None = None
+    # "trackCfg confirm": a club or leave fire is a candidate the ball's
+    # flight must confirm (l3_confirm.h) before the host is told; False fires
+    # at once, as the recordings were made. confirm_window_us None keeps the
+    # firmware's window.
+    confirm: bool = False
+    confirm_window_us: int | None = None
     # Firmware config constants (tunables.py) set over the defaults; applied last, so they win.
     overrides: Mapping[str, float] = field(default_factory=dict)
 
@@ -618,6 +624,12 @@ class ReplayResult:
     # The shot's impact time as IMPACT froze it, before the fit refined
     # shot.impactTimestampUs (apply_impact_fit); None without an impact.
     frozen_impact_timestamp_us: int | None = None
+    # Confirm mode (ReplayConfig.confirm): the frame the ball's flight
+    # confirmed the fire (the host's S!), the verdict ("idle" without a fire,
+    # "confirmed", "rejected") and l3_confirm_format at the end.
+    confirm_frame: int | None = None
+    confirm_verdict: str = "idle"
+    confirm_status: str = ""
     # Frames the shot machine tracked the ball for before SOLVE, and whether
     # the dump said (retention report / window change) or it fell back to all.
     ball_track_frames: int = 0
@@ -994,6 +1006,9 @@ def replay_dump(
     leave_cfg.binWidthM = RANGE_SPAN_M / config.fft_size
     leave = fw.Leave()
     lib.l3_leave_init(ctypes.byref(leave), ctypes.byref(leave_cfg))
+    confirm = _confirm_rule(lib, config, track_cfg)
+    ball_reader = fw.fit_reader(lib, "l3_fit_span_point")
+    confirm_frame: int | None = None
     destination = config.destination
     fit_cfg = fw.ImpactFitCfg()
     lib.l3_impact_fit_cfg_defaults(ctypes.byref(fit_cfg))
@@ -1195,6 +1210,17 @@ def replay_dump(
                     frozen_floor=_post_floor(leave_floor, trig) if band_enabled else None,
                 )
             )
+            if config.confirm and confirm_frame is None:
+                ball_span = fw.FitSpan(ctypes.pointer(ball_track.core), 0, ball_track.core.count)
+                verdict = lib.l3_confirm_update(
+                    ctypes.byref(confirm),
+                    ball_reader,
+                    ctypes.cast(ctypes.byref(ball_span), ctypes.c_void_p),
+                    ball_track.core.count,
+                    timestamp_us,
+                )
+                if fw.CONFIRM_VERDICT_NAMES[verdict] == "confirmed":
+                    confirm_frame = frame
             if fitted_frozen_us is None and shot.state == _SHOT_RESULT:
                 fitted_frozen_us = _run_impact_fit(
                     lib,
@@ -1382,7 +1408,8 @@ def replay_dump(
         # sound-triggered recording's impact is post_from_frame, so nothing
         # before it fires.
         fired = bool(ranged or left) and not early
-        if fired and fired_frame is None:
+        first_fire = fired and fired_frame is None
+        if first_fire:
             fired_frame = frame
         # The shot machine, as l3_shotObserve feeds it; IMPACT arms the ball tracker.
         shot_in = fw.ShotInput()
@@ -1414,6 +1441,13 @@ def replay_dump(
                 ball_position,
                 shot_in.impactTimestampUs,
             )
+        if first_fire and config.confirm:
+            # l3_confirmCandidate: a candidate waits for the ball's flight;
+            # without an armed ball tracker it fires at once.
+            if ball_track.armed:
+                lib.l3_confirm_arm(ctypes.byref(confirm), int(shot_in.impactTimestampUs))
+            else:
+                confirm_frame = frame
         if fired and left and ball_track.armed:
             # l3_considerSelfTrigger: the fallback's late fire (the club's rule
             # may have fired too) seeds the flight with the ball's two points.
@@ -1446,6 +1480,9 @@ def replay_dump(
             )
         )
 
+    if config.confirm and frames:
+        # The post movie ends with the capture: a candidate still pending is rejected.
+        lib.l3_confirm_end(ctypes.byref(confirm), frames[-1].timestamp_us)
     if retain_cfg is not None:
         frames = _attach_retention(frames, retain_windows)
     club_speed, club_slope, club_residual = club_at_impact or _club_fit(lib, track)
@@ -1491,6 +1528,9 @@ def replay_dump(
         impact_fit=_impact_fit_summary(fit) if fitted_frozen_us is not None else None,
         impact_fit_status=fw.c_text(lib.l3_impact_fit_format, ctypes.byref(fit), cap=240),
         frozen_impact_timestamp_us=frozen_impact_us,
+        confirm_frame=confirm_frame,
+        confirm_verdict=fw.CONFIRM_VERDICT_NAMES[confirm.verdict],
+        confirm_status=fw.c_text(lib.l3_confirm_format, ctypes.byref(confirm), cap=240),
         ball_track_frames=int(shot_cfg.ballTrackFrames),
         ball_track_frames_known=known_post is not None,
         recovered_frames=recovered_frames(ball_track.verdict),
@@ -1580,6 +1620,23 @@ def _banded_window_targets(  # pylint: disable=too-many-arguments
     keep = lib.l3_band_keep_short if keep_short else lib.l3_band_filter
     found = keep(ctypes.byref(band), targets, found)
     return found, count, float(floor), obs
+
+
+def _confirm_rule(lib, config: ReplayConfig, track_cfg: fw.TrackCfg) -> fw.Confirm:
+    """``l3_confirm`` as "trackCfg confirm" configures it on the board: the
+    club track's bin width and Doppler alias span, the window when given."""
+    cfg = fw.ConfirmCfg()
+    lib.l3_confirm_cfg_defaults(ctypes.byref(cfg))
+    cfg.enabled = 1 if config.confirm else 0
+    cfg.binWidthM = track_cfg.binWidthM
+    cfg.velocitySpanMps = track_cfg.velocitySpanMps
+    if config.confirm_window_us is not None:
+        cfg.windowUs = config.confirm_window_us
+    if lib.l3_confirm_cfg_check(ctypes.byref(cfg)) != 0:
+        raise ValueError(f"the firmware rejects this confirm configuration: {config}")
+    confirm = fw.Confirm()
+    lib.l3_confirm_init(ctypes.byref(confirm), ctypes.byref(cfg))
+    return confirm
 
 
 def _leave_club_near(lib, leave: fw.Leave, track: fw.ClubTrack | None, band: fw.Band) -> int:

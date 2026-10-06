@@ -184,6 +184,27 @@ first point needs only confidence 0.05 (the club tracker's 0.2 let the club's
 follow-through be taken as the ball). It fires about two frames after launch.
 `triggerLog track` prints a `leave` line after the `range impact` line.
 
+At the kiosk's snr 1 both rules also fire without a ball: a backswing, the
+hands or the golfer shifting starts a club track that then walks through noise
+points to the ball. On 2026-10-03 that cost the downswing after every
+backswing, because each fire blinds the radars for seconds. Confirm mode
+(`trackCfg confirm 1`, `l3_confirm.c`; the Pi sends it with the self-trigger
+unless `--iwr6843-no-confirm-flight`) makes a fire a candidate. The ring
+freezes and the post movie fills as before, and the board writes `Candidate`.
+Each post frame then looks at the ball track for a flight: three consecutive
+points, each stepping outward at 15-90 m/s, the aliased Doppler changing by at
+most 2 m/s point to point, and the fitted range rate wrapping onto the Doppler
+within 5 m/s (noise reads any Doppler). A flight sends `Triggered`, and the
+host sends S! as before. No flight within 24 ms of the candidate, or by the
+end of the post movie, sends `Rejected`, and the host releases the ring
+without S!. The OPS keeps about 100 ms before its S!, so the 2-16 ms the
+flight takes to show costs it nothing. With no armed ball tracker a candidate
+fires at once. `triggerLog track` prints a `confirm` line after the `leave`
+line. Replayed at the kiosk's settings, 52 of the 58 labelled swings that
+fire confirm, and none of the fires without a ball does (the 2026-10-03
+kiosk dumps, the 2026-10-04 TrackMan takeaways and a simulated backswing on
+noise; `tests/test_iwr6843_trigger_confirm_replay.py`).
+
 #### The scan plan: fitting the 3 ms frame
 
 Scoring a range bin (`l3_verticalResidual`) costs ~73 us on the R4F

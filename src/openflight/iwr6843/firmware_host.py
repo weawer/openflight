@@ -43,6 +43,7 @@ HOST_SOURCES = (
     "l3_ball_recover.c",
     "l3_impact.c",
     "l3_leave.c",
+    "l3_confirm.c",
     "l3_scan.c",
     "l3_shot.c",
     "l3_ball_track.c",
@@ -92,6 +93,12 @@ IMPACT_WHY_NAMES = ("none", "nodelivery", "pending", "passed", "fired")
 IMPACT_CAUSE_NAMES = ("none", "crossing", "end")
 LEAVE_CLUB_MIN_POINTS = 2  # l3_leave.h
 LEAVE_WHY_NAMES = ("none", "noclub", "idle", "far", "stood", "started", "slow", "fired")
+# l3_confirm.h
+CONFIRM_VERDICT_NAMES = ("idle", "pending", "confirmed", "rejected")
+CONFIRM_WHY_NAMES = ("none", "few", "still", "fast", "jump", "rate", "flight", "timeout", "ended")
+CONFIRM_MIN_POINTS = 3
+CONFIRM_MAX_POINTS = 8
+CONFIRM_MAX_WINDOW_US = 100000
 
 # l3_impact_fit.h
 FIT_MAX_POINTS = 8
@@ -969,6 +976,37 @@ class Leave(ctypes.Structure):
         ("startTarget", TargetObs),
         ("stepTarget", TargetObs),
         ("counters", ctypes.c_uint32 * len(LEAVE_WHY_NAMES)),
+    ]
+
+
+class ConfirmCfg(ctypes.Structure):
+    """``l3_confirm_cfg_t``: what a ball flight must show to confirm a fire."""
+
+    _fields_ = [
+        ("enabled", ctypes.c_uint32),
+        ("windowUs", ctypes.c_uint32),
+        ("points", ctypes.c_uint32),
+        ("minSpeedMps", ctypes.c_float),
+        ("maxSpeedMps", ctypes.c_float),
+        ("dopplerStepMps", ctypes.c_float),
+        ("rateDopplerMps", ctypes.c_float),
+        ("binWidthM", ctypes.c_float),
+        ("velocitySpanMps", ctypes.c_float),
+    ]
+
+
+class Confirm(ctypes.Structure):
+    """``l3_confirm_t``: the ball-flight confirmation of a club or leave fire."""
+
+    _fields_ = [
+        ("cfg", ConfirmCfg),
+        ("verdict", ctypes.c_uint8),
+        ("why", ctypes.c_uint8),
+        ("candidateUs", ctypes.c_uint32),
+        ("decidedUs", ctypes.c_uint32),
+        ("speedMps", ctypes.c_float),
+        ("confirmed", ctypes.c_uint32),
+        ("rejected", ctypes.c_uint32),
     ]
 
 
@@ -1856,6 +1894,20 @@ _SIGNATURES: dict[str, tuple[list, object]] = {
     ),
     "l3_leave_format": ([_P(Leave), *_TEXT], ctypes.c_int32),
     "l3_impact_format": ([_P(Impact), *_TEXT], ctypes.c_int32),
+    # l3_confirm.h
+    "l3_confirm_cfg_defaults": ([_P(ConfirmCfg)], None),
+    "l3_confirm_cfg_check": ([_P(ConfirmCfg)], ctypes.c_int32),
+    "l3_confirm_init": ([_P(Confirm), _P(ConfirmCfg)], None),
+    "l3_confirm_rearm": ([_P(Confirm)], None),
+    "l3_confirm_arm": ([_P(Confirm), _U32], None),
+    "l3_confirm_update": (
+        [_P(Confirm), ctypes.c_void_p, ctypes.c_void_p, _U32, _U32],
+        ctypes.c_uint8,
+    ),
+    "l3_confirm_end": ([_P(Confirm), _U32], ctypes.c_uint8),
+    "l3_confirm_verdict_name": ([ctypes.c_uint8], ctypes.c_char_p),
+    "l3_confirm_why_name": ([ctypes.c_uint8], ctypes.c_char_p),
+    "l3_confirm_format": ([_P(Confirm), *_TEXT], ctypes.c_int32),
     # l3_impact_fit.h
     "l3_impact_fit_cfg_defaults": ([_P(ImpactFitCfg)], None),
     "l3_ball_anchor_make": (
@@ -2245,6 +2297,13 @@ __all__ = [
     "Delivery",
     "FollowCtx",
     "IMPACT_CAUSE_NAMES",
+    "CONFIRM_MAX_POINTS",
+    "CONFIRM_MAX_WINDOW_US",
+    "CONFIRM_MIN_POINTS",
+    "CONFIRM_VERDICT_NAMES",
+    "CONFIRM_WHY_NAMES",
+    "Confirm",
+    "ConfirmCfg",
     "IMPACT_WHY_NAMES",
     "LEAVE_WHY_NAMES",
     "MEAS_FALLBACK",

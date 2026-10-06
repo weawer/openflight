@@ -102,6 +102,12 @@ class _ArmRadar:
         self.commands.append(line)
         return "Done\n"
 
+    def set_confirm(self, enabled: bool) -> bool:
+        self.commands.append(f"confirm {int(enabled)}")
+        return self.confirm_supported
+
+    confirm_supported = True
+
 
 def test_arming_samples_the_lane_then_arms_the_club_track(monkeypatch):
     def measure(_radar, tee_bin, *, snr):
@@ -115,7 +121,86 @@ def test_arming_samples_the_lane_then_arms_the_club_track(monkeypatch):
 
     assert threshold == 200000.0
     assert radar.commands[0] == "cfg"
+    assert "confirm 0" in radar.commands, "a board left in confirm mode fires as before"
     assert radar.commands[-1] == "triggerCfg 14 1.0 1"
+
+
+def test_arming_with_confirm_turns_the_flight_confirmation_on(monkeypatch):
+    monkeypatch.setattr(swing_trigger, "measure_trigger_level", lambda *_a, **_k: (1.0, 1.0))
+    radar = _ArmRadar()
+
+    swing_trigger._arm(radar, "cfg", TEE_BIN, 1.0, confirm=True)
+
+    assert radar.commands.index("confirm 1") < radar.commands.index("triggerCfg 14 1.0 1")
+
+
+def test_arming_with_confirm_on_firmware_without_it_stops(monkeypatch):
+    monkeypatch.setattr(swing_trigger, "measure_trigger_level", lambda *_a, **_k: (1.0, 1.0))
+    radar = _ArmRadar()
+    radar.confirm_supported = False
+
+    with pytest.raises(SystemExit, match="no flight confirmation"):
+        swing_trigger._arm(radar, "cfg", TEE_BIN, 1.0, confirm=True)
+
+
+def test_arming_without_confirm_on_old_firmware_is_fine(monkeypatch):
+    monkeypatch.setattr(swing_trigger, "measure_trigger_level", lambda *_a, **_k: (1.0, 1.0))
+    radar = _ArmRadar()
+    radar.confirm_supported = False
+
+    assert swing_trigger._arm(radar, "cfg", TEE_BIN, 1.0) == 1.0
+
+
+@pytest.mark.parametrize(
+    ("line", "expected"),
+    [
+        (
+            "confirm on=1 verdict=confirmed why=flight speed=48.20 dt=6000 confirmed_n=1 "
+            "rejected_n=0 unarmed=0",
+            "confirmed: a ball flight at 48.2 m/s, 6 ms after the candidate",
+        ),
+        (
+            "confirm on=1 verdict=rejected why=timeout speed=0.00 dt=26000 confirmed_n=0 "
+            "rejected_n=1 unarmed=0",
+            "rejected: no ball flight (why=timeout), so no S!",
+        ),
+        (
+            "confirm on=1 verdict=idle why=none speed=0.00 dt=0 confirmed_n=0 rejected_n=0 "
+            "unarmed=1",
+            "fired at once: no ball tracker armed",
+        ),
+        (
+            "confirm on=1 verdict=pending why=few speed=0.00 dt=0 confirmed_n=0 rejected_n=0 "
+            "unarmed=0",
+            "confirm verdict pending (why=few)",
+        ),
+    ],
+)
+def test_the_confirm_verdict_is_summarised(line, expected):
+    assert expected in swing_trigger.summarize_confirm(FIRED_TRACK + line + "\n")
+
+
+@pytest.mark.parametrize(
+    "track",
+    [
+        FIRED_TRACK,
+        FIRED_TRACK + "confirm on=0 verdict=idle why=none speed=0.00 dt=0 confirmed_n=0 "
+        "rejected_n=0 unarmed=0\n",
+    ],
+)
+def test_no_confirm_verdict_without_confirm_mode(track):
+    assert swing_trigger.summarize_confirm(track) is None
+
+
+def test_a_swing_prints_the_confirm_verdict(capsys):
+    track = FIRED_TRACK + (
+        "confirm on=1 verdict=rejected why=ended speed=0.00 dt=30000 confirmed_n=0 "
+        "rejected_n=1 unarmed=0\n"
+    )
+
+    swing_trigger._validate_swing(_SwingRadar(track), 1)
+
+    assert "rejected: no ball flight (why=ended)" in capsys.readouterr().out
 
 
 class _SwingRadar:

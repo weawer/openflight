@@ -11,8 +11,15 @@ reads ``triggerLog track`` and ``triggerLog shot``, releases the frozen ring,
 and prints PASS when the club track's range-only impact is what fired. Ctrl+C
 stops.
 
+``--confirm`` turns the firmware's flight confirmation on (``trackCfg
+confirm``), as the kiosk runs it: each fire is then a candidate, and the
+script also prints whether the ball's flight confirmed it. A backswing should
+fire a candidate the board rejects. Without it confirmation is turned off, so
+a board left in confirm mode by the kiosk fires as before.
+
     uv run python scripts/iwr6843/swing_trigger.py --tee-m 1.575
     uv run python scripts/iwr6843/swing_trigger.py --port /dev/ttyUSB0 --tee-m 1.575
+    uv run python scripts/iwr6843/swing_trigger.py --tee-m 1.575 --confirm
 """
 
 from __future__ import annotations
@@ -99,6 +106,30 @@ def summarize_fire(track_reply: str) -> tuple[bool, str]:
     return False, f"  FAIL  the range impact did not fire (why={ranged.get('why', '?')}): {summary}"
 
 
+def summarize_confirm(track_reply: str) -> str | None:
+    """The flight confirmation's verdict on this fire, or None when confirm
+    mode is off (or the firmware has none)."""
+    for line in track_reply.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("confirm "):
+            continue
+        fields = _fields(stripped)
+        if fields.get("on") != "1":
+            return None
+        verdict = fields.get("verdict", "?")
+        if verdict == "confirmed":
+            return (
+                f"  confirmed: a ball flight at {float(fields.get('speed', 'nan')):.1f} m/s, "
+                f"{int(fields.get('dt', 0)) / 1000:.0f} ms after the candidate"
+            )
+        if verdict == "rejected":
+            return f"  rejected: no ball flight (why={fields.get('why', '?')}), so no S!"
+        if fields.get("unarmed", "0") != "0" and verdict == "idle":
+            return "  fired at once: no ball tracker armed to confirm it"
+        return f"  confirm verdict {verdict} (why={fields.get('why', '?')})"
+    return None
+
+
 def _validate_swing(radar: IWR6843Radar, swing: int) -> bool:
     """Read the club track that fired, release the ring, and judge the swing."""
     print(f"\nswing {swing}:", flush=True)
@@ -116,6 +147,9 @@ def _validate_swing(radar: IWR6843Radar, swing: int) -> bool:
             print(f"  {line.strip()}", flush=True)
     passed, text = summarize_fire(track)
     print(text, flush=True)
+    verdict = summarize_confirm(track)
+    if verdict is not None:
+        print(verdict, flush=True)
     for line in radar.stats().splitlines():
         fields = parse_trig(line)
         if fields is None:
@@ -202,12 +236,18 @@ def watch(radar: IWR6843Radar, threshold: float) -> tuple[int, int]:
     return passed, swings
 
 
-def _arm(radar: IWR6843Radar, config: str, tee_bin: int, snr: float) -> float:
-    """Load the cfg, sample the empty lane, arm, and return the threshold."""
+def _arm(
+    radar: IWR6843Radar, config: str, tee_bin: int, snr: float, confirm: bool = False
+) -> float:
+    """Load the cfg, set the flight confirmation, sample the empty lane, arm,
+    and return the threshold."""
     radar.send_config(config)
     reply = radar.cmd("debugCfg 1")
     if "Done" not in reply:
         raise SystemExit(f"debugCfg rejected: {reply.strip()}")
+    # Always sent: the firmware keeps it across sensorStart.
+    if not radar.set_confirm(confirm) and confirm:
+        raise SystemExit("this firmware has no flight confirmation (trackCfg confirm); reflash it")
     print("Measuring the empty lane for 2s. Keep it clear.", flush=True)
     floor, threshold = measure_trigger_level(radar, tee_bin, snr=snr)
     print(f"floor p95 {floor:.0f}; threshold {threshold:.0f} at snr {snr:g}", flush=True)
@@ -234,6 +274,11 @@ def main() -> None:
         default=SELF_TRIGGER_DEFAULT_SNR,
         help="club target threshold as a multiple of the firmware's running noise floor",
     )
+    parser.add_argument(
+        "--confirm",
+        action="store_true",
+        help="fire only once the ball's flight confirms a candidate, as the kiosk does",
+    )
     args = parser.parse_args()
 
     error = port_name_error(args.port, sys.platform)
@@ -243,7 +288,7 @@ def main() -> None:
     radar = IWR6843Radar(port=args.port)
     print(f"IWR6843 on {radar.port}. Stop the kiosk before swinging.", flush=True)
     try:
-        threshold = _arm(radar, args.config, tee_bin, args.snr)
+        threshold = _arm(radar, args.config, tee_bin, args.snr, confirm=args.confirm)
         watch(radar, threshold)
     finally:
         try:

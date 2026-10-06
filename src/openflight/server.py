@@ -1201,6 +1201,7 @@ def init_iwr6843(
     tee_band_bins: float | None = None,
     ball_snr: float | None = None,
     veto_no_ball: bool = False,
+    confirm_flight: bool = True,
 ) -> bool:
     """Initialize GPIO-triggered TI capture and the frozen LCMF-v1 estimator.
 
@@ -1214,7 +1215,9 @@ def init_iwr6843(
     trackers ignore; the firmware places it on the noisiest idle bins near the
     tee and freezes it while the club swings; None is the default width, 0
     turns it off. ``ball_snr`` is the ball tracker's threshold apart from the
-    trigger's; None keeps the firmware's. ``debug`` reads the frozen ring back
+    trigger's; None keeps the firmware's. ``confirm_flight`` has the
+    self-trigger tell the host only once the ball's flight confirms a fire, so
+    a backswing or an empty lane never sends S!. ``debug`` reads the frozen ring back
     after every shot as a full capture, saves it and runs the host pipeline
     beside the board's result; without it the board's result is the shot's
     only IWR data.
@@ -1294,6 +1297,7 @@ def init_iwr6843(
             ball_snr=ball_snr,
             board_calibration=board_calibration,
             veto_no_ball=veto_no_ball,
+            confirm_flight=confirm_flight,
         )
         if self_trigger is not None:
             logger.warning(
@@ -1342,6 +1346,7 @@ def init_iwr6843(
             "ball_snr": ball_snr,
             "detect_core": capture_monitor.detect_core,
             "veto_no_ball": veto_no_ball,
+            "confirm_flight": confirm_flight,
             "board_calibration": board_calibration.to_dict(),
             "net_range_m": net_from_front_m,
             "flight": flight,
@@ -5196,6 +5201,14 @@ def main():
         "(raking a ball over, a waggle), and rearm at once. Off by default: the firmware's "
         "ball tracker still misses real balls. Requires --iwr6843-self-trigger",
     )
+    parser.add_argument(
+        "--iwr6843-no-confirm-flight",
+        action="store_true",
+        help="Fire the self-trigger on every club or ball-leave candidate, as before, "
+        "instead of only once the ball's flight confirms it. Confirmation keeps backswings "
+        "and static scenes from firing; it needs firmware with trackCfg confirm. "
+        "Requires --iwr6843-self-trigger",
+    )
     from .iwr6843.setup_poll import BALL_DETECTOR_MODES  # pylint: disable=import-outside-toplevel
 
     parser.add_argument(
@@ -5475,6 +5488,8 @@ def main():
         )
     if args.iwr6843_veto_no_ball and not args.iwr6843_self_trigger:
         parser.error("--iwr6843-veto-no-ball requires --iwr6843-self-trigger")
+    if args.iwr6843_no_confirm_flight and not args.iwr6843_self_trigger:
+        parser.error("--iwr6843-no-confirm-flight requires --iwr6843-self-trigger")
     if self_trigger_config is not None and args.trigger != "sound":
         parser.error("--iwr6843-self-trigger drives the OPS with S!; use --trigger sound")
     if args.camera_capture and (
@@ -5670,6 +5685,7 @@ def main():
             tee_band_bins=args.iwr6843_tee_band_bins,
             ball_snr=args.iwr6843_ball_snr,
             veto_no_ball=args.iwr6843_veto_no_ball,
+            confirm_flight=not args.iwr6843_no_confirm_flight,
         ):
             calibration = iwr6843_runtime.calibration
             ball_speed_correction_distance_ft = _iwr6843_tee_range_m(args) * 3.28084

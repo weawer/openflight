@@ -41,6 +41,9 @@ def main() -> None:
     radar = IWR6843Radar(port=args.port)
     try:
         radar.send_config(args.config)
+        # Every fire, as before: the kiosk may have left the flight
+        # confirmation on, and the firmware keeps it across sensorStart.
+        radar.set_confirm(False)
         # The firmware keeps its own noise floor; show it and the threshold
         # it implies so a swing's club track can be read against them.
         floor, threshold = measure_trigger_level(radar, tee_bin, snr=args.snr)

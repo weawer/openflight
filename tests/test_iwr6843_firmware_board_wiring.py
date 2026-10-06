@@ -505,7 +505,6 @@ def test_per_frame_launch_stops_once_the_result_is_ready():
     )
     assert ball_track.index("l3_ball_track_launch(") < ball_track.index(
         "l3_ball_track_reconstruct("
-
     )
 
 
@@ -563,3 +562,82 @@ def test_the_clubs_claim_reaches_the_ball_history_after_the_club_follow():
     assert "gClubTrack.lastTargetIndex" in ball_track[note : note + 120]
     between = ball_track[club:note]
     assert "l3_ball_track_update_joint" not in between and between.count(";") == 1
+
+
+# --- confirm mode (l3_confirm.h, firmware_replay ReplayConfig.confirm) ------
+
+
+def test_confirm_mode_is_set_up_kept_across_configuration_and_rearmed():
+    assert '#include "l3_confirm.h"' in SOURCE
+    assert "static l3_confirm_t        gConfirm;" in SOURCE
+    # Defaults once, like the band, so "trackCfg confirm" survives triggerCfg.
+    cal = body("l3_ensureRadarCal")
+    assert "if (!gConfirmCfgSet) {" in cal
+    assert "l3_confirm_cfg_defaults(&gConfirmCfg);" in cal
+    configure = body("l3_clubTrackConfigure")
+    assert "gConfirmCfg.binWidthM = cfg.binWidthM;" in configure
+    assert "gConfirmCfg.velocitySpanMps = cfg.velocitySpanMps;" in configure
+    assert "l3_confirm_init(&gConfirm, &gConfirmCfg);" in configure
+    assert "l3_confirm_rearm(&gConfirm);" in body("l3_trigRearm")
+    makefile = (FIRMWARE_DIR / "makefile").read_text(encoding="utf-8")
+    assert " l3_confirm.c " in makefile
+
+
+def test_without_confirm_mode_the_fire_still_tells_the_host_at_once():
+    self_trigger = body("l3_considerSelfTrigger")
+    freeze = self_trigger.index("gHwaFreezeRequested = 1U;")
+    gate = self_trigger.index("if (!gConfirm.cfg.enabled) {")
+    notice = self_trigger.index('l3_queueNotice("Triggered\\n");')
+    drain = self_trigger.index("l3_angleQueueDrain();")
+    assert freeze < gate < notice < drain
+    assert self_trigger.count('l3_queueNotice("Triggered\\n");') == 1
+
+
+def test_in_confirm_mode_the_fire_is_a_candidate_after_the_ball_tracker_is_armed():
+    self_trigger = body("l3_considerSelfTrigger")
+    observe = self_trigger.index("l3_shotObserve(teeBin, fired, impactUs);")
+    candidate = self_trigger.index("l3_confirmCandidate(impactUs);")
+    seed = self_trigger.index("l3_ball_track_seed(&gBallTrack")
+    assert observe < candidate < seed
+    assert "if (fired && gConfirm.cfg.enabled) {" in self_trigger
+    handler = body("l3_confirmCandidate")
+    # No ball tracker, nothing could confirm it: fire at once, as before.
+    unarmed = handler.index("if (!gBallTrack.armed) {")
+    assert handler.index('l3_queueNotice("Triggered\\n");') > unarmed
+    assert "gConfirmUnarmed++;" in handler
+    assert handler.index("l3_confirm_arm(&gConfirm, impactUs);") < handler.index(
+        'l3_queueNotice("Candidate\\n");'
+    )
+
+
+def test_each_post_frame_confirms_or_rejects_a_pending_candidate():
+    task = body("l3_detectTask")
+    assert task.index("l3_considerBallTrack(queuedSlot);") < task.index("l3_confirmStep();")
+    step = body("l3_confirmStep")
+    assert "if (gConfirm.verdict != L3_CONFIRM_PENDING) {" in step
+    assert "l3_fit_span_t ballSpan = { &gBallTrack.core, 0U, gBallTrack.core.count };" in step
+    assert "gBallTrack.core.count, gPostTimestampUs);" in step
+    # The post movie's last frame rejects a candidate still pending.
+    assert "gPostFramesScored >= gCapturePlan.postFrames" in step
+    assert "l3_confirm_end(&gConfirm, gPostTimestampUs);" in step
+    assert 'l3_queueNotice("Triggered\\n");' in step
+    assert 'l3_queueNotice("Rejected\\n");' in step
+
+
+def test_confirm_is_a_track_cfg_sub_mode():
+    track_cfg = body("l3_cli_trackCfg")
+    assert 'strcmp(argv[1], "confirm") == 0' in track_cfg
+    assert "return l3_cli_trackCfgConfirm(argc, argv);" in track_cfg
+    handler = body("l3_cli_trackCfgConfirm")
+    assert "!(values[0] == 0.0F || values[0] == 1.0F)" in handler
+    assert "l3_confirm_cfg_check(&cfg) != 0" in handler
+    # Applied to the live rule too, so it takes effect at the next fire.
+    assert "gConfirmCfg = cfg;" in handler
+    assert "gConfirm.cfg = cfg;" in handler
+
+
+def test_track_log_prints_the_confirmation():
+    log = body("l3_cli_triggerLog")
+    track = log[log.index('strcmp(argv[1], "track") == 0') :]
+    assert "(void)l3_confirm_format(&gConfirm, line, sizeof(line));" in track
+    assert "unarmed=%u" in track

@@ -199,6 +199,13 @@ notes whether it is **behind** (a newer frame already landed). Then:
 13. **Ball-leave fallback** (`l3_leave.c`): when the club rules miss, the
     first return beyond the band stepping outward at a ball's speed
     (22–90 m/s), armed only just after the club reached the band, fires.
+14. **Flight confirmation** (`l3_confirm.c`, `trackCfg confirm 1`): a fire
+    from 12 or 13 freezes the ring as before but is only a candidate
+    (`Candidate`). Each post frame then checks the ball track for three
+    consecutive points stepping outward at 15–90 m/s with a smooth aliased
+    Doppler that the fitted range rate wraps onto. That sends `Triggered`;
+    24 ms or the end of the post movie without one sends `Rejected`, and the
+    host releases the ring without S!.
 
 Behind, the detect task sheds the ball detector and the band map chunk:
 what the fire does not need. The club's angle snapshot is kept (§10).
@@ -379,6 +386,7 @@ source-structure tests.
 | `l3_club_track.c` | The trajectory core: 32-point ring, predictive association, fits, delivery, point lookup by timestamp |
 | `l3_impact.c` | Range-only impact: crossing and approach-end rules |
 | `l3_leave.c` | Ball-leave fallback |
+| `l3_confirm.c` | Flight confirmation of a fire (confirm mode) |
 | `l3_ball.c` | Ball-placement detector with a scalable cadence; angle-due clock |
 | `l3_angle.c` | Angle estimation; steering-rotor table |
 | `l3_angle_queue.c` | The club's pending angles: push, peek/finish, drain, apply by timestamp |
@@ -420,7 +428,7 @@ commands; new diagnostics are sub-modes.
 | `captureCfg`, `phaseCaptureCfg`, `captureFormat`, `iq8Scale` | The capture plan and format |
 | `l3dump`, `l3sparse`, `l3track`, `l3release` | Read the frozen ring (whole, sparse, tracked cells); rearm |
 | `triggerCfg <bin> <snr> <on>` | The self-trigger |
-| `trackCfg ...` | The tracker; sub-modes `cal`, `elem`, `impact`, `impactFit`, `ballSnr`, `subbin`, **`dsp ping\|probe [bins]\|status\|hw`**, **`detectCore [mss\|dss\|verify]`** |
+| `trackCfg ...` | The tracker; sub-modes `cal`, `elem`, `impact`, `impactFit`, `ballSnr`, `confirm <0\|1> [windowMs]`, `subbin`, **`dsp ping\|probe [bins]\|status\|hw`**, **`detectCore [mss\|dss\|verify]`** |
 | `ball [status] \| scan \| cfg` | The ball-placement detector |
 | `triggerLog [trace\|track\|shot\|result\|perf\|timing\|frames\|cal\|clear]` | Diagnostics; `perf` includes the angle queue and detect core |
 | `stats`, `hwastats`, `debugCfg` | Health counters (`detect dropped= stale= ... stale_read=`), HWA state, streamed decisions |

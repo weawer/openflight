@@ -52,13 +52,20 @@ from openflight.iwr6843.sparse import (
 BAUD = 1_041_667
 # Firmware CLI line written when the self-trigger freezes the ring.
 TRIGGER_NOTICE = b"Triggered"
+# Confirm mode ("trackCfg confirm 1", firmware/iwr6843/l3_confirm.h): the ring
+# freezes on a candidate, then the ball's flight confirms it ("Triggered") or
+# it is rejected and the frozen ring waits for l3release.
+CANDIDATE_NOTICE = b"Candidate"
+REJECTED_NOTICE = b"Rejected"
+NOTICES = (TRIGGER_NOTICE, CANDIDATE_NOTICE, REJECTED_NOTICE)
 # The firmware CLI prompt, written after every reply (l3_dump.c cliPrompt).
 CLI_PROMPT = b"l3dump:/>"
 _REPLY_VERDICTS = (b"Done", b"Error", b"not recognized")
 # A reply whose prompt never comes is complete once its bytes stop for this
 # long after the verdict (the firmware writes a reply without pauses).
 _REPLY_QUIET_S = 0.1
-_NOTICE_TAIL_BYTES = len(TRIGGER_NOTICE) - 1
+# Long enough to hold the head of any notice split across two reads.
+_NOTICE_TAIL_BYTES = max(len(notice) for notice in NOTICES) - 1
 _PORT_GLOBS = ("/dev/ttyUSB*", "/dev/tty.SLAB_USBtoUART*")
 
 logger = logging.getLogger(__name__)
@@ -72,6 +79,36 @@ def _reply_verdict_at(resp: bytes) -> int:
     """Index just past the first Done/Error/not-recognized word, or -1."""
     found = [(resp.index(word) + len(word)) for word in _REPLY_VERDICTS if word in resp]
     return min(found) if found else -1
+
+
+def next_notice(data: bytes) -> tuple[bytes, bytes]:
+    """The earliest notice in ``data`` and what follows its line, else
+    ``(b"", tail)`` with a tail long enough to hold a split notice.
+
+    What follows is kept whole when it holds another notice, so a candidate
+    and its verdict read together are both reported.
+    """
+    found = [(data.find(notice), notice) for notice in NOTICES if notice in data]
+    if not found:
+        return b"", data[-_NOTICE_TAIL_BYTES:]
+    at, notice = min(found)
+    rest = data[at + len(notice) :]
+    end_of_line = rest.find(b"\n")
+    rest = rest[end_of_line + 1 :] if end_of_line >= 0 else b""
+    if not any(other in rest for other in NOTICES):
+        rest = rest[-_NOTICE_TAIL_BYTES:]
+    return notice, rest
+
+
+def _remembered_notices(data: bytes) -> bytes:
+    """Every notice in ``data``, oldest first, one per line, then a tail
+    that may hold the head of the next."""
+    kept = []
+    while True:
+        notice, data = next_notice(data)
+        if not notice:
+            return b"".join(kept) + data
+        kept.append(notice + b"\n")
 
 
 def open_port(port: str, baud: int = BAUD, timeout: float = 0.3) -> serial.Serial:
@@ -125,29 +162,34 @@ class IWR6843Radar:
                 return cand
         return None
 
-    def wait_trigger_notice(self, pending: bytes = b"") -> tuple[bool, bytes]:
-        """Wait up to the port timeout for CLI bytes; report a ``Triggered`` line.
+    def wait_notice(self, pending: bytes = b"") -> tuple[bytes, bytes]:
+        """Wait up to the port timeout for CLI bytes; report the next notice.
 
-        ``read`` returns as soon as a byte arrives, so the notice is seen
-        within about a millisecond. ``pending`` carries a partial line
-        between calls; the tail kept is long enough to hold a split word.
+        Returns ``(notice, pending)``: one of ``NOTICES`` (b"" when none came)
+        and the bytes to pass to the next call. ``read`` returns as soon as a
+        byte arrives, so a notice is seen within about a millisecond.
+        ``pending`` carries a partial line, or notices still to report,
+        between calls. Notices come one per call, oldest first.
         """
         pending = self._trigger_pending + pending
         self._trigger_pending = b""
-        if TRIGGER_NOTICE not in pending:
-            waiting = self.ser.in_waiting
-            pending += self.ser.read(waiting if waiting else 1)
-        if TRIGGER_NOTICE in pending:
-            return True, b""
-        return False, pending[-_NOTICE_TAIL_BYTES:]
+        notice, rest = next_notice(pending)
+        if notice:
+            return notice, rest
+        waiting = self.ser.in_waiting
+        return next_notice(pending + self.ser.read(waiting if waiting else 1))
+
+    def wait_trigger_notice(self, pending: bytes = b"") -> tuple[bool, bytes]:
+        """``wait_notice`` reporting only whether the notice was ``Triggered``.
+
+        For callers that leave confirm mode off, where it is the only notice.
+        """
+        notice, pending = self.wait_notice(pending)
+        return notice == TRIGGER_NOTICE, pending
 
     def _remember_trigger_notice(self, data: bytes) -> None:
-        """Keep a notice (or its split head) that a command read off the port."""
-        pending = self._trigger_pending + data
-        if TRIGGER_NOTICE in pending:
-            self._trigger_pending = TRIGGER_NOTICE
-        else:
-            self._trigger_pending = pending[-_NOTICE_TAIL_BYTES:]
+        """Keep the notices (or a split head) that a command read off the port."""
+        self._trigger_pending = _remembered_notices(self._trigger_pending + data)
 
     def _discard_before_readback(self) -> None:
         """Drop stale input before reading the frozen capture out.
@@ -648,6 +690,20 @@ class IWR6843Radar:
         raises RuntimeError.
         """
         return self._set_track_cfg_sub_mode(f"trackCfg ballSnr {snr:g}", refusal_ok=snr == 0.0)
+
+    def set_confirm(self, enabled: bool, window_ms: float | None = None) -> bool:
+        """``trackCfg confirm``: fire only once the ball's flight confirms a
+        candidate (``l3_confirm.h``); ``window_ms`` None keeps the firmware's.
+
+        Kept by the firmware across ``triggerCfg`` and ``sensorStart``. Returns
+        True when acknowledged; firmware that predates it refusing either
+        value returns False (it fires at once, as confirm off does). Silence
+        raises RuntimeError.
+        """
+        command = f"trackCfg confirm {int(enabled)}"
+        if window_ms is not None:
+            command += f" {window_ms:g}"
+        return self._set_track_cfg_sub_mode(command, refusal_ok=True)
 
     def set_radar_cal(self, args: tuple[float, ...]) -> bool:
         """``trackCfg cal``: the attitude and baseline zeros (``BoardCalibration.cal_args``).
