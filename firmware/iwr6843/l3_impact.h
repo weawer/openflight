@@ -12,7 +12,12 @@
  * of the ball's, because at impact its return merges with the ball's and the
  * club track stops taking points. So impact also fires on the frame an
  * approaching track (a usable club-in estimate) takes no point, having last
- * been seen within endM of the ball's range, dated to that last point.
+ * been seen within endM short of the ball's range, dated to that last point.
+ * The approach must also be at least endMinMps: on the bench (2026-10) a
+ * backswing's downrange crossing (the club-in fit takes 17 m/s and up)
+ * armed it and fired 0.5-0.8 s before impact; every approach that armed it
+ * on the labelled swings was 20.6 m/s or faster. A point past the ball's
+ * range never arms it: before impact the club is short of the ball.
  *
  * A geometric detector once sat beside it, judging the club's 3D line against
  * the ball's position; it was removed on 2026-09-30 with the range gate: the
@@ -29,9 +34,11 @@
 typedef struct {
     float horizonS;       /* fire when the crossing is within this of the frame's time */
     float endM;           /* fire when the approach ends within this of the ball; 0 = off */
+    float endMinMps;      /* ... at this club-in speed or faster; 0 = any usable */
 } l3_impact_cfg_t;
 
-#define L3_IMPACT_END_MAX_M 2.0F  /* "trackCfg impact"'s limit for endM */
+#define L3_IMPACT_END_MAX_M 2.0F     /* "trackCfg impact"'s limit for endM */
+#define L3_IMPACT_END_MAX_MPS 70.0F  /* ... and for endMinMps (l3_impact_fit clubMaxMps) */
 
 /* The club track this frame, as the approach-end rule sees it. */
 typedef struct {
@@ -62,7 +69,7 @@ typedef struct {
     uint8_t   fired;
     uint8_t   why;                /* last update */
     uint8_t   cause;              /* what fired, L3_IMPACT_CAUSE_* */
-    uint8_t   endArmed;           /* the newest point was an approach within endM */
+    uint8_t   endArmed;           /* the newest point was an approach that arms the end */
     uint32_t  endTimeUs;          /* that point's time */
     float     offsetS;            /* crossing time relative to the frame (+ ahead) */
     uint32_t  impactTimestampUs;  /* the crossing, or the approach's last point */
@@ -77,8 +84,8 @@ const char *l3_impact_why_name(uint8_t why);
 const char *l3_impact_cause_name(uint8_t cause);
 /* Fire on the club-in estimate when its crossing of the ball's range is
  * within the horizon of nowUs, the current frame's time, or (club not NULL)
- * on the first frame without a point after an approach point within endM of
- * the ball. A missing or rejected estimate is nodelivery. Returns 1 on the
+ * on the first frame without a point after an approach point at least
+ * endMinMps, short of the ball by at most endM. A missing or rejected estimate is nodelivery. Returns 1 on the
  * update that fires; later updates are ignored until l3_impact_rearm. */
 int32_t l3_impact_update_range(l3_impact_t *impact, const l3_fit_estimate_t *clubIn,
                                const l3_impact_club_t *club, uint32_t nowUs);

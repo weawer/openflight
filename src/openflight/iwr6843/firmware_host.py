@@ -666,7 +666,11 @@ class FollowCtx(ctypes.Structure):
 class ImpactCfg(ctypes.Structure):
     """``l3_impact_cfg_t``."""
 
-    _fields_ = [("horizonS", ctypes.c_float), ("endM", ctypes.c_float)]
+    _fields_ = [
+        ("horizonS", ctypes.c_float),
+        ("endM", ctypes.c_float),
+        ("endMinMps", ctypes.c_float),
+    ]
 
 
 # l3_dsp_ipc.h

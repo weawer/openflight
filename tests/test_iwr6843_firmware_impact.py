@@ -40,9 +40,9 @@ def range_impact(lib, **overrides) -> fw.Impact:
     return impact
 
 
-def club_in_estimate(time_us: float, why: str = "ok") -> fw.FitEstimate:
+def club_in_estimate(time_us: float, why: str = "ok", speed_mps: float = 30.0) -> fw.FitEstimate:
     e = fw.FitEstimate()
-    e.why, e.timeUs, e.sigmaUs, e.speedMps, e.points = FIT_WHY[why], time_us, 300.0, 30.0, 4
+    e.why, e.timeUs, e.sigmaUs, e.speedMps, e.points = FIT_WHY[why], time_us, 300.0, speed_mps, 4
     return e
 
 
@@ -63,12 +63,19 @@ def update(lib, impact, estimate, now_us: int, club: fw.ImpactClub | None = None
     return lib.l3_impact_update_range(ctypes.byref(impact), ref, club_ref, now_us)
 
 
-def test_the_settings_are_the_horizon_and_the_end_distance():
-    assert [name for name, _type in fw.ImpactCfg._fields_] == ["horizonS", "endM"]
+def test_the_settings_are_the_horizon_the_end_distance_and_the_end_speed():
+    assert [name for name, _type in fw.ImpactCfg._fields_] == ["horizonS", "endM", "endMinMps"]
 
 
 def test_the_default_end_distance(lib):
     assert range_impact(lib).cfg.endM == pytest.approx(0.40)
+
+
+def test_the_default_end_speed(lib):
+    """Over the late backswing's downrange crossing (~17 m/s, the club-in
+    fit's own floor) and under every approach that armed the end on the
+    labelled swings (20.6-62 m/s)."""
+    assert range_impact(lib).cfg.endMinMps == pytest.approx(20.0)
 
 
 def test_the_default_horizon_value(lib):
@@ -244,3 +251,68 @@ def test_rearm_clears_the_armed_end(lib):
     lib.l3_impact_rearm(ctypes.byref(impact))
     assert impact.endArmed == 0 and impact.cause == CAUSE["none"]
     assert update(lib, impact, None, 27_000, club_state(False)) == 0
+
+
+# --- backswing false fires (bench, 2026-10) ---------------------------------
+#
+# 129 fires for 36 TrackMan shots: 15 fired 0.54-0.82 s early, at takeaway,
+# one with cause=end on an empty club track. The end armed on any approach
+# the club-in fit accepted (17 m/s and up) within endM of the ball on either
+# side, so a slow downrange crossing or a return past the ball armed it and
+# the frame the track was released fired it.
+
+
+def test_a_slow_approach_near_the_ball_does_not_arm_the_end(lib):
+    """A backswing's downrange crossing passes the club-in fit's 17 m/s floor
+    but is slower than any downswing that reached the ball."""
+    impact = range_impact(lib)
+    e = club_in_estimate(60_000, speed_mps=18.0)
+    assert update(lib, impact, e, 24_000, club_state(True, 0.20, 24_000)) == 0
+    assert impact.endArmed == 0
+    assert update(lib, impact, None, 27_000, club_state(False)) == 0
+    assert impact.fired == 0
+
+
+def test_an_approach_at_the_end_speed_arms_the_end(lib):
+    impact = range_impact(lib)
+    e = club_in_estimate(60_000, speed_mps=20.0)
+    update(lib, impact, e, 24_000, club_state(True, 0.20, 24_000))
+    assert impact.endArmed == 1
+    assert update(lib, impact, None, 27_000, club_state(False)) == 1
+    assert impact.cause == CAUSE["end"]
+
+
+def test_a_zero_end_speed_arms_on_any_usable_approach(lib):
+    impact = range_impact(lib, endMinMps=0.0)
+    update(
+        lib, impact, club_in_estimate(60_000, speed_mps=17.5), 24_000, club_state(True, 0.2, 24_000)
+    )
+    assert impact.endArmed == 1
+
+
+def test_a_point_past_the_ball_does_not_arm_the_end(lib):
+    """Before impact the club is short of the ball: a return beyond it (the
+    golfer, the net, the bay) is not an approach ending at the ball."""
+    impact = range_impact(lib)
+    e = club_in_estimate(60_000)
+    assert update(lib, impact, e, 24_000, club_state(True, -0.30, 24_000)) == 0
+    assert impact.endArmed == 0
+    assert update(lib, impact, None, 27_000, club_state(False)) == 0
+    assert impact.fired == 0
+
+
+def test_a_point_at_the_ball_arms_the_end(lib):
+    impact = range_impact(lib)
+    update(lib, impact, club_in_estimate(60_000), 24_000, club_state(True, 0.0, 24_000))
+    assert impact.endArmed == 1
+
+
+def test_a_slow_point_after_a_fast_one_disarms_the_end(lib):
+    """The newest approach point decides, as the distance does."""
+    impact = range_impact(lib)
+    update(lib, impact, club_in_estimate(60_000), 24_000, club_state(True, 0.30, 24_000))
+    update(
+        lib, impact, club_in_estimate(60_000, speed_mps=18.0), 27_000, club_state(True, 0.2, 27_000)
+    )
+    assert impact.endArmed == 0
+    assert update(lib, impact, None, 30_000, club_state(False)) == 0

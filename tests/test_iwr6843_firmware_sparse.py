@@ -562,13 +562,15 @@ def test_calibration_and_impact_are_configured_through_track_cfg_sub_modes():
     assert "l3_cal_set_element(&gRadarCal, index, values[2], values[1])" in elem
     assert "values[0] >= (float)L3_CAL_MAX_VIRTUAL" in elem
     impact = _function("static int32_t l3_cli_trackCfgImpact(")
-    # The horizon and an optional approach-end distance: the old five-value
-    # line of the geometric detector is refused.
-    assert "uint32_t count = (argc == 4) ? 2U : 1U;" in impact
-    assert "l3_parseFloats(argc, argv, 2, count, values) != 0" in impact
+    # The horizon, then an optional approach-end distance and end speed: the
+    # old five-value line of the geometric detector is refused.
+    assert "uint32_t count = (argc >= 4) ? (uint32_t)(argc - 2) : 1U;" in impact
+    assert "count > 3U || l3_parseFloats(argc, argv, 2, count, values) != 0" in impact
     assert "values[1] > L3_IMPACT_END_MAX_M" in impact
+    assert "values[2] > L3_IMPACT_END_MAX_MPS" in impact
     assert "gImpactCfg.horizonS = values[0];" in impact
     assert "gImpactCfg.endM = values[1];" in impact
+    assert "gImpactCfg.endMinMps = values[2];" in impact
     assert "l3_impact_init(&gRangeImpact, &gImpactCfg);" in impact
     assert "tableEntry[19]" not in source, "sub-modes, not new commands"
     assert "or cal/elem/impact/impactFit ..." in source

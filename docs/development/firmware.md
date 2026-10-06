@@ -140,7 +140,7 @@ triggerLog [trace|track|shot|result|perf|timing|clear]
 trackCfg detectCore [dss|verify]
 trackCfg cal <pitchDeg> <yawDeg> <rollDeg> <azOffsetRad> <elOffsetDeg> <rangeBiasM>
 trackCfg elem <index> <phaseRad> <gain>
-trackCfg impact <horizonS> [endM]
+trackCfg impact <horizonS> [endM [endMinMps]]
 captureCfg adaptive <enabled> <approachBins> <marginBins>
 ```
 
@@ -160,8 +160,13 @@ radar range when the ball leaves is 3-12 bins (median 7.4) short of the
 ball's: at impact the club's return merges with the ball's and the club track
 stops taking points. So the range impact also fires on the first frame an
 approaching track (one with a usable club-in estimate) takes no point after a
-point within `endM` of the ball's range (default 0.40 m, about 8.5 bins; 0
-turns it off), dated to that last point. `triggerLog track` prints which rule
+point within `endM` short of the ball's range (default 0.40 m, about 8.5
+bins; 0 turns it off), dated to that last point. That approach must be at
+least `endMinMps` (default 20 m/s; 0 accepts any usable approach): on the
+bench (2026-10) a backswing's downrange crossing, which the club-in fit
+accepts from 17 m/s, armed the end and fired 0.5-0.8 s before impact, while
+every approach that armed it on the labelled swings was 20.6 m/s or faster.
+A point past the ball's range never arms it. `triggerLog track` prints which rule
 fired (`cause=crossing` or `cause=end`) and whether the end rule is armed.
 
 When the club is not seen before launch (the early 2026-08-09 captures lose it
