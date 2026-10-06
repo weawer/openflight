@@ -43,7 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the 8 bench false fires the impact rules reproduce and changes nothing at
   3 ms frames. The END rule also needs a downswing speed (20 m/s) and a point
   short of the ball (merged from `feat/iwr-calcs`). Both take a firmware
-  rebuild to reach the board.
+  rebuild to reach the board. `--iwr6843-min-span-us N` (0 = off) sets the
+  span at runtime through `trackCfg impactFit <band> <minSpanUs>`, so the
+  gate can be A/B tested without a reflash; the Pi sends the firmware
+  default at every start when it is not given.
 - **IWR6843 enclosure depth is 30 mm, not 0.30 m.** `ARRAY_DEPTH_M` is added to a tape reading from the enclosure front. 0.30 m put the tee about six bins too far: a 1.7 m setting watched 2.0 m. The stock self-trigger bin is now 32 (was 38).
 
 ### Added

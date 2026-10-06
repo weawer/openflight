@@ -141,6 +141,7 @@ trackCfg detectCore [dss|verify]
 trackCfg cal <pitchDeg> <yawDeg> <rollDeg> <azOffsetRad> <elOffsetDeg> <rangeBiasM>
 trackCfg elem <index> <phaseRad> <gain>
 trackCfg impact <horizonS> [endM [endMinMps]]
+trackCfg impactFit <bandBins> [minSpanUs]
 captureCfg adaptive <enabled> <approachBins> <marginBins>
 ```
 
@@ -179,9 +180,15 @@ bench's takeaway fires (2026-10) showed 7 of the 8 that went through these
 rules came from just such a track, the club at address 0-0.4 m short of the
 ball fitted at 20-57 m/s, past both `clubMinMps` and `endMinMps`. Every
 range-rule fire on the labelled swings fitted 6 ms or more, and 3 points at
-3 ms frames span 6 ms, so 3 ms behaviour is unchanged. Both values are
-compile-time defaults (`l3_impact_fit_cfg_defaults`); replays set them through
-the `fit` tunables, and 0 turns either off.
+3 ms frames span 6 ms, so 3 ms behaviour is unchanged. `fitSpanUs` is a
+compile-time default (`l3_impact_fit_cfg_defaults`). `minSpanUs` is also the
+optional second value of `trackCfg impactFit <bandBins> [minSpanUs]` (whole
+microseconds, 0..12000; left out it is kept), which the Pi sends at every
+start: the firmware default unless `--iwr6843-min-span-us` sets it, so the
+gate can be turned off (`0`) or moved at the range without a reflash.
+Firmware before 1.0.3 refuses the second value; the Pi then sends the band
+alone, or stops if a span was asked for. Replays set both through the `fit`
+tunables, and 0 turns either off.
 
 To judge a trigger change on recorded captures before flashing it, compare
 builds: `uv run python scripts/analysis/compare_trigger_builds.py 4c86e6f HEAD`

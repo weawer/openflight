@@ -481,6 +481,7 @@ static uint32_t            gDetectShed;    /* frames that shed the ball detector
 static l3_impact_fit_t     gImpactFit;
 static uint8_t             gImpactFitCfgSet;
 #define L3_IMPACT_FIT_MAX_BAND_BINS 64.0F
+#define L3_IMPACT_FIT_MAX_MIN_SPAN_US 12000.0F  /* "trackCfg impactFit"'s limit for minSpanUs */
 /* The shot state machine and the post-impact ball tracker. Post frames the
  * ring keeps are published to the detect task with L3_DETECT_POST_EPOCH;
  * they are never overwritten before the rearm, so no liveness check. */
@@ -5161,22 +5162,31 @@ static int32_t l3_cli_trackCfgDetectCore(int32_t argc, char *argv[])
     return 0;
 }
 
-/* "trackCfg impactFit <bandBins>": the tee band's total width in range bins
- * (l3_band.h), placed on the noisiest idle bins near the tee; 0 for no band. A sub-mode, not a command of its own: the CLI
- * table is at the SDK's CLI_MAX_CMD. Kept across triggerCfg and sensorStart;
- * the next pre-impact frame places the band. */
+/* "trackCfg impactFit <bandBins> [minSpanUs]": the tee band's total width in
+ * range bins (l3_band.h), placed on the noisiest idle bins near the tee; 0 for
+ * no band. minSpanUs, whole microseconds, is the club-in fit's span floor
+ * (l3_impact_fit_cfg_t; 0 turns the gate off); left out it is kept, so the
+ * one-value line older hosts send changes the band alone. A sub-mode, not a
+ * command of its own: the CLI table is at the SDK's CLI_MAX_CMD. Kept across
+ * triggerCfg and sensorStart; the next pre-impact frame places the band. */
 static int32_t l3_cli_trackCfgImpactFit(int32_t argc, char *argv[])
 {
-    float values[1];
+    float values[2];
+    uint32_t count = (argc == 4) ? 2U : 1U;
 
     /* !(>= 0) also refuses a NaN strtof accepted. */
-    if (l3_parseFloats(argc, argv, 2, 1U, values) != 0 || !(values[0] >= 0.0F) ||
-        values[0] > L3_IMPACT_FIT_MAX_BAND_BINS) {
-        CLI_write("Error: trackCfg impactFit <bandBins 0..64>\n");
+    if (l3_parseFloats(argc, argv, 2, count, values) != 0 || !(values[0] >= 0.0F) ||
+        values[0] > L3_IMPACT_FIT_MAX_BAND_BINS ||
+        (count == 2U && (!(values[1] >= 0.0F) || values[1] > L3_IMPACT_FIT_MAX_MIN_SPAN_US ||
+                         values[1] != (float)(uint32_t)values[1]))) {
+        CLI_write("Error: trackCfg impactFit <bandBins 0..64> [minSpanUs 0..12000]\n");
         return -1;
     }
     l3_ensureRadarCal();
     gImpactFitCfg.bandBins = values[0];
+    if (count == 2U) {
+        gImpactFitCfg.minSpanUs = (uint32_t)values[1];
+    }
     CLI_write("Done\n");
     return 0;
 }

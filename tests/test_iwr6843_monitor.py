@@ -18,6 +18,7 @@ from openflight.iwr6843.dsp_link import DETECT_CORES, DspLinkError
 from openflight.iwr6843.dump import pack_dump
 from openflight.iwr6843.firmware_version import FirmwareVersion
 from openflight.iwr6843.monitor import (
+    CLUB_IN_MIN_SPAN_DEFAULT_US,
     DEFAULT_IWR6843_CONFIG,
     DETECT_CORE,
     MSS_SCORED_CAPTURE_FORMATS,
@@ -98,8 +99,8 @@ class FakeRadar:
             raise self.config_errors.pop(0)
         self.configs.append(path)
 
-    def set_tee_band(self, bins: float) -> bool:
-        """The monitor sends the band (0 included) at every start."""
+    def set_tee_band(self, bins: float, min_span_us: int | None = None) -> bool:
+        """The monitor sends the band (0 included) and the span at every start."""
         return True
 
     def set_ball_snr(self, snr: float) -> bool:
@@ -1385,21 +1386,26 @@ class TeeBandRadar(FakeRadar):
         band_error: Exception | None = None,
         band_supported: bool = True,
         cal_supported: bool = True,
+        span_supported: bool = True,
     ):
         super().__init__(raw)
         self.events: list[tuple[str, object]] = []
         self.band_error = band_error
         self.band_supported = band_supported
         self.cal_supported = cal_supported
+        # False: firmware before 1.0.3, which refuses a second impactFit value.
+        self.span_supported = span_supported
 
     def send_config(self, path: str, lines=None):
         super().send_config(path, lines)
         self.events.append(("config", path))
 
-    def set_tee_band(self, bins: float) -> bool:
-        self.events.append(("band", bins))
+    def set_tee_band(self, bins: float, min_span_us: int | None = None) -> bool:
+        self.events.append(("band", bins) if min_span_us is None else ("band", bins, min_span_us))
         if self.band_error is not None:
             raise self.band_error
+        if min_span_us is not None and not self.span_supported:
+            return False
         return self.band_supported
 
     def set_radar_cal(self, args):
@@ -1430,7 +1436,10 @@ def test_tee_band_is_sent_after_the_config(tmp_path, bins):
 
     monitor.start(armed=False)
     try:
-        assert radar.events[:2] == [("config", str(tmp_path / "radar.cfg")), ("band", bins)]
+        assert radar.events[:2] == [
+            ("config", str(tmp_path / "radar.cfg")),
+            ("band", bins, CLUB_IN_MIN_SPAN_DEFAULT_US),
+        ]
     finally:
         monitor.stop()
 
@@ -1444,7 +1453,10 @@ def test_tee_band_off_is_still_sent_so_a_restart_clears_a_stale_band(tmp_path):
     monitor.start(armed=False)
     try:
         assert monitor.tee_band_bins == 0.0
-        assert radar.events[:2] == [("config", str(tmp_path / "radar.cfg")), ("band", 0.0)]
+        assert radar.events[:2] == [
+            ("config", str(tmp_path / "radar.cfg")),
+            ("band", 0.0, CLUB_IN_MIN_SPAN_DEFAULT_US),
+        ]
     finally:
         monitor.stop()
 
@@ -1537,9 +1549,88 @@ def test_tee_band_is_on_at_the_firmware_default_width_by_default(tmp_path):
     monitor.start(armed=False)
     try:
         assert TEE_BAND_DEFAULT_BINS == 6.0
-        assert radar.events[1] == ("band", TEE_BAND_DEFAULT_BINS)
+        assert radar.events[1] == ("band", TEE_BAND_DEFAULT_BINS, CLUB_IN_MIN_SPAN_DEFAULT_US)
     finally:
         monitor.stop()
+
+
+# --- the club-in fit's span floor (trackCfg impactFit's second value) ---------
+
+
+def test_the_min_span_is_the_firmware_default_unless_set(tmp_path):
+    """The firmware keeps it across sensorStart, so it is sent at every start:
+    a run after one that turned the gate off must turn it back on."""
+    radar = TeeBandRadar(_raw_dump())
+    monitor = _tee_band_monitor(tmp_path, radar)
+
+    monitor.start(armed=False)
+    try:
+        assert monitor.club_in_min_span_us is None
+        assert monitor.club_in_min_span_us_applied == CLUB_IN_MIN_SPAN_DEFAULT_US == 5500
+        assert radar.events[1] == ("band", TEE_BAND_DEFAULT_BINS, 5500)
+    finally:
+        monitor.stop()
+
+
+@pytest.mark.parametrize("span", [0, 4000, 5500, 12000])
+def test_a_configured_min_span_is_sent_with_the_band(tmp_path, span):
+    radar = TeeBandRadar(_raw_dump())
+    monitor = _tee_band_monitor(tmp_path, radar, club_in_min_span_us=span)
+
+    monitor.start(armed=False)
+    try:
+        assert radar.events[1] == ("band", TEE_BAND_DEFAULT_BINS, span)
+        assert monitor.club_in_min_span_us_applied == span
+    finally:
+        monitor.stop()
+
+
+def test_older_firmware_without_the_span_gets_the_band_alone(tmp_path, caplog):
+    """Firmware before 1.0.3 has no span gate: nothing to set, start continues."""
+    radar = TeeBandRadar(_raw_dump(), span_supported=False)
+    monitor = _tee_band_monitor(tmp_path, radar)
+
+    with caplog.at_level(logging.INFO, logger="openflight.iwr6843.monitor"):
+        monitor.start(armed=False)
+    try:
+        assert radar.events[1:3] == [
+            ("band", TEE_BAND_DEFAULT_BINS, 5500),
+            ("band", TEE_BAND_DEFAULT_BINS),
+        ]
+        assert monitor.club_in_min_span_us_applied is None
+        assert any("minSpanUs" in r.getMessage() for r in caplog.records)
+    finally:
+        monitor.stop()
+
+
+def test_a_requested_min_span_on_older_firmware_is_an_error(tmp_path):
+    """Asked for at the range, it must take effect or stop the start: an A/B
+    whose B silently ran as A is worse than no test."""
+    radar = TeeBandRadar(_raw_dump(), span_supported=False)
+    monitor = _tee_band_monitor(tmp_path, radar, club_in_min_span_us=0)
+
+    with pytest.raises(RuntimeError, match="minSpanUs.*1.0.3"):
+        monitor.start(armed=False)
+
+    assert radar.shutdown_events[0] == "sensorStop"
+
+
+def test_band_off_and_no_span_on_firmware_without_either_still_starts(tmp_path):
+    radar = TeeBandRadar(_raw_dump(), band_supported=False, span_supported=False)
+    monitor = _tee_band_monitor(tmp_path, radar, tee_band_bins=0.0)
+
+    monitor.start(armed=False)
+    try:
+        assert monitor._running  # pylint: disable=protected-access
+        assert monitor.club_in_min_span_us_applied is None
+    finally:
+        monitor.stop()
+
+
+@pytest.mark.parametrize("span", [-1, 12001, 5500.5, float("nan"), True])
+def test_the_min_span_must_be_whole_microseconds_within_the_firmware_limit(tmp_path, span):
+    with pytest.raises(ValueError, match="min span"):
+        _tee_band_monitor(tmp_path, TeeBandRadar(_raw_dump()), club_in_min_span_us=span)
 
 
 def test_board_calibration_is_sent_after_band_and_ball_snr_before_the_trigger(tmp_path):
@@ -1548,7 +1639,7 @@ def test_board_calibration_is_sent_after_band_and_ball_snr_before_the_trigger(tm
     monitor = _tee_band_monitor(tmp_path, radar, board_calibration=board)
     monitor.start(armed=False)
     try:
-        kinds = [kind for kind, _ in radar.events]
+        kinds = [event[0] for event in radar.events]
         assert kinds.index("band") < kinds.index("cal") < kinds.index("elem")
         assert radar.events[kinds.index("cal")][1] == board.cal_args
         assert monitor.calibration_applied is True
@@ -1561,7 +1652,7 @@ def test_no_calibration_sends_identity_so_a_restart_clears_it(tmp_path):
     monitor = _tee_band_monitor(tmp_path, radar)
     monitor.start(armed=False)
     try:
-        cal = next(args for kind, args in radar.events if kind == "cal")
+        cal = next(event[1] for event in radar.events if event[0] == "cal")
         assert cal == BoardCalibration.identity().cal_args
     finally:
         monitor.stop()

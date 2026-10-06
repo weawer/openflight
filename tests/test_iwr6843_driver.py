@@ -782,6 +782,45 @@ def test_clearing_the_band_on_a_silent_board_still_fails(monkeypatch):
         radar.set_tee_band(0.0)
 
 
+def test_set_tee_band_can_carry_the_club_in_min_span(monkeypatch):
+    radar = IWR6843Radar.__new__(IWR6843Radar)
+    calls = []
+    monkeypatch.setattr(
+        radar, "cmd", lambda command, window: calls.append((command, window)) or "Done\n"
+    )
+
+    assert radar.set_tee_band(6.0, 5500) is True
+    assert radar.set_tee_band(0.0, 0) is True
+
+    assert [command for command, _ in calls] == [
+        "trackCfg impactFit 6 5500",
+        "trackCfg impactFit 0 0",
+    ]
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        "Error: trackCfg impactFit <bandBins 0..64>\n",
+        "'trackCfg' is not recognized as a CLI command\n",
+    ],
+)
+def test_firmware_without_the_min_span_refuses_it_as_false(monkeypatch, reply):
+    """1.0.2 and older take one value: the caller decides whether that matters."""
+    radar = IWR6843Radar.__new__(IWR6843Radar)
+    monkeypatch.setattr(radar, "cmd", lambda *_args, **_kwargs: reply)
+
+    assert radar.set_tee_band(6.0, 5500) is False
+
+
+def test_a_silent_board_fails_with_the_min_span_too(monkeypatch):
+    radar = IWR6843Radar.__new__(IWR6843Radar)
+    monkeypatch.setattr(radar, "cmd", lambda *_args, **_kwargs: "")
+
+    with pytest.raises(RuntimeError, match="did not acknowledge"):
+        radar.set_tee_band(6.0, 5500)
+
+
 def test_set_ball_snr_sends_the_track_cfg_sub_mode(monkeypatch):
     """The ball tracker's snr rides trackCfg beside the band; 0 is the firmware default."""
     radar = IWR6843Radar.__new__(IWR6843Radar)

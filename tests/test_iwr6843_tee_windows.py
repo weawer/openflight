@@ -201,7 +201,7 @@ class ConfigRadar:
     def send_config(self, path, lines=None):
         self.sent.append((path, lines))
 
-    def set_tee_band(self, bins):
+    def set_tee_band(self, bins, min_span_us=None):
         return True
 
     def set_ball_snr(self, snr):

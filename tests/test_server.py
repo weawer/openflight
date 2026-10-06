@@ -533,6 +533,7 @@ class TestIWR6843ShotIntegration:
                 self.self_trigger = None
                 self.onboard_tracking = False
                 self.detect_core = None
+                self.club_in_min_span_us_applied = 5500
                 captured["armed"] = armed
                 return None
 
@@ -613,6 +614,7 @@ class TestIWR6843ShotIntegration:
 
             def start(self, *, armed=True, onboard_track_config=None):
                 self.detect_core = None  # what IWR6843CaptureMonitor.start resolves
+                self.club_in_min_span_us_applied = None
                 self.self_trigger = None
                 self.onboard_tracking = False
 
@@ -667,6 +669,26 @@ class TestIWR6843ShotIntegration:
         assert server_module.iwr6843_runtime_config["ball_snr"] == 4.5
         server_module.iwr6843_runtime = None
 
+    def test_init_iwr6843_leaves_the_min_span_to_the_firmware_by_default(
+        self, monkeypatch, tmp_path
+    ):
+        captured = self._init_capturing_monitor_kwargs(monkeypatch, tmp_path)
+
+        assert captured["club_in_min_span_us"] is None
+        assert server_module.iwr6843_runtime_config["club_in_min_span_us"] is None
+        server_module.iwr6843_runtime = None
+
+    def test_init_iwr6843_passes_the_min_span_and_records_what_the_board_took(
+        self, monkeypatch, tmp_path
+    ):
+        captured = self._init_capturing_monitor_kwargs(monkeypatch, tmp_path, club_in_min_span_us=0)
+
+        assert captured["club_in_min_span_us"] == 0
+        assert server_module.iwr6843_runtime_config["club_in_min_span_us"] == 0
+        # What the monitor reports the board acknowledged (the double says 5500).
+        assert server_module.iwr6843_runtime_config["club_in_min_span_us_applied"] == 5500
+        server_module.iwr6843_runtime = None
+
     def test_init_iwr6843_leaves_the_no_ball_veto_off_by_default(self, monkeypatch, tmp_path):
         captured = self._init_capturing_monitor_kwargs(monkeypatch, tmp_path)
 
@@ -717,6 +739,7 @@ class TestIWR6843ShotIntegration:
 
             def start(self, *, armed=True, onboard_track_config=None):
                 self.detect_core = None  # what IWR6843CaptureMonitor.start resolves
+                self.club_in_min_span_us_applied = None
                 del armed, onboard_track_config
 
             def submit(self, name, job):
@@ -899,6 +922,7 @@ class TestIWR6843ShotIntegration:
 
             def start(self, *, armed=True, onboard_track_config=None):
                 self.detect_core = None  # what IWR6843CaptureMonitor.start resolves
+                self.club_in_min_span_us_applied = None
                 self.self_trigger = None
                 self.onboard_tracking = False
                 return None
@@ -948,6 +972,7 @@ class TestIWR6843ShotIntegration:
 
             def start(self, *, armed=True, onboard_track_config=None):
                 self.detect_core = None  # what IWR6843CaptureMonitor.start resolves
+                self.club_in_min_span_us_applied = None
                 self.self_trigger = None
                 self.onboard_tracking = False
 
@@ -994,6 +1019,7 @@ class TestIWR6843ShotIntegration:
 
             def start(self, *, armed=True, onboard_track_config=None):
                 self.detect_core = None  # what IWR6843CaptureMonitor.start resolves
+                self.club_in_min_span_us_applied = None
                 self.self_trigger = None
                 self.onboard_tracking = False
                 self.onboard_track_config = onboard_track_config
@@ -4951,6 +4977,44 @@ class TestIWR6843BallSnrArgument:
         assert "--iwr6843-ball-snr must be" in capsys.readouterr().err
 
 
+class TestIWR6843MinSpanArgument:
+    """--iwr6843-min-span-us sets the club-in fit's span floor at runtime, so the
+    gate can be A/B tested at the range without reflashing (0 turns it off)."""
+
+    def test_cli_default_leaves_the_firmware_default(self):
+        parser = argparse.ArgumentParser()
+        server_module._add_iwr6843_min_span_argument(parser)
+
+        assert parser.parse_args([]).iwr6843_min_span_us is None
+
+    @pytest.mark.parametrize(("text", "value"), [("0", 0), ("5500", 5500), ("12000", 12000)])
+    def test_cli_accepts_whole_microseconds(self, text, value):
+        parser = argparse.ArgumentParser()
+        server_module._add_iwr6843_min_span_argument(parser)
+
+        assert parser.parse_args(["--iwr6843-min-span-us", text]).iwr6843_min_span_us == value
+
+    @pytest.mark.parametrize("value", ["-1", "12001"])
+    def test_a_span_outside_the_firmware_limit_is_a_usage_error(self, monkeypatch, capsys, value):
+        monkeypatch.setattr(
+            sys, "argv", ["openflight-server", "--iwr6843", "--iwr6843-min-span-us", value]
+        )
+
+        with pytest.raises(SystemExit) as exc_info:
+            server_module.main()
+
+        assert exc_info.value.code == 2
+        assert "--iwr6843-min-span-us must be 0..12000" in capsys.readouterr().err
+
+    @pytest.mark.parametrize("value", ["5.5", "x", "nan"])
+    def test_a_span_that_is_not_whole_microseconds_is_a_usage_error(self, value):
+        parser = argparse.ArgumentParser()
+        server_module._add_iwr6843_min_span_argument(parser)
+
+        with pytest.raises(SystemExit):
+            parser.parse_args(["--iwr6843-min-span-us", value])
+
+
 class TestIWR6843TeeMinimum:
     """--iwr6843-tee-m is refused under 1.4 m. Closer than that the watch region
     starts under a metre from the radar, where the golfer's hands and body
@@ -5555,6 +5619,7 @@ class TestIWR6843OnboardTracking:
 
             def start(self, *, armed=True, onboard_track_config=None):
                 self.detect_core = None  # what IWR6843CaptureMonitor.start resolves
+                self.club_in_min_span_us_applied = None
                 self.self_trigger = None
                 self.onboard_tracking = False
                 if onboard_track_config:

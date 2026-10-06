@@ -142,7 +142,7 @@ class TestMonitorInstallsFactory:
             def send_config(self, path, lines=None):
                 pass
 
-            def set_tee_band(self, bins):
+            def set_tee_band(self, bins, min_span_us=None):
                 return True
 
             def set_ball_snr(self, snr):

@@ -13,7 +13,10 @@ club track is active."""
 
 from __future__ import annotations
 
+import ctypes
 import re
+
+import pytest
 
 from openflight.iwr6843.firmware_host import FIRMWARE_DIR
 
@@ -244,7 +247,7 @@ def test_band_command_is_a_track_cfg_sub_mode():
     assert 'strcmp(argv[1], "impactFit") == 0' in track_cfg
     assert "return l3_cli_trackCfgImpactFit(argc, argv);" in track_cfg
     handler = body("l3_cli_trackCfgImpactFit")
-    assert "l3_parseFloats(argc, argv, 2, 1U, values) != 0" in handler
+    assert "l3_parseFloats(argc, argv, 2, count, values) != 0" in handler
     assert "!(values[0] >= 0.0F)" in handler, "negative and NaN refused"
     assert "values[0] > L3_IMPACT_FIT_MAX_BAND_BINS" in handler
     assert handler.index("l3_ensureRadarCal();") < handler.index(
@@ -253,6 +256,39 @@ def test_band_command_is_a_track_cfg_sub_mode():
     assert 'CLI_write("Done\\n");' in handler
     assert "#define L3_IMPACT_FIT_MAX_BAND_BINS 64.0F" in SOURCE
     assert "tableEntry[19]" not in SOURCE
+
+
+def test_band_command_takes_the_club_in_min_span_as_an_optional_second_value():
+    """trackCfg impactFit <bandBins> [minSpanUs]: the Pi sends the span at every
+    start (so a stale one from a previous run is replaced) and can turn the
+    span gate off at the range without a reflash. One value keeps the span."""
+    handler = body("l3_cli_trackCfgImpactFit")
+    assert "uint32_t count = (argc == 4) ? 2U : 1U;" in handler
+    assert "(count == 2U && (!(values[1] >= 0.0F) ||" in handler, "negative and NaN refused"
+    assert "values[1] > L3_IMPACT_FIT_MAX_MIN_SPAN_US" in handler
+    assert "values[1] != (float)(uint32_t)values[1]" in handler, "whole microseconds only"
+    assert "Error: trackCfg impactFit <bandBins 0..64> [minSpanUs 0..12000]" in handler
+    assert handler.index("gImpactFitCfg.bandBins = values[0];") < handler.index(
+        "if (count == 2U) {"
+    )
+    assert "gImpactFitCfg.minSpanUs = (uint32_t)values[1];" in handler
+    assert handler.index("l3_ensureRadarCal();") < handler.index("gImpactFitCfg.minSpanUs")
+    assert "#define L3_IMPACT_FIT_MAX_MIN_SPAN_US 12000.0F" in SOURCE
+
+
+def test_the_pi_knows_the_min_span_limit_and_default():
+    from openflight.iwr6843 import (  # pylint: disable=import-outside-toplevel
+        firmware_host as fw,
+        monitor,
+    )
+
+    assert monitor.CLUB_IN_MIN_SPAN_MAX_US == 12000
+    if fw.host_compiler() is None:
+        pytest.skip("no C compiler for the firmware modules")
+    lib = fw.build_firmware_library()
+    cfg = fw.ImpactFitCfg()
+    lib.l3_impact_fit_cfg_defaults(ctypes.byref(cfg))
+    assert monitor.CLUB_IN_MIN_SPAN_DEFAULT_US == cfg.minSpanUs
 
 
 def test_track_log_prints_the_impact_fit_after_the_impact():

@@ -1201,6 +1201,7 @@ def init_iwr6843(
     tee_band_bins: float | None = None,
     ball_snr: float | None = None,
     veto_no_ball: bool = False,
+    club_in_min_span_us: int | None = None,
 ) -> bool:
     """Initialize GPIO-triggered TI capture and the frozen LCMF-v1 estimator.
 
@@ -1214,7 +1215,9 @@ def init_iwr6843(
     trackers ignore; the firmware places it on the noisiest idle bins near the
     tee and freezes it while the club swings; None is the default width, 0
     turns it off. ``ball_snr`` is the ball tracker's threshold apart from the
-    trigger's; None keeps the firmware's. ``debug`` reads the frozen ring back
+    trigger's; None keeps the firmware's. ``club_in_min_span_us`` is the
+    club-in fit's span floor for the self-trigger (0 turns the gate off); None
+    sends the firmware default. ``debug`` reads the frozen ring back
     after every shot as a full capture, saves it and runs the host pipeline
     beside the board's result; without it the board's result is the shot's
     only IWR data.
@@ -1292,6 +1295,7 @@ def init_iwr6843(
             tee_range_m=tee_range_m,
             tee_band_bins=tee_band_bins,
             ball_snr=ball_snr,
+            club_in_min_span_us=club_in_min_span_us,
             board_calibration=board_calibration,
             veto_no_ball=veto_no_ball,
         )
@@ -1340,6 +1344,9 @@ def init_iwr6843(
             "array_depth_m": ARRAY_DEPTH_M,
             "tee_band_bins": tee_band_bins,
             "ball_snr": ball_snr,
+            "club_in_min_span_us": club_in_min_span_us,
+            # What the board acknowledged; None on firmware without the gate.
+            "club_in_min_span_us_applied": capture_monitor.club_in_min_span_us_applied,
             "detect_core": capture_monitor.detect_core,
             "veto_no_ball": veto_no_ball,
             "board_calibration": board_calibration.to_dict(),
@@ -4873,6 +4880,25 @@ def _add_iwr6843_ball_snr_argument(parser):
     )
 
 
+def _add_iwr6843_min_span_argument(parser):
+    """Add the club-in fit's span floor for the self-trigger (0: the gate off)."""
+    from .iwr6843.monitor import (  # pylint: disable=import-outside-toplevel
+        CLUB_IN_MIN_SPAN_DEFAULT_US,
+        CLUB_IN_MIN_SPAN_FIRMWARE,
+        CLUB_IN_MIN_SPAN_MAX_US,
+    )
+
+    parser.add_argument(
+        "--iwr6843-min-span-us",
+        type=int,
+        default=None,
+        help="Shortest club-in fit, first point to last, in whole microseconds that may "
+        f"fire the self-trigger, 0..{CLUB_IN_MIN_SPAN_MAX_US} (default: the firmware's, "
+        f"{CLUB_IN_MIN_SPAN_DEFAULT_US}; 0 = off). Needs firmware "
+        f"{CLUB_IN_MIN_SPAN_FIRMWARE} or later",
+    )
+
+
 def _add_battery_arguments(parser):
     """Add explicit battery-provider selection."""
     parser.add_argument(
@@ -5244,6 +5270,7 @@ def main():
     )
     _add_iwr6843_tee_band_argument(parser)
     _add_iwr6843_ball_snr_argument(parser)
+    _add_iwr6843_min_span_argument(parser)
     parser.add_argument(
         "--iwr6843-net-m",
         type=float,
@@ -5462,6 +5489,13 @@ def main():
                 check_ball_snr(args.iwr6843_ball_snr)
             except ValueError as error:
                 parser.error(f"--iwr6843-ball-snr must be {str(error).split('must be ', 1)[1]}")
+        from .iwr6843.monitor import (  # pylint: disable=import-outside-toplevel
+            CLUB_IN_MIN_SPAN_MAX_US,
+        )
+
+        span = args.iwr6843_min_span_us
+        if span is not None and not 0 <= span <= CLUB_IN_MIN_SPAN_MAX_US:
+            parser.error(f"--iwr6843-min-span-us must be 0..{CLUB_IN_MIN_SPAN_MAX_US}")
     try:
         self_trigger_config = _self_trigger_config(args) if args.iwr6843 else None
     except (OSError, ValueError) as error:
@@ -5670,6 +5704,7 @@ def main():
             tee_band_bins=args.iwr6843_tee_band_bins,
             ball_snr=args.iwr6843_ball_snr,
             veto_no_ball=args.iwr6843_veto_no_ball,
+            club_in_min_span_us=args.iwr6843_min_span_us,
         ):
             calibration = iwr6843_runtime.calibration
             ball_speed_correction_distance_ft = _iwr6843_tee_range_m(args) * 3.28084

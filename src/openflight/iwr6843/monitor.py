@@ -46,6 +46,12 @@ _STATS_ACTIVE = re.compile(r"\bactive=(\d+)")
 _STATS_LATCHED = re.compile(r"\blatched=(\d+)")
 # The firmware's limit for "trackCfg impactFit" (L3_IMPACT_FIT_MAX_BAND_BINS).
 TEE_BAND_MAX_BINS = 64.0
+# The club-in fit's span floor (l3_impact_fit_cfg_defaults minSpanUs), the
+# second value of "trackCfg impactFit", and its limit there
+# (L3_IMPACT_FIT_MAX_MIN_SPAN_US). Firmware 1.0.3 and later.
+CLUB_IN_MIN_SPAN_DEFAULT_US = 5500
+CLUB_IN_MIN_SPAN_MAX_US = 12000
+CLUB_IN_MIN_SPAN_FIRMWARE = "1.0.3"
 
 
 @dataclass(frozen=True)
@@ -425,6 +431,7 @@ class IWR6843CaptureMonitor:
         tee_range_m: float | None = None,
         tee_band_bins: float = TEE_BAND_DEFAULT_BINS,
         ball_snr: float | None = None,
+        club_in_min_span_us: int | None = None,
         board_calibration: BoardCalibration | None = None,
         veto_no_ball: bool = False,
         readback: bool = True,
@@ -462,6 +469,21 @@ class IWR6843CaptureMonitor:
         # The ball tracker's extraction snr, apart from the trigger's; None
         # sends 0, the firmware's own default.
         self.ball_snr = None if ball_snr is None else check_ball_snr(ball_snr)
+        # The club-in fit's span floor in whole microseconds (0: the gate
+        # off); None sends the firmware default. bool is an int: refuse it.
+        if club_in_min_span_us is not None and (
+            isinstance(club_in_min_span_us, bool)
+            or not isinstance(club_in_min_span_us, int)
+            or not 0 <= club_in_min_span_us <= CLUB_IN_MIN_SPAN_MAX_US
+        ):
+            raise ValueError(
+                f"club-in min span must be whole microseconds 0..{CLUB_IN_MIN_SPAN_MAX_US} "
+                f"(0 = off), got {club_in_min_span_us!r}"
+            )
+        self.club_in_min_span_us = club_in_min_span_us
+        # What the board acknowledged at the last (re)start; None when the
+        # firmware predates the setting (it has no span gate).
+        self.club_in_min_span_us_applied: int | None = None
         # Sent to the board at every start (identity when None); False until
         # the firmware has acknowledged it.
         self.board_calibration = board_calibration or BoardCalibration.identity()
@@ -637,13 +659,7 @@ class IWR6843CaptureMonitor:
         """
         self.radar.send_config(str(self.config_path), lines=self._config_lines)
         self._sensor_configured = True
-        # Always sent, 0 included: the firmware keeps the band across
-        # sensorStart, so a restart without the flag must clear it.
-        if not self.radar.set_tee_band(self.tee_band_bins):
-            logger.info(
-                "[IWR6843] Firmware has no tee band (trackCfg impactFit); "
-                "nothing to clear with the band off"
-            )
+        self._apply_band_and_span()
         # Always sent, the default (0) included, for the same reason.
         if not self.radar.set_ball_snr(0.0 if self.ball_snr is None else self.ball_snr):
             logger.info(
@@ -670,6 +686,40 @@ class IWR6843CaptureMonitor:
         # up at 2 ms, starves the CLI, and the board stops answering.
         self._apply_detect_core()
         self._apply_self_trigger()
+
+    def _apply_band_and_span(self) -> None:
+        """Send ``trackCfg impactFit <band> <span>``: both always, the defaults
+        included, because the firmware keeps them across sensorStart and a
+        restart without the flags must clear a previous run's values.
+
+        Firmware before CLUB_IN_MIN_SPAN_FIRMWARE refuses the span; it has no
+        span gate, so without a requested span the band goes alone. A
+        requested span it cannot take stops the start.
+        """
+        span = (
+            CLUB_IN_MIN_SPAN_DEFAULT_US
+            if self.club_in_min_span_us is None
+            else self.club_in_min_span_us
+        )
+        self.club_in_min_span_us_applied = None
+        if self.radar.set_tee_band(self.tee_band_bins, span):
+            self.club_in_min_span_us_applied = span
+            return
+        if self.club_in_min_span_us is not None:
+            raise RuntimeError(
+                f"IWR6843 firmware refused trackCfg impactFit minSpanUs {span}: the "
+                f"club-in span gate needs firmware {CLUB_IN_MIN_SPAN_FIRMWARE} or later"
+            )
+        logger.info(
+            "[IWR6843] Firmware has no club-in span gate (trackCfg impactFit minSpanUs, "
+            "firmware %s); sending the tee band alone",
+            CLUB_IN_MIN_SPAN_FIRMWARE,
+        )
+        if not self.radar.set_tee_band(self.tee_band_bins):
+            logger.info(
+                "[IWR6843] Firmware has no tee band (trackCfg impactFit); "
+                "nothing to clear with the band off"
+            )
 
     def add_restart_hook(self, hook: Callable[[IWR6843Radar], None]) -> None:
         """Run ``hook(radar)`` on the worker after a restart that rearmed the
@@ -1207,6 +1257,9 @@ __all__ = [
     "SELF_TRIGGER_DEFAULT_BIN",
     "SELF_TRIGGER_TEE_LEAD_BINS",
     "DEFAULT_IWR6843_CONFIG",
+    "CLUB_IN_MIN_SPAN_DEFAULT_US",
+    "CLUB_IN_MIN_SPAN_FIRMWARE",
+    "CLUB_IN_MIN_SPAN_MAX_US",
     "DETECT_CORE",
     "MSS_SCORED_CAPTURE_FORMATS",
     "SELF_TRIGGER_DEFAULT_SNR",

@@ -623,8 +623,9 @@ class IWR6843Radar:
             "ball cfg", self.cmd(f"ball cfg {int(enable)} {int(follow and enable)}", 2.0)
         )
 
-    def set_tee_band(self, bins: float) -> bool:
-        """Set the tee band's width in range bins (0: no band).
+    def set_tee_band(self, bins: float, min_span_us: int | None = None) -> bool:
+        """Set the tee band's width in range bins (0: no band), and with
+        ``min_span_us`` the club-in fit's span floor (0: the gate off).
 
         The club and ball trackers ignore targets inside the band, which the
         firmware places on the noisiest idle bins near the ball, and the impact is fitted from the tracks either side of it. A
@@ -633,9 +634,15 @@ class IWR6843Radar:
 
         Returns True when the board acknowledged it. Clearing the band (0) on
         firmware that predates it (an ``Error`` or ``not recognized`` reply)
-        returns False: there is no band to clear. Any other refusal, and a
+        returns False: there is no band to clear. With ``min_span_us`` any
+        refusal returns False, since firmware before 1.0.3 takes one value
+        (the caller decides whether that matters). Any other refusal, and a
         board that does not answer at all, raises RuntimeError.
         """
+        if min_span_us is not None:
+            return self._set_track_cfg_sub_mode(
+                f"trackCfg impactFit {bins:g} {int(min_span_us):d}", refusal_ok=True
+            )
         return self._set_track_cfg_sub_mode(f"trackCfg impactFit {bins:g}", refusal_ok=bins == 0.0)
 
     def set_ball_snr(self, snr: float) -> bool:
