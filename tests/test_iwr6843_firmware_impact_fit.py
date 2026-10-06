@@ -283,6 +283,117 @@ def test_a_jittered_backswing_does_not_pass_the_floor_at_2_ms(lib):
     assert old.why == WHY["ok"] and old.speedMps > 17.0, "the four-point fit is what fired"
 
 
+# --- the club-in fit must span a minimum time (2026-10-06) ---------------------
+#
+# Replaying the bench's false fires (4 Oct TrackMan session, 3 Oct backswing
+# dumps) through the firmware: 7 of the 8 that went through the impact rules
+# fired on a club track three points old at 2 ms frames, 4 ms first to last,
+# 0-0.4 m short of the ball (the club at address), with a fitted speed of
+# 20-57 m/s. fitSpanUs had no older points to add and endMinMps's 20 m/s
+# floor passed them. Every range-rule fire on the labelled swings fitted
+# 6 ms or more.
+
+FIT_WHY_ORDER = (
+    "ok",
+    "missing",
+    "few_points",
+    "wrong_direction",
+    "speed_bounds",
+    "physics",
+    "nonfinite",
+    "dropped",
+    "uncertain",
+    "short_span",
+)
+
+
+def test_short_span_is_appended_so_the_older_codes_keep_their_numbers():
+    """The Pi decodes the result's why by number (shot_result._impact_fit)."""
+    assert fw.FIT_WHY_NAMES == FIT_WHY_ORDER
+
+
+def test_the_fit_name_table_matches_the_c(lib):
+    names = [
+        lib.l3_impact_fit_why_name(index).decode("ascii") for index in range(len(FIT_WHY_ORDER))
+    ]
+    assert tuple(names) == FIT_WHY_ORDER
+
+
+def test_the_club_in_fit_spans_5_5_ms_at_least_by_default(lib):
+    assert cfg(lib).minSpanUs == 5500
+
+
+def test_three_points_at_3_ms_still_fit(lib):
+    """6 ms first to last: 3 ms behaviour is unchanged."""
+    e = estimate(lib, CLUB_IN, line(30.0, CLUB_IN_T[-3:]))
+    assert e.points == 3 and e.why == WHY["ok"]
+
+
+def test_three_points_at_2_ms_are_too_short_to_judge(lib):
+    """4 ms first to last: a third of a bin of jitter is ~4 m/s here."""
+    e = estimate(lib, CLUB_IN, line(30.0, CLUB_IN_2MS_T[-3:]))
+    assert e.points == 3 and e.why == WHY["short_span"]
+
+
+def test_four_points_at_2_ms_fit(lib):
+    e = estimate(lib, CLUB_IN, line(30.0, CLUB_IN_2MS_T[-4:]), fitSpanUs=0)
+    assert e.points == 4 and e.why == WHY["ok"]
+
+
+def test_the_address_wobble_that_fired_the_bench_is_refused(lib):
+    """iwr6843_20261004_101032_133_070 (TrackMan: 0.72 s before impact): a new
+    club track 0.26, 0.23, 0.16 m short of the ball at 2 ms frames, fitted at
+    24.7 m/s, armed the end rule and fired at takeaway."""
+    samples = [(6_000.0, BALL_M - 0.26), (8_000.0, BALL_M - 0.23), (10_000.0, BALL_M - 0.16)]
+    assert estimate(lib, CLUB_IN, samples).why == WHY["short_span"]
+    old = estimate(lib, CLUB_IN, samples, minSpanUs=0)
+    assert old.why == WHY["ok"] and old.speedMps > 20.0, "the short fit is what fired"
+
+
+def test_min_span_zero_turns_the_gate_off(lib):
+    e = estimate(lib, CLUB_IN, line(30.0, CLUB_IN_2MS_T[-3:]), minSpanUs=0)
+    assert e.why == WHY["ok"]
+
+
+@pytest.mark.parametrize("which, speed", [(CLUB_OUT, 25.0), (BALL_OUT, 60.0)])
+def test_the_outs_are_not_held_to_the_span(lib, which, speed):
+    """A ball track after impact is short by nature; the gate is the trigger's."""
+    assert estimate(lib, which, line(speed, BALL_OUT_2MS_T[:3])).why == WHY["ok"]
+
+
+def test_a_span_exactly_at_the_minimum_fits(lib):
+    samples = line(30.0, (10_000, 12_750, 15_500))
+    assert estimate(lib, CLUB_IN, samples, fitSpanUs=0).why == WHY["ok"]
+
+
+def test_a_span_just_under_the_minimum_is_short(lib):
+    samples = line(30.0, (10_000, 12_749, 15_499))
+    assert estimate(lib, CLUB_IN, samples, fitSpanUs=0).why == WHY["short_span"]
+
+
+def test_the_span_is_wrap_safe_across_the_microsecond_rollover(lib):
+    """Timestamps are uint32 us; a fit across the wrap still measures 4 ms."""
+    base = 2**32 - 3_000
+    samples = [
+        (float((base + dt) % 2**32), BALL_M - 0.30 + 0.06 * i)
+        for i, dt in enumerate((0, 2_000, 4_000))
+    ]
+    assert estimate(lib, CLUB_IN, samples).why == WHY["short_span"]
+
+
+def test_points_at_one_time_stay_nonfinite_not_short(lib):
+    """The span check comes after the fit's own checks: these points do not
+    spread in time at all, which nonfinite already says."""
+    same = [(12_000.0, 1.6), (12_000.0, 1.7), (12_000.0, 1.8)]
+    assert estimate(lib, CLUB_IN, same).why == WHY["nonfinite"]
+
+
+def test_a_short_span_estimate_keeps_its_points_and_speed_for_diagnostics(lib):
+    e = estimate(lib, CLUB_IN, line(30.0, CLUB_IN_2MS_T[-3:]))
+    assert e.why == WHY["short_span"] and e.points == 3
+    assert e.speedMps == pytest.approx(30.0, rel=1e-3)
+
+
 def test_crawling_club_out_is_too_uncertain_to_time(lib):
     # After impact the club only slows and there is no speed floor but "moving
     # away"; at 3 m/s, though, a bin of quantisation is 4.5 ms, over the cap.

@@ -26,6 +26,10 @@ void l3_impact_fit_cfg_defaults(l3_impact_fit_cfg_t *cfg)
     /* 4 points span 9 ms at 3 ms frames; at 2 ms the same span takes 6. Under
      * 9 ms so a 3 ms frame's few-us jitter never adds a fifth point. */
     cfg->fitSpanUs = 8500U;
+    /* 3 points span 6 ms at 3 ms frames, so 3 ms behaviour is unchanged; at
+     * 2 ms the club-in fit needs 4. Every range-rule fire on the labelled
+     * swings fitted 6 ms or more; the bench's takeaway fires fitted 4 ms. */
+    cfg->minSpanUs = 5500U;
 }
 
 void l3_impact_fit_reset(l3_impact_fit_t *fit)
@@ -174,6 +178,14 @@ void l3_impact_fit_track(const l3_impact_fit_cfg_t *cfg, uint8_t which, l3_point
         out->why = L3_FIT_WHY_NONFINITE;
         return;
     }
+    /* Club in: a fit over too short a time is all range jitter, whatever
+     * speed it reads (l3_impact_fit_cfg_t minSpanUs). point is the newest. */
+    if (which == L3_FIT_CLUB_IN && cfg->minSpanUs > 0U &&
+        (uint32_t)(point.timestampUs - firstUs) < cfg->minSpanUs) {
+        out->speedMps = str / stt;  /* kept for diagnostics, as uncertain keeps its */
+        out->why = L3_FIT_WHY_SHORT_SPAN;
+        return;
+    }
     v = str / stt;
     for (i = 0U; i < n; i++) {
         float e = r[i] - (rMean + v * (t[i] - tMean));
@@ -221,7 +233,7 @@ void l3_impact_fit_track(const l3_impact_fit_cfg_t *cfg, uint8_t which, l3_point
 
 static const char *const kWhyNames[L3_FIT_WHY_COUNT] = {
     "ok", "missing", "few_points", "wrong_direction", "speed_bounds", "physics", "nonfinite",
-    "dropped", "uncertain"
+    "dropped", "uncertain", "short_span"
 };
 static const char *const kVerdictNames[L3_FIT_VERDICT_COUNT] = {
     "none", "single_track", "consistent", "inconsistent"

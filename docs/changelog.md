@@ -35,6 +35,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`--iwr6843-onboard-metrics`.** The firmware's metrics always apply now.
 
 ### Fixed
+- **The IWR6843 self-trigger no longer fires at takeaway on a club at address.**
+  At 2 ms frames a new club track's three points span only 4 ms, and range
+  jitter alone fitted them at 20-57 m/s, enough for the impact rules to fire
+  0.5-0.8 s before impact. The club-in fit must now span at least 5.5 ms
+  (`minSpanUs`; a refused fit reads `short_span`). Replayed, this stops 6 of
+  the 8 bench false fires the impact rules reproduce and changes nothing at
+  3 ms frames. The END rule also needs a downswing speed (20 m/s) and a point
+  short of the ball (merged from `feat/iwr-calcs`). Both take a firmware
+  rebuild to reach the board.
 - **IWR6843 enclosure depth is 30 mm, not 0.30 m.** `ARRAY_DEPTH_M` is added to a tape reading from the enclosure front. 0.30 m put the tee about six bins too far: a 1.7 m setting watched 2.0 m. The stock self-trigger bin is now 32 (was 38).
 
 ### Added

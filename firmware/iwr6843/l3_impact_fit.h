@@ -32,6 +32,7 @@ enum {
     L3_FIT_WHY_NONFINITE,        /* times do not spread, or the fit overflowed */
     L3_FIT_WHY_DROPPED,          /* the outlier of three */
     L3_FIT_WHY_UNCERTAIN,        /* sigma over maxSigmaUs: too loose to place impact */
+    L3_FIT_WHY_SHORT_SPAN,       /* club in spans under minSpanUs: too short to judge */
     L3_FIT_WHY_COUNT
 };
 
@@ -68,6 +69,13 @@ typedef struct {
      * standing return (20260927_144341: the ball stuck at 52.6). 0 keeps
      * fitPoints alone. */
     uint32_t fitSpanUs;
+    /* Club in only (the self-trigger): a fit whose points span less than this
+     * first to last is short_span, judged neither for speed nor for impact.
+     * At 2 ms a new track's three points span 4 ms, and range jitter alone
+     * reads 20-57 m/s: on the bench (2026-10) such tracks, the club at
+     * address, fired the trigger at takeaway past both clubMinMps and the
+     * impact rule's endMinMps. 0 turns it off. */
+    uint32_t minSpanUs;
 } l3_impact_fit_cfg_t;
 
 typedef struct {

@@ -169,6 +169,20 @@ every approach that armed it on the labelled swings was 20.6 m/s or faster.
 A point past the ball's range never arms it. `triggerLog track` prints which rule
 fired (`cause=crossing` or `cause=end`) and whether the end rule is armed.
 
+Both rules need a usable club-in estimate, and that estimate must span time,
+not just points. The club-in fit takes `fitPoints` (4), then older points
+until it spans `fitSpanUs` (8.5 ms), so at 2 ms frames it fits 6 points where
+3 ms fits 4. A fit whose points still span under `minSpanUs` (5.5 ms) is
+`short_span` and arms nothing: at 2 ms a new track's three points span 4 ms,
+and a third of a bin of range jitter then reads about 4 m/s. Replaying the
+bench's takeaway fires (2026-10) showed 7 of the 8 that went through these
+rules came from just such a track, the club at address 0-0.4 m short of the
+ball fitted at 20-57 m/s, past both `clubMinMps` and `endMinMps`. Every
+range-rule fire on the labelled swings fitted 6 ms or more, and 3 points at
+3 ms frames span 6 ms, so 3 ms behaviour is unchanged. Both values are
+compile-time defaults (`l3_impact_fit_cfg_defaults`); replays set them through
+the `fit` tunables, and 0 turns either off.
+
 When the club is not seen before launch (the early 2026-08-09 captures lose it
 3-5 frames out), neither rule fires, so the ball leaving is a fallback
 (`l3_leave.c`, tee band on only). Before impact the band hides the ball; the

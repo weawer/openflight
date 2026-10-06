@@ -106,7 +106,7 @@ def test_range_impact_long_past_is_passed_not_fired(lib):
     assert impact.why == WHY["passed"]
 
 
-@pytest.mark.parametrize("why", ["missing", "few_points", "speed_bounds"])
+@pytest.mark.parametrize("why", ["missing", "few_points", "speed_bounds", "short_span"])
 def test_range_impact_without_a_club_in_estimate_does_not_fire(lib, why):
     impact = range_impact(lib)
     assert update(lib, impact, club_in_estimate(30_000, why), 29_000) == 0

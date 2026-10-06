@@ -108,6 +108,7 @@ FIT_WHY_NAMES = (
     "nonfinite",
     "dropped",
     "uncertain",
+    "short_span",
 )
 FIT_VERDICT_NAMES = ("none", "single_track", "consistent", "inconsistent")
 # The whys whose estimate keeps its time and sigma (l3_impact_fit_format prints them).
@@ -1022,6 +1023,7 @@ class ImpactFitCfg(ctypes.Structure):
         ("bandSearchBins", ctypes.c_float),
         ("clutterSigmas", ctypes.c_float),
         ("fitSpanUs", ctypes.c_uint32),
+        ("minSpanUs", ctypes.c_uint32),
     ]
 
 
