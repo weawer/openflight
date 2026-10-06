@@ -1,0 +1,94 @@
+{
+  "name": "OpenFlight IWR6843LEVM calibration - Robinante unit - PROVISIONAL (TrackMan 2026-10-04)",
+  "scope": "PROVISIONAL. Only tilt_deg differs from config/iwr6843_calibration_reference.json. It is an EFFECTIVE tilt fitted to 7 TrackMan shots (one session); it may be absorbing per-board element-phase error. Replace with a measured tilt plus a per-board corner-reflector solve when available. Horizontal launch is NOT calibrated by this file.",
+  "date": "2026-10-04",
+  "convention": "apply to x8[::-1] (physical order); x8_cal = x8_flipped * exp(-1j*phase_rad) / gain",
+  "range_scale": 1.0000803901783588,
+  "range_offset_m": 0.0658055136060177,
+  "range_bias_const_m": 0.06600698211167506,
+  "elem_phase_rad": [
+    0.2778072807709608,
+    0.37860061155408375,
+    0.4261360708353723,
+    0.31214846813374375,
+    -0.4272771170028819,
+    -0.3218347485541023,
+    -0.243035692050102,
+    -0.359058712099395
+  ],
+  "elem_gain": [
+    0.9503119735500952,
+    0.8619496796511844,
+    0.9948198803070384,
+    1.1254193596708486,
+    1.0141238079661876,
+    0.9154894053354172,
+    1.044647423117734,
+    1.0932384704014946
+  ],
+  "tilt_deg": 4.75,
+  "radar_height_m": 0.15239999999999998,
+  "positions": [
+    {
+      "files": [
+        "clap_031.l3dump",
+        "clap_032.l3dump"
+      ],
+      "tape_m": 1.524,
+      "height_m": 0.4699
+    },
+    {
+      "files": [
+        "clap_038.l3dump",
+        "clap_039.l3dump"
+      ],
+      "tape_m": 2.4383999999999997,
+      "height_m": 0.8128
+    },
+    {
+      "files": [
+        "clap_045.l3dump",
+        "clap_046.l3dump"
+      ],
+      "tape_m": 3.556,
+      "height_m": 0.30479999999999996
+    }
+  ],
+  "provisional": {
+    "based_on": "config/iwr6843_calibration_reference.json (2026-07-12); elem_phase_rad, elem_gain, range_* and radar_height_m copied unchanged",
+    "changed": {
+      "tilt_deg": {
+        "from": 10.0,
+        "to": 4.75
+      }
+    },
+    "fit_data": "session 20261004_095102 vs TrackMan; 7 captures with a real ball track (TM 30, 38, 45, 46, 47, 52, 54); see trackman_openflight_aligned.csv",
+    "fit_method": "offline LCMF-v1 replay of the saved l3dumps, tilt swept 0-12 deg in 0.25 deg steps, minimum mean |IWR VLA - TrackMan VLA| with all 7 accepted",
+    "geometry_used": {
+      "tee_from_front_m": 1.575,
+      "net_from_front_m": 4.6,
+      "ball_height_m": 0.04,
+      "radar_height_m": 0.1524,
+      "tx_order": "normal",
+      "tdm_sign_policy": "positive",
+      "cfg": "iwr6843_l3dump_wide_24f2ms_53bin_iq16_window_hann.cfg"
+    },
+    "vla_error_deg": {
+      "tilt_10_mae": 4.71,
+      "tilt_10_bias": 4.61,
+      "tilt_4.75_mae": 1.48,
+      "tilt_4.75_bias": 0.99,
+      "leave_one_out_mae": 1.73,
+      "leave_one_out_tilt_range": [
+        4.25,
+        4.75
+      ]
+    },
+    "caveats": [
+      "7 shots, one session, one golfer; 5 irons (TrackMan VLA 17-19 deg) and 2 low 5-woods (2.4 and 3.2 deg).",
+      "Per-shot error vs tilt is non-monotonic (estimator mode switching); the 4.25-5.0 deg region is the most stable.",
+      "tee and tilt were never physically measured; tee was the 1.575 m default.",
+      "horizontal_phase_reference_rad: not fitted. In these 7 shots TrackMan HLA and VLA correlate at 0.92, so horizontal phase cannot be separated from launch height; no reference under the repo sign convention fits (leave-one-out MAE ~15 deg)."
+    ]
+  }
+}
