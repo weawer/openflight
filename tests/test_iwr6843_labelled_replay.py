@@ -11,16 +11,20 @@ baseline. To accept a deliberate change run
 from __future__ import annotations
 
 import functools
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 import pytest
 
-from openflight.iwr6843 import firmware_host as fw, firmware_replay as fr, label_scoring as ls
+from openflight.iwr6843 import (
+    firmware_host as fw,
+    firmware_replay as fr,
+    label_scoring as ls,
+    trigger_eval as te,
+)
 from openflight.iwr6843.dump import parse_dump
 from openflight.iwr6843.monitor import SELF_TRIGGER_TEE_LEAD_BINS
-from openflight.iwr6843.self_trigger import FIRMWARE_TRIGGER_DEFAULT_SNR, TEE_BAND_DEFAULT_BINS
 
 needs_compiler = pytest.mark.skipif(
     fw.host_compiler() is None, reason="no C compiler for the firmware modules"
@@ -61,18 +65,8 @@ LATE_FRAMES = 2
 
 def _kiosk_config(config: fr.ReplayConfig, ball_bin: int) -> fr.ReplayConfig:
     """What the kiosk sends for a ball at ``ball_bin``: ``triggerCfg`` aimed
-    SELF_TRIGGER_TEE_LEAD_BINS short of it at the default snr, the default tee
-    band, no locked-ball destination and no manifest overrides; nothing forces
-    impact, so the self-trigger alone decides when the capture freezes."""
-    return replace(
-        config,
-        tee_bin=ball_bin - SELF_TRIGGER_TEE_LEAD_BINS,
-        dest_bin=None,
-        snr=FIRMWARE_TRIGGER_DEFAULT_SNR,
-        band_bins=TEE_BAND_DEFAULT_BINS,
-        post_from_frame=None,
-        overrides={},
-    )
+    SELF_TRIGGER_TEE_LEAD_BINS short of it (trigger_eval.kiosk_config)."""
+    return te.kiosk_config(ball_bin - SELF_TRIGGER_TEE_LEAD_BINS, config)
 
 
 @dataclass(frozen=True)

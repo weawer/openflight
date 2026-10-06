@@ -183,6 +183,17 @@ range-rule fire on the labelled swings fitted 6 ms or more, and 3 points at
 compile-time defaults (`l3_impact_fit_cfg_defaults`); replays set them through
 the `fit` tunables, and 0 turns either off.
 
+To judge a trigger change on recorded captures before flashing it, compare
+builds: `uv run python scripts/analysis/compare_trigger_builds.py 4c86e6f HEAD`
+replays the labelled swings and the bench sessions (`trigger_eval.BENCH_SETS`)
+through each ref's own firmware C and lists every capture whose fire changed.
+`uv run python -m openflight.iwr6843.trigger_eval` prints one build's fires
+with the club-in fit and approach behind each. A dump keeps only 18 ms before
+its freeze at the 2 ms profile, so a fire that needed more track history does
+not reproduce: a replay that fires is evidence, one that does not is not.
+`tests/test_iwr6843_trigger_eval.py` holds the bench's stopped false fires,
+the ones still open (strict xfails) and the on-time captures to the firmware.
+
 When the club is not seen before launch (the early 2026-08-09 captures lose it
 3-5 frames out), neither rule fires, so the ball leaving is a fallback
 (`l3_leave.c`, tee band on only). Before impact the band hides the ball; the

@@ -47,6 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **IWR6843 enclosure depth is 30 mm, not 0.30 m.** `ARRAY_DEPTH_M` is added to a tape reading from the enclosure front. 0.30 m put the tee about six bins too far: a 1.7 m setting watched 2.0 m. The stock self-trigger bin is now 32 (was 38).
 
 ### Added
+- **`scripts/analysis/compare_trigger_builds.py`** replays the labelled swings
+  and the 2026-10 bench sessions through the IWR6843 self-trigger of several
+  git refs and lists every capture whose fire changed
+  (`openflight.iwr6843.trigger_eval` evaluates one build).
+
 - **IWR6843 trajectory reconstruction.** The ball's direction is now fitted
   on the board at RESULT from the departing track, anchored at the tee, and
   reported with a reason; an uncertainty gate withholds HLA/VLA when the
