@@ -78,9 +78,48 @@ def test_bump_rejects_an_unknown_part():
         SemVer(1, 2, 3).bump("build")
 
 
+# --- the fork tag (2026-10-13) -------------------------------------------------
+#
+# Two different images were both released as 1.0.3: Cormac's feat/iwr-calcs
+# build (4e4e9c5d94b7, the one on the 2026-10-12 TrackMan bench) and this
+# branch's, with the club-in span gate. This branch's versions carry ".j".
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [("1.0.3.j", SemVer(1, 0, 3, "j")), ("2.10.0.jx", SemVer(2, 10, 0, "jx"))],
+)
+def test_semver_parses_a_fork_tag(text, expected):
+    assert SemVer.parse(text) == expected
+    assert str(expected) == text
+
+
+@pytest.mark.parametrize("text", ["1.0.3.", "1.0.3.J", "1.0.3.j1", "1.0.3-j", "1.0.3.j.k"])
+def test_a_fork_tag_is_lowercase_letters_only(text):
+    with pytest.raises(ValueError, match="MAJOR.MINOR.PATCH"):
+        SemVer.parse(text)
+
+
+def test_a_tagged_version_is_not_the_untagged_one():
+    assert SemVer.parse("1.0.3.j") != SemVer.parse("1.0.3")
+
+
+@pytest.mark.parametrize(
+    "part,expected",
+    [("patch", "1.0.4.j"), ("minor", "1.1.0.j"), ("major", "2.0.0.j")],
+)
+def test_bump_keeps_the_fork_tag(part, expected):
+    assert str(SemVer(1, 0, 3, "j").bump(part)) == expected
+
+
+def test_this_branchs_versions_carry_the_j_tag():
+    assert read_release_version().tag == "j"
+
+
 def test_semver_orders_numerically_not_lexically():
     assert SemVer.parse("1.10.0") > SemVer.parse("1.9.9")
     assert SemVer.parse("2.0.0") > SemVer.parse("1.99.99")
+    assert SemVer.parse("1.0.10.j") > SemVer.parse("1.0.9.j")
 
 
 # --- firmware/VERSION --------------------------------------------------------
@@ -99,6 +138,16 @@ def test_bump_rewrites_the_version_file(tmp_path):
 
     assert (old, new) == (SemVer(1, 2, 3), SemVer(1, 3, 0))
     assert path.read_text(encoding="utf-8") == "1.3.0\n"
+
+
+def test_bump_rewrites_a_tagged_version_file(tmp_path):
+    path = tmp_path / "VERSION"
+    path.write_text("1.0.3.j\n", encoding="utf-8")
+
+    old, new = bump_release_version("patch", path)
+
+    assert (str(old), str(new)) == ("1.0.3.j", "1.0.4.j")
+    assert path.read_text(encoding="utf-8") == "1.0.4.j\n"
 
 
 def test_bump_leaves_a_malformed_version_file_untouched(tmp_path):
@@ -463,6 +512,23 @@ def test_check_version_accepts_the_repository_version(tmp_path):
 @needs_make
 @pytest.mark.parametrize("bad", ["1.0", "v1.0.0", "1.0.0-rc1", "01.0.0"])
 def test_check_version_rejects_a_malformed_version(tmp_path, bad):
+    result = _make("check-version", f"RELEASE_DIR={tmp_path}", f"FW_VERSION={bad}")
+
+    assert result.returncode != 0
+    assert "must be MAJOR.MINOR.PATCH" in result.stdout
+
+
+@needs_make
+def test_check_version_accepts_a_fork_tag_and_names_the_release_after_it(tmp_path):
+    result = _make("check-version", f"RELEASE_DIR={tmp_path}", "FW_VERSION=1.0.3.j")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "openflight_iwr6843_v1.0.3.j.bin" in result.stdout
+
+
+@needs_make
+@pytest.mark.parametrize("bad", ["1.0.3.J", "1.0.3.j1", "1.0.3.", "1.0.3.0"])
+def test_check_version_rejects_a_malformed_fork_tag(tmp_path, bad):
     result = _make("check-version", f"RELEASE_DIR={tmp_path}", f"FW_VERSION={bad}")
 
     assert result.returncode != 0

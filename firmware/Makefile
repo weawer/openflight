@@ -88,8 +88,8 @@ help:
 # exists: every shipped image must carry a version no other image has.
 check-version:
 	@set -eu; \
-	if ! printf '%s\n' "$(FW_VERSION)" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$$'; then \
-		echo "ERROR: firmware/VERSION must be MAJOR.MINOR.PATCH, got '$(FW_VERSION)'."; \
+	if ! printf '%s\n' "$(FW_VERSION)" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(\.[a-z]+)?$$'; then \
+		echo "ERROR: firmware/VERSION must be MAJOR.MINOR.PATCH[.tag] (tag: lowercase letters), got '$(FW_VERSION)'."; \
 		exit 1; \
 	fi; \
 	if [ -e "$(RELEASE_DIR)/$(RELEASE_NAME)" ] && [ "$(ALLOW_OVERWRITE)" != "1" ]; then \

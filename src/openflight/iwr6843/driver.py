@@ -635,9 +635,10 @@ class IWR6843Radar:
         Returns True when the board acknowledged it. Clearing the band (0) on
         firmware that predates it (an ``Error`` or ``not recognized`` reply)
         returns False: there is no band to clear. With ``min_span_us`` any
-        refusal returns False, since firmware before 1.0.3 takes one value
-        (the caller decides whether that matters). Any other refusal, and a
-        board that does not answer at all, raises RuntimeError.
+        refusal returns False, since firmware without the span gate (before
+        this branch's 1.0.3.j) takes one value; the caller decides whether
+        that matters. Any other refusal, and a board that does not answer at
+        all, raises RuntimeError.
         """
         if min_span_us is not None:
             return self._set_track_cfg_sub_mode(

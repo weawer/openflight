@@ -48,10 +48,11 @@ _STATS_LATCHED = re.compile(r"\blatched=(\d+)")
 TEE_BAND_MAX_BINS = 64.0
 # The club-in fit's span floor (l3_impact_fit_cfg_defaults minSpanUs), the
 # second value of "trackCfg impactFit", and its limit there
-# (L3_IMPACT_FIT_MAX_MIN_SPAN_US). Firmware 1.0.3 and later.
+# (L3_IMPACT_FIT_MAX_MIN_SPAN_US). This branch's firmware from 1.0.3.j: the
+# 1.0.3 released from feat/iwr-calcs has no span gate.
 CLUB_IN_MIN_SPAN_DEFAULT_US = 5500
 CLUB_IN_MIN_SPAN_MAX_US = 12000
-CLUB_IN_MIN_SPAN_FIRMWARE = "1.0.3"
+CLUB_IN_MIN_SPAN_FIRMWARE = "1.0.3.j"
 
 
 @dataclass(frozen=True)

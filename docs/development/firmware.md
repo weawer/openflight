@@ -186,7 +186,8 @@ optional second value of `trackCfg impactFit <bandBins> [minSpanUs]` (whole
 microseconds, 0..12000; left out it is kept), which the Pi sends at every
 start: the firmware default unless `--iwr6843-min-span-us` sets it, so the
 gate can be turned off (`0`) or moved at the range without a reflash.
-Firmware before 1.0.3 refuses the second value; the Pi then sends the band
+Firmware without the gate (before 1.0.3.j; the 1.0.3 released from
+`feat/iwr-calcs` has none) refuses the second value; the Pi then sends the band
 alone, or stops if a span was asked for. Replays set both through the `fit`
 tunables, and 0 turns either off.
 
@@ -1284,7 +1285,8 @@ rsync -av \
 ## Versioning Releases
 
 Firmware releases use semantic versioning. `firmware/VERSION` holds
-`MAJOR.MINOR.PATCH` and is the single source of truth: the build stamps it into
+`MAJOR.MINOR.PATCH`, with a fork tag on this branch (`1.0.3.j`), and is the
+single source of truth: the build stamps it into
 the image, names the release file after it, and the flashed board reports it
 through the CLI `stats version` sub-mode.
 
@@ -1303,6 +1305,12 @@ git commit -am "firmware: release v$(cat firmware/VERSION)"
 make -C firmware docker-build                # or build-native
 git add firmware/releases/ && git commit -m "firmware: add v$(cat firmware/VERSION) image"
 ```
+
+Two forks once released different images as 1.0.3 (`feat/iwr-calcs`'s,
+git `4e4e9c5d94b7`, and this branch's with the club-in span gate), so this
+branch's versions end in `.j`: lowercase letters after the patch number name
+the fork, a bump keeps them, and the release file takes them
+(`openflight_iwr6843_v1.0.3.j.bin`). They never mark a pre-release.
 
 The build refuses a malformed `VERSION`, and refuses to overwrite a release
 file that already exists, so two different images never share a version. Pass

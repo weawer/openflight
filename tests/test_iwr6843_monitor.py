@@ -19,6 +19,7 @@ from openflight.iwr6843.dump import pack_dump
 from openflight.iwr6843.firmware_version import FirmwareVersion
 from openflight.iwr6843.monitor import (
     CLUB_IN_MIN_SPAN_DEFAULT_US,
+    CLUB_IN_MIN_SPAN_FIRMWARE,
     DEFAULT_IWR6843_CONFIG,
     DETECT_CORE,
     MSS_SCORED_CAPTURE_FORMATS,
@@ -1557,6 +1558,11 @@ def test_tee_band_is_on_at_the_firmware_default_width_by_default(tmp_path):
 # --- the club-in fit's span floor (trackCfg impactFit's second value) ---------
 
 
+def test_the_min_span_names_this_branchs_first_firmware_with_it():
+    """Cormac's 1.0.3 (feat/iwr-calcs) has no span gate; this branch's 1.0.3.j does."""
+    assert CLUB_IN_MIN_SPAN_FIRMWARE == "1.0.3.j"
+
+
 def test_the_min_span_is_the_firmware_default_unless_set(tmp_path):
     """The firmware keeps it across sensorStart, so it is sent at every start:
     a run after one that turned the gate off must turn it back on."""
@@ -1609,7 +1615,7 @@ def test_a_requested_min_span_on_older_firmware_is_an_error(tmp_path):
     radar = TeeBandRadar(_raw_dump(), span_supported=False)
     monitor = _tee_band_monitor(tmp_path, radar, club_in_min_span_us=0)
 
-    with pytest.raises(RuntimeError, match="minSpanUs.*1.0.3"):
+    with pytest.raises(RuntimeError, match=r"minSpanUs.*1\.0\.3\.j"):
         monitor.start(armed=False)
 
     assert radar.shutdown_events[0] == "sensorStop"

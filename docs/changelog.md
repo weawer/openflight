@@ -47,6 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   span at runtime through `trackCfg impactFit <band> <minSpanUs>`, so the
   gate can be A/B tested without a reflash; the Pi sends the firmware
   default at every start when it is not given.
+- **This branch's firmware versions end in `.j` (`1.0.3.j`).** `feat/iwr-calcs`
+  also released a 1.0.3, without the span gate (the image on the 2026-10-12
+  TrackMan bench), so the two could not be told apart from `stats version`.
+  `firmware/VERSION` and `make -C firmware check-version` take a fork tag of
+  lowercase letters after the patch number; `bump-version` keeps it.
 - **IWR6843 enclosure depth is 30 mm, not 0.30 m.** `ARRAY_DEPTH_M` is added to a tape reading from the enclosure front. 0.30 m put the tee about six bins too far: a 1.7 m setting watched 2.0 m. The stock self-trigger bin is now 32 (was 38).
 
 ### Added
